@@ -1,0 +1,58 @@
+import { ArenaMatchup } from "../types";
+
+export const arenaMatchups: ArenaMatchup[] = [
+  {
+    id: "am-1",
+    hypothesisA: "h-1",
+    hypothesisB: "h-4",
+    totalVotes: 342,
+    votesA: 189,
+    votesB: 127,
+    votesTie: 26,
+  },
+  {
+    id: "am-2",
+    hypothesisA: "h-3",
+    hypothesisB: "h-7",
+    totalVotes: 215,
+    votesA: 134,
+    votesB: 62,
+    votesTie: 19,
+  },
+  {
+    id: "am-3",
+    hypothesisA: "h-5",
+    hypothesisB: "h-8",
+    totalVotes: 178,
+    votesA: 95,
+    votesB: 68,
+    votesTie: 15,
+  },
+  {
+    id: "am-4",
+    hypothesisA: "h-2",
+    hypothesisB: "h-6",
+    totalVotes: 256,
+    votesA: 167,
+    votesB: 72,
+    votesTie: 17,
+  },
+  {
+    id: "am-5",
+    hypothesisA: "h-12",
+    hypothesisB: "h-11",
+    totalVotes: 198,
+    votesA: 121,
+    votesB: 58,
+    votesTie: 19,
+  },
+  {
+    id: "am-6",
+    hypothesisA: "h-9",
+    hypothesisB: "h-10",
+    totalVotes: 143,
+    votesA: 78,
+    votesB: 51,
+    votesTie: 14,
+  },
+];
