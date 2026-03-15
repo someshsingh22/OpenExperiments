@@ -62,7 +62,10 @@ export default function CompleteProfilePage() {
       });
 
       if (!res.ok) {
-        const data = await res.json() as { error?: string; errors?: { field: string; message: string }[] };
+        const data = (await res.json()) as {
+          error?: string;
+          errors?: { field: string; message: string }[];
+        };
         if (data.errors?.length) {
           setError(data.errors.map((e) => e.message).join(". "));
         } else {
@@ -108,16 +111,12 @@ export default function CompleteProfilePage() {
             className={inputClass}
             required
           />
-          <p className="mt-1 text-xs text-stone-400">
-            Displayed on your comments and hypotheses.
-          </p>
+          <p className="mt-1 text-xs text-stone-400">Displayed on your comments and hypotheses.</p>
         </div>
 
         {/* Contact email — shown but read-only */}
         <div>
-          <label className="mb-1.5 block text-sm font-semibold text-stone-700">
-            Contact email
-          </label>
+          <label className="mb-1.5 block text-sm font-semibold text-stone-700">Contact email</label>
           <input
             type="email"
             value={user.email || ""}
@@ -131,9 +130,7 @@ export default function CompleteProfilePage() {
 
         {/* Position */}
         <div>
-          <label className="mb-1.5 block text-sm font-semibold text-stone-700">
-            Position
-          </label>
+          <label className="mb-1.5 block text-sm font-semibold text-stone-700">Position</label>
           <input
             type="text"
             value={position}
@@ -176,9 +173,7 @@ export default function CompleteProfilePage() {
 
         {/* Bio */}
         <div>
-          <label className="mb-1.5 block text-sm font-semibold text-stone-700">
-            Bio
-          </label>
+          <label className="mb-1.5 block text-sm font-semibold text-stone-700">Bio</label>
           <textarea
             value={bio}
             onChange={(e) => setBio(e.target.value)}
@@ -192,9 +187,7 @@ export default function CompleteProfilePage() {
 
         {/* ORCID */}
         <div>
-          <label className="mb-1.5 block text-sm font-semibold text-stone-700">
-            ORCID
-          </label>
+          <label className="mb-1.5 block text-sm font-semibold text-stone-700">ORCID</label>
           <input
             type="text"
             value={orcid}

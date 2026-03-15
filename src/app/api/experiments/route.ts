@@ -16,15 +16,30 @@ function buildResultsResponse(result: {
 }) {
   const obj: Record<string, unknown> = {};
   let has = false;
-  if (result.pValue) { obj.pValue = result.pValue; has = true; }
-  if (result.effectSize) { obj.effectSize = result.effectSize; has = true; }
-  if (result.sampleSize) { obj.sampleSize = result.sampleSize; has = true; }
+  if (result.pValue) {
+    obj.pValue = result.pValue;
+    has = true;
+  }
+  if (result.effectSize) {
+    obj.effectSize = result.effectSize;
+    has = true;
+  }
+  if (result.sampleSize) {
+    obj.sampleSize = result.sampleSize;
+    has = true;
+  }
   if (result.confidenceIntervalLow || result.confidenceIntervalHigh) {
     obj.confidenceInterval = [result.confidenceIntervalLow, result.confidenceIntervalHigh];
     has = true;
   }
-  if (result.summary) { obj.summary = result.summary; has = true; }
-  if (result.uplift) { obj.uplift = result.uplift; has = true; }
+  if (result.summary) {
+    obj.summary = result.summary;
+    has = true;
+  }
+  if (result.uplift) {
+    obj.uplift = result.uplift;
+    has = true;
+  }
   return has ? obj : undefined;
 }
 
@@ -74,7 +89,7 @@ export async function GET(request: Request) {
         version: e.version,
         results: result ? buildResultsResponse(result) : undefined,
       };
-    })
+    }),
   );
 
   return Response.json({ data });
@@ -106,19 +121,31 @@ export async function POST(request: Request) {
   }
 
   if (!datasetId && !datasetName) {
-    return Response.json({ error: "Either datasetId or datasetName must be provided" }, { status: 400 });
+    return Response.json(
+      { error: "Either datasetId or datasetName must be provided" },
+      { status: 400 },
+    );
   }
 
   // Status-conditional validation
   if ((status === "running" || status === "completed") && !methodology) {
-    return Response.json({ error: "Methodology is required for running/completed experiments" }, { status: 400 });
+    return Response.json(
+      { error: "Methodology is required for running/completed experiments" },
+      { status: 400 },
+    );
   }
   if (status === "completed" && !analysisPlan) {
-    return Response.json({ error: "Analysis plan is required for completed experiments" }, { status: 400 });
+    return Response.json(
+      { error: "Analysis plan is required for completed experiments" },
+      { status: 400 },
+    );
   }
   const r = results as Record<string, unknown> | undefined;
   if (status === "completed" && (!r || !r.summary)) {
-    return Response.json({ error: "Results summary is required for completed experiments" }, { status: 400 });
+    return Response.json(
+      { error: "Results summary is required for completed experiments" },
+      { status: 400 },
+    );
   }
 
   const id = crypto.randomUUID();
@@ -144,7 +171,8 @@ export async function POST(request: Request) {
   });
 
   // Handle results for completed experiments
-  const hasResults = r && (r.summary || r.pValue != null || r.effectSize != null || r.sampleSize != null);
+  const hasResults =
+    r && (r.summary || r.pValue != null || r.effectSize != null || r.sampleSize != null);
   if (hasResults) {
     await db.insert(experimentResults).values({
       experimentId: id,
@@ -172,7 +200,7 @@ export async function POST(request: Request) {
     sampleSize: hasResults ? ((r.sampleSize as number) ?? null) : null,
     confidenceIntervalLow: hasResults ? ((r.confidenceIntervalLow as number) ?? null) : null,
     confidenceIntervalHigh: hasResults ? ((r.confidenceIntervalHigh as number) ?? null) : null,
-    summary: hasResults ? ((r.summary as string) || null) : null,
+    summary: hasResults ? (r.summary as string) || null : null,
     changeSummary: "Initial submission",
     createdAt: now,
   });

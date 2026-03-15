@@ -1,7 +1,7 @@
 export const runtime = "edge";
 
 import { getDB } from "@/db";
-import { comments, hypotheses, users } from "@/db/schema";
+import { comments, users } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { getSession, requireSession } from "@/lib/auth";
 
@@ -38,9 +38,7 @@ export async function GET(request: Request) {
       doi: c.doi,
       createdAt: new Date(c.createdAt * 1000).toISOString().split("T")[0],
       parentId: c.parentId,
-      author: c.authorId
-        ? { id: c.authorId, name: c.authorName, avatarUrl: c.authorAvatar }
-        : null,
+      author: c.authorId ? { id: c.authorId, name: c.authorName, avatarUrl: c.authorAvatar } : null,
     })),
   });
 }
@@ -77,18 +75,21 @@ export async function POST(request: Request) {
 
   // Increment comment count
   await db.run(
-    sql`UPDATE hypotheses SET comment_count = comment_count + 1, updated_at = ${now} WHERE id = ${hypothesisId}`
+    sql`UPDATE hypotheses SET comment_count = comment_count + 1, updated_at = ${now} WHERE id = ${hypothesisId}`,
   );
 
-  return Response.json({
-    data: {
-      id,
-      hypothesisId,
-      body: content,
-      doi: doi || null,
-      parentId: parentId || null,
-      createdAt: new Date(now * 1000).toISOString().split("T")[0],
-      author: { id: user!.id, name: user!.name, avatarUrl: user!.avatarUrl },
+  return Response.json(
+    {
+      data: {
+        id,
+        hypothesisId,
+        body: content,
+        doi: doi || null,
+        parentId: parentId || null,
+        createdAt: new Date(now * 1000).toISOString().split("T")[0],
+        author: { id: user!.id, name: user!.name, avatarUrl: user!.avatarUrl },
+      },
     },
-  }, { status: 201 });
+    { status: 201 },
+  );
 }

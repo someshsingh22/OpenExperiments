@@ -77,17 +77,11 @@ export default function ExperimentsPage() {
       </div>
 
       <section>
-        <h2 className="mb-6 text-xl font-semibold text-stone-900">
-          All Experiments
-        </h2>
+        <h2 className="mb-6 text-xl font-semibold text-stone-900">All Experiments</h2>
         {loading ? (
-          <div className="py-12 text-center text-sm text-stone-400">
-            Loading experiments...
-          </div>
+          <div className="py-12 text-center text-sm text-stone-400">Loading experiments...</div>
         ) : experiments.length === 0 ? (
-          <div className="py-12 text-center text-sm text-stone-400">
-            No experiments yet.
-          </div>
+          <div className="py-12 text-center text-sm text-stone-400">No experiments yet.</div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {experiments.map((exp) => (
@@ -110,10 +104,14 @@ function ExperimentCard({ experiment }: { experiment: Experiment }) {
       className="group block rounded-lg border border-stone-200 bg-white p-4 transition-all duration-300 hover:-translate-y-1 hover:border-stone-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)]"
     >
       <div className="mb-2.5 flex flex-wrap items-center gap-1.5">
-        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${typeMeta.cls}`}>
+        <span
+          className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${typeMeta.cls}`}
+        >
           {typeMeta.label}
         </span>
-        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${statusMeta.cls}`}>
+        <span
+          className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${statusMeta.cls}`}
+        >
           {statusMeta.label}
         </span>
       </div>
@@ -122,7 +120,7 @@ function ExperimentCard({ experiment }: { experiment: Experiment }) {
         {experiment.datasetName}
       </p>
       {experiment.methodology && (
-        <p className="mb-2.5 text-[13px] leading-relaxed text-stone-600 line-clamp-3">
+        <p className="mb-2.5 line-clamp-3 text-[13px] leading-relaxed text-stone-600">
           {experiment.methodology}
         </p>
       )}
@@ -140,24 +138,16 @@ function ExperimentCard({ experiment }: { experiment: Experiment }) {
         </div>
         <div className="flex items-center gap-2">
           {experiment.results?.pValue != null && (
-            <span className="font-mono tabular-nums">
-              p={experiment.results.pValue}
-            </span>
+            <span className="font-mono tabular-nums">p={experiment.results.pValue}</span>
           )}
-          {experiment.osfLink && (
-            <ExternalLink className="h-3 w-3" />
-          )}
+          {experiment.osfLink && <ExternalLink className="h-3 w-3" />}
         </div>
       </div>
     </Link>
   );
 }
 
-function ExperimentSubmitForm({
-  onSubmitted,
-}: {
-  onSubmitted: () => void;
-}) {
+function ExperimentSubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
   const { user, loading: authLoading, setShowAuthModal } = useAuth();
 
   const [problemStatements, setProblemStatements] = useState<ProblemStatement[]>([]);
@@ -239,11 +229,12 @@ function ExperimentSubmitForm({
         <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-teal-50">
           <Check className="h-5 w-5 text-teal-600" />
         </div>
-        <h2 className="mb-1 text-lg font-semibold text-stone-800">
-          Experiment submitted
-        </h2>
+        <h2 className="mb-1 text-lg font-semibold text-stone-800">Experiment submitted</h2>
         <p className="mb-5 text-sm text-stone-500">
-          Reference: <code className="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-xs text-stone-600">{submittedId}</code>
+          Reference:{" "}
+          <code className="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-xs text-stone-600">
+            {submittedId}
+          </code>
         </p>
         <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-center">
           <Link
@@ -272,16 +263,12 @@ function ExperimentSubmitForm({
     <section className="rounded-2xl border border-stone-200 bg-stone-50/50 p-8">
       <div className="mb-6 flex items-center gap-3">
         <FlaskConical className="h-6 w-6 text-stone-400" />
-        <h2 className="text-xl font-semibold text-stone-900">
-          Submit an Experiment
-        </h2>
+        <h2 className="text-xl font-semibold text-stone-900">Submit an Experiment</h2>
       </div>
 
       {authLoading ? null : !user ? (
-        <div className="text-center py-6">
-          <p className="text-sm text-stone-500 mb-4">
-            Sign in to submit an experiment.
-          </p>
+        <div className="py-6 text-center">
+          <p className="mb-4 text-sm text-stone-500">Sign in to submit an experiment.</p>
           <button
             onClick={() => setShowAuthModal(true)}
             className="rounded-md border border-stone-900 bg-stone-900 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-stone-800"
@@ -302,11 +289,9 @@ function ExperimentSubmitForm({
                 hypothesisId: selectedHypothesis,
                 problemStatementId: selectedPS || undefined,
                 type: studyType,
-                datasetId: datasetMode === "platform" && selectedDataset ? selectedDataset : undefined,
-                datasetName:
-                  datasetMode === "platform"
-                    ? ds?.name || ""
-                    : customDatasetName,
+                datasetId:
+                  datasetMode === "platform" && selectedDataset ? selectedDataset : undefined,
+                datasetName: datasetMode === "platform" ? ds?.name || "" : customDatasetName,
                 status,
                 methodology: methodology || undefined,
                 analysisPlan: analysisPlan || undefined,
@@ -352,7 +337,7 @@ function ExperimentSubmitForm({
                   </option>
                 ))}
               </select>
-              <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-300" />
+              <ChevronDown className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-stone-300" />
             </div>
           </div>
 
@@ -364,7 +349,7 @@ function ExperimentSubmitForm({
               </label>
               <Link
                 href="/submit"
-                className="text-[11px] font-medium text-stone-400 hover:text-stone-600 transition-colors"
+                className="text-[11px] font-medium text-stone-400 transition-colors hover:text-stone-600"
               >
                 Hypothesis not on OpenExperiments yet? Add here &rarr;
               </Link>
@@ -382,26 +367,22 @@ function ExperimentSubmitForm({
                 </option>
                 {hypotheses.map((h) => (
                   <option key={h.id} value={h.id}>
-                    {h.statement.length > 120
-                      ? h.statement.slice(0, 120) + "..."
-                      : h.statement}
+                    {h.statement.length > 120 ? h.statement.slice(0, 120) + "..." : h.statement}
                   </option>
                 ))}
               </select>
-              <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-300" />
+              <ChevronDown className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-stone-300" />
             </div>
           </div>
 
           {/* Study Type */}
           <div>
-            <label className="mb-1.5 block text-sm font-semibold text-stone-700">
-              Study Type
-            </label>
+            <label className="mb-1.5 block text-sm font-semibold text-stone-700">Study Type</label>
             <div className="flex flex-wrap gap-2">
               {EXP_TYPE_OPTIONS.map((opt) => (
                 <label
                   key={opt.value}
-                  className="flex items-center gap-2 rounded-md border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:border-stone-300 cursor-pointer"
+                  className="flex cursor-pointer items-center gap-2 rounded-md border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:border-stone-300"
                 >
                   <input
                     type="radio"
@@ -419,9 +400,7 @@ function ExperimentSubmitForm({
 
           {/* Dataset */}
           <div>
-            <label className="mb-1.5 block text-sm font-semibold text-stone-700">
-              Dataset
-            </label>
+            <label className="mb-1.5 block text-sm font-semibold text-stone-700">Dataset</label>
             <div className="mb-2 flex gap-2">
               <button
                 type="button"
@@ -461,7 +440,7 @@ function ExperimentSubmitForm({
                     </option>
                   ))}
                 </select>
-                <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-300" />
+                <ChevronDown className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-stone-300" />
               </div>
             ) : (
               <input
@@ -484,7 +463,7 @@ function ExperimentSubmitForm({
               {STATUS_OPTIONS.map((opt) => (
                 <label
                   key={opt.value}
-                  className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium cursor-pointer transition-colors ${
+                  className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
                     status === opt.value
                       ? "border-stone-900 bg-stone-900 text-white"
                       : "border-stone-200 bg-white text-stone-700 hover:border-stone-300"
@@ -506,7 +485,7 @@ function ExperimentSubmitForm({
 
           {/* Conditional fields based on status */}
           <div className="space-y-5 rounded-xl border border-stone-200 bg-white p-5">
-            <p className="text-xs font-medium uppercase tracking-wider text-stone-400">
+            <p className="text-xs font-medium tracking-wider text-stone-400 uppercase">
               {status === "planned" && "Planned Details"}
               {status === "running" && "Running Details"}
               {status === "completed" && "Completed Details"}
@@ -516,9 +495,11 @@ function ExperimentSubmitForm({
             <div>
               <label className="mb-1.5 block text-sm font-semibold text-stone-700">
                 Methodology
-                {methodologyRequired
-                  ? <span className="ml-1 text-red-400">*</span>
-                  : <span className="ml-1 font-normal text-stone-400">(optional)</span>}
+                {methodologyRequired ? (
+                  <span className="ml-1 text-red-400">*</span>
+                ) : (
+                  <span className="ml-1 font-normal text-stone-400">(optional)</span>
+                )}
               </label>
               <textarea
                 value={methodology}
@@ -535,9 +516,11 @@ function ExperimentSubmitForm({
               <div>
                 <label className="mb-1.5 block text-sm font-semibold text-stone-700">
                   Analysis Plan
-                  {analysisRequired
-                    ? <span className="ml-1 text-red-400">*</span>
-                    : <span className="ml-1 font-normal text-stone-400">(optional)</span>}
+                  {analysisRequired ? (
+                    <span className="ml-1 text-red-400">*</span>
+                  ) : (
+                    <span className="ml-1 font-normal text-stone-400">(optional)</span>
+                  )}
                 </label>
                 <textarea
                   value={analysisPlan}
@@ -570,71 +553,71 @@ function ExperimentSubmitForm({
                   <label className="mb-2 block text-sm font-semibold text-stone-700">
                     Key Metrics <span className="font-normal text-stone-400">(optional)</span>
                   </label>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <div>
-                    <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-stone-400">
-                      p-value
-                    </label>
-                    <input
-                      type="number"
-                      step="any"
-                      value={resPValue}
-                      onChange={(e) => setResPValue(e.target.value)}
-                      placeholder="0.002"
-                      className={metricInputClass}
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-stone-400">
-                      Effect Size
-                    </label>
-                    <input
-                      type="number"
-                      step="any"
-                      value={resEffectSize}
-                      onChange={(e) => setResEffectSize(e.target.value)}
-                      placeholder="0.33"
-                      className={metricInputClass}
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-stone-400">
-                      Sample Size
-                    </label>
-                    <input
-                      type="number"
-                      step="1"
-                      value={resSampleSize}
-                      onChange={(e) => setResSampleSize(e.target.value)}
-                      placeholder="2500"
-                      className={metricInputClass}
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-stone-400">
-                      95% CI
-                    </label>
-                    <div className="flex items-center gap-1">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div>
+                      <label className="mb-1 block text-[11px] font-medium tracking-wider text-stone-400 uppercase">
+                        p-value
+                      </label>
                       <input
                         type="number"
                         step="any"
-                        value={resCILow}
-                        onChange={(e) => setResCILow(e.target.value)}
-                        placeholder="0.18"
-                        className={metricInputClass}
-                      />
-                      <span className="text-stone-300">&ndash;</span>
-                      <input
-                        type="number"
-                        step="any"
-                        value={resCIHigh}
-                        onChange={(e) => setResCIHigh(e.target.value)}
-                        placeholder="0.48"
+                        value={resPValue}
+                        onChange={(e) => setResPValue(e.target.value)}
+                        placeholder="0.002"
                         className={metricInputClass}
                       />
                     </div>
+                    <div>
+                      <label className="mb-1 block text-[11px] font-medium tracking-wider text-stone-400 uppercase">
+                        Effect Size
+                      </label>
+                      <input
+                        type="number"
+                        step="any"
+                        value={resEffectSize}
+                        onChange={(e) => setResEffectSize(e.target.value)}
+                        placeholder="0.33"
+                        className={metricInputClass}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-[11px] font-medium tracking-wider text-stone-400 uppercase">
+                        Sample Size
+                      </label>
+                      <input
+                        type="number"
+                        step="1"
+                        value={resSampleSize}
+                        onChange={(e) => setResSampleSize(e.target.value)}
+                        placeholder="2500"
+                        className={metricInputClass}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-[11px] font-medium tracking-wider text-stone-400 uppercase">
+                        95% CI
+                      </label>
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          step="any"
+                          value={resCILow}
+                          onChange={(e) => setResCILow(e.target.value)}
+                          placeholder="0.18"
+                          className={metricInputClass}
+                        />
+                        <span className="text-stone-300">&ndash;</span>
+                        <input
+                          type="number"
+                          step="any"
+                          value={resCIHigh}
+                          onChange={(e) => setResCIHigh(e.target.value)}
+                          placeholder="0.48"
+                          className={metricInputClass}
+                        />
+                      </div>
+                    </div>
                   </div>
-                </div>
                 </div>
               </div>
             )}
@@ -643,7 +626,8 @@ function ExperimentSubmitForm({
           {/* OSF Link - always optional */}
           <div>
             <label className="mb-1.5 block text-sm font-semibold text-stone-700">
-              OSF Pre-registration Link <span className="font-normal text-stone-400">(optional)</span>
+              OSF Pre-registration Link{" "}
+              <span className="font-normal text-stone-400">(optional)</span>
             </label>
             <input
               type="url"

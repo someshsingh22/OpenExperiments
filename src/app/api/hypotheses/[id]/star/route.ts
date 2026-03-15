@@ -4,10 +4,7 @@ import { getDB } from "@/db";
 import { stars, hypotheses } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { getSession } = await import("@/lib/auth");
   const user = await getSession(request);
   const { id } = await params;
@@ -31,10 +28,7 @@ export async function GET(
   return Response.json({ data: { count, starred } });
 }
 
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { getSession, requireSession } = await import("@/lib/auth");
   const user = await getSession(request);
   const unauthorized = requireSession(user);
@@ -64,9 +58,7 @@ export async function POST(
 
   if (existing) {
     // Unstar
-    await db
-      .delete(stars)
-      .where(and(eq(stars.userId, user!.id), eq(stars.hypothesisId, id)));
+    await db.delete(stars).where(and(eq(stars.userId, user!.id), eq(stars.hypothesisId, id)));
   } else {
     // Star
     await db.insert(stars).values({

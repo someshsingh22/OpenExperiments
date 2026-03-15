@@ -8,8 +8,7 @@ import { z } from "zod";
 // Configuration
 // ---------------------------------------------------------------------------
 
-const API_URL =
-  process.env.OPENEXPERIMENTS_API_URL || "https://openexperiments.pages.dev";
+const API_URL = process.env.OPENEXPERIMENTS_API_URL || "https://openexperiments.pages.dev";
 const SITE_URL = process.env.OPENEXPERIMENTS_SITE_URL || API_URL;
 
 // ---------------------------------------------------------------------------
@@ -24,7 +23,7 @@ async function api<T>(path: string): Promise<T> {
     throw new Error(
       `Cannot reach OpenExperiments API at ${API_URL}. Is the server running?\n${
         err instanceof Error ? err.message : err
-      }`
+      }`,
     );
   }
   if (!res.ok) {
@@ -56,9 +55,7 @@ server.tool(
     "research areas are active and what data is available for testing.",
   {},
   async () => {
-    const { data } = await api<{ data: any[] }>(
-      "/api/problem-statements?includeDatasets=true"
-    );
+    const { data } = await api<{ data: any[] }>("/api/problem-statements?includeDatasets=true");
     let text = `# Problem Statements (${data.length})\n\n`;
     for (const ps of data) {
       text += `## ${ps.question}\n`;
@@ -67,16 +64,14 @@ server.tool(
       text += `- Hypotheses: ${ps.hypothesisCount}\n`;
       text += `- Description: ${ps.description}\n`;
       if (ps.datasets?.length > 0) {
-        text += `- Datasets: ${ps.datasets
-          .map((d: any) => `${d.name} (${d.id})`)
-          .join(", ")}\n`;
+        text += `- Datasets: ${ps.datasets.map((d: any) => `${d.name} (${d.id})`).join(", ")}\n`;
       } else {
         text += `- Datasets: None — new datasets needed\n`;
       }
       text += `\n`;
     }
     return { content: [{ type: "text" as const, text }] };
-  }
+  },
 );
 
 // --- Datasets ----------------------------------------------------------
@@ -87,10 +82,7 @@ server.tool(
     "task descriptions. Essential for understanding what data exists to test " +
     "hypotheses. Filter by domain: 'persuasion' or 'memorability'.",
   {
-    domain: z
-      .enum(["persuasion", "memorability"])
-      .optional()
-      .describe("Filter by domain"),
+    domain: z.enum(["persuasion", "memorability"]).optional().describe("Filter by domain"),
   },
   async ({ domain }) => {
     const qs = domain ? `?domain=${domain}` : "";
@@ -110,7 +102,7 @@ server.tool(
       text += `- Problem statements: ${d.problemStatementCount ?? 0} | Experiments: ${d.experimentCount ?? 0}\n\n`;
     }
     return { content: [{ type: "text" as const, text }] };
-  }
+  },
 );
 
 server.tool(
@@ -149,7 +141,7 @@ server.tool(
       text += `  ${exp.methodology.slice(0, 150)}...\n`;
     }
     return { content: [{ type: "text" as const, text }] };
-  }
+  },
 );
 
 // --- Hypotheses --------------------------------------------------------
@@ -161,14 +153,8 @@ server.tool(
     "inspiration. Supports filtering by domain, phase, and status.",
   {
     query: z.string().describe("Search keywords"),
-    domain: z
-      .enum(["persuasion", "memorability"])
-      .optional()
-      .describe("Filter by domain"),
-    phase: z
-      .enum(["live", "completed"])
-      .optional()
-      .describe("Filter by phase"),
+    domain: z.enum(["persuasion", "memorability"]).optional().describe("Filter by domain"),
+    phase: z.enum(["live", "completed"]).optional().describe("Filter by phase"),
     status: z
       .enum(["proposed", "arena_ranked", "data_tested", "field_validated"])
       .optional()
@@ -184,17 +170,13 @@ server.tool(
     if (phase) params.set("phase", phase);
     if (status) params.set("status", status);
 
-    const { data, total } = await api<{ data: any[]; total: number }>(
-      `/api/hypotheses?${params}`
-    );
+    const { data, total } = await api<{ data: any[]; total: number }>(`/api/hypotheses?${params}`);
 
     let text = `# Search: "${query}" — ${data.length} of ${total} results\n\n`;
     for (const h of data) {
       text += `### ${h.id}: ${h.statement}\n`;
       text += `- Status: ${h.status} | Phase: ${h.phase} | Source: ${h.source}${h.agentName ? ` (${h.agentName})` : ""}\n`;
-      const domains = Array.isArray(h.domain)
-        ? h.domain.join(", ")
-        : h.domain;
+      const domains = Array.isArray(h.domain) ? h.domain.join(", ") : h.domain;
       text += `- Domain: ${domains} | Problem: ${h.problemStatement}\n`;
       if (h.arenaElo) text += `- ELO: ${h.arenaElo}`;
       if (h.pValue != null) text += ` | p=${h.pValue}, d=${h.effectSize}`;
@@ -202,7 +184,7 @@ server.tool(
       text += `- Comments: ${h.commentCount}\n\n`;
     }
     return { content: [{ type: "text" as const, text }] };
-  }
+  },
 );
 
 server.tool(
@@ -232,8 +214,7 @@ server.tool(
     if (h.arenaElo) text += `- ELO: ${h.arenaElo}\n`;
     if (h.evidenceScore) text += `- Evidence Score: ${h.evidenceScore}\n`;
     if (h.pValue != null) text += `- p=${h.pValue}, d=${h.effectSize}\n`;
-    if (h.citationDois?.length > 0)
-      text += `- Citations: ${h.citationDois.join(", ")}\n`;
+    if (h.citationDois?.length > 0) text += `- Citations: ${h.citationDois.join(", ")}\n`;
     if (h.relatedHypothesisIds?.length > 0)
       text += `- Related: ${h.relatedHypothesisIds.join(", ")}\n`;
 
@@ -256,7 +237,7 @@ server.tool(
       text += `- ${c.body}${c.doi ? ` [DOI: ${c.doi}]` : ""}\n`;
     }
     return { content: [{ type: "text" as const, text }] };
-  }
+  },
 );
 
 // --- Arena -------------------------------------------------------------
@@ -276,7 +257,7 @@ server.tool(
       text += `| ${i + 1} | ${h.id} | ${h.winRate}% | ${d} | ${h.statement.slice(0, 80)}... |\n`;
     });
     return { content: [{ type: "text" as const, text }] };
-  }
+  },
 );
 
 // --- Experiments -------------------------------------------------------
@@ -286,10 +267,7 @@ server.tool(
   "List experiments with methodology, dataset, status, and results. " +
     "Optionally filter by hypothesis ID.",
   {
-    hypothesisId: z
-      .string()
-      .optional()
-      .describe("Filter by hypothesis ID"),
+    hypothesisId: z.string().optional().describe("Filter by hypothesis ID"),
   },
   async ({ hypothesisId }) => {
     const qs = hypothesisId ? `?hypothesisId=${hypothesisId}` : "";
@@ -309,7 +287,7 @@ server.tool(
       text += `\n`;
     }
     return { content: [{ type: "text" as const, text }] };
-  }
+  },
 );
 
 server.tool(
@@ -320,9 +298,7 @@ server.tool(
     experimentId: z.string().describe("Experiment ID (e.g., 'exp-1')"),
   },
   async ({ experimentId }) => {
-    const res = await api<{ data: any; hypothesis: any }>(
-      `/api/experiments/${experimentId}`
-    );
+    const res = await api<{ data: any; hypothesis: any }>(`/api/experiments/${experimentId}`);
     const e = res.data;
     let text = `# Experiment ${e.id}\n\n`;
     text += `- Type: ${e.type} | Status: ${e.status}\n`;
@@ -346,7 +322,7 @@ server.tool(
       text += `Status: ${res.hypothesis.status}, Phase: ${res.hypothesis.phase}\n`;
     }
     return { content: [{ type: "text" as const, text }] };
-  }
+  },
 );
 
 // --- Platform overview -------------------------------------------------
@@ -371,8 +347,7 @@ server.tool(
       proposed: hyps.filter((h) => h.status === "proposed").length,
       arena_ranked: hyps.filter((h) => h.status === "arena_ranked").length,
       data_tested: hyps.filter((h) => h.status === "data_tested").length,
-      field_validated: hyps.filter((h) => h.status === "field_validated")
-        .length,
+      field_validated: hyps.filter((h) => h.status === "field_validated").length,
     };
     const byPhase = {
       live: hyps.filter((h) => h.phase === "live").length,
@@ -416,7 +391,7 @@ server.tool(
     text += `4. Validate: Top hypotheses advance to pre-registered field experiments\n`;
 
     return { content: [{ type: "text" as const, text }] };
-  }
+  },
 );
 
 // --- Submission URL generator ------------------------------------------
@@ -437,29 +412,19 @@ server.tool(
       .string()
       .optional()
       .describe("Custom problem statement if not using an existing one"),
-    domains: z
-      .array(z.enum(["persuasion", "memorability"]))
-      .describe("Research domains"),
+    domains: z.array(z.enum(["persuasion", "memorability"])).describe("Research domains"),
     source: z
       .enum(["human", "ai_agent"])
       .optional()
       .describe("Who generated the hypothesis (default: human)"),
   },
-  async ({
-    statement,
-    rationale,
-    problemStatementId,
-    customProblemStatement,
-    domains,
-    source,
-  }) => {
+  async ({ statement, rationale, problemStatementId, customProblemStatement, domains, source }) => {
     const params = new URLSearchParams();
     params.set("statement", statement);
     params.set("rationale", rationale);
     params.set("domains", domains.join(","));
     if (problemStatementId) params.set("ps", problemStatementId);
-    if (customProblemStatement)
-      params.set("customPS", customProblemStatement);
+    if (customProblemStatement) params.set("customPS", customProblemStatement);
     if (source) params.set("source", source);
 
     const url = `${SITE_URL}/submit?${params.toString()}`;
@@ -482,7 +447,7 @@ server.tool(
     }
 
     return { content: [{ type: "text" as const, text }] };
-  }
+  },
 );
 
 // ===================================================================
@@ -494,18 +459,13 @@ server.prompt(
   "Load all OpenExperiments context (problem statements, datasets, example " +
     "hypotheses) to help turn a rough idea into a testable hypothesis.",
   {
-    idea: z
-      .string()
-      .optional()
-      .describe("The user's rough idea or area of interest"),
+    idea: z.string().optional().describe("The user's rough idea or area of interest"),
   },
   async ({ idea }) => {
     const [psRes, dsRes, hypRes] = await Promise.all([
       api<{ data: any[] }>("/api/problem-statements?includeDatasets=true"),
       api<{ data: any[] }>("/api/datasets"),
-      api<{ data: any[] }>(
-        "/api/hypotheses?phase=completed&sort=top_rated&limit=5"
-      ),
+      api<{ data: any[] }>("/api/hypotheses?phase=completed&sort=top_rated&limit=5"),
     ]);
 
     let ctx = "";
@@ -552,9 +512,7 @@ server.prompt(
     for (const h of hypRes.data) {
       ctx += `**${h.statement}**\n`;
       ctx += `Rationale: ${h.rationale}\n`;
-      const domains = Array.isArray(h.domain)
-        ? h.domain.join(", ")
-        : h.domain;
+      const domains = Array.isArray(h.domain) ? h.domain.join(", ") : h.domain;
       ctx += `Domain: ${domains} | Problem: ${h.problemStatement}\n`;
       ctx += `Status: ${h.status}`;
       if (h.arenaElo) ctx += ` | ELO: ${h.arenaElo}`;
@@ -588,7 +546,7 @@ server.prompt(
         },
       ],
     };
-  }
+  },
 );
 
 server.prompt(
@@ -615,14 +573,11 @@ server.prompt(
 
     ctx += `## Existing Hypotheses\n\n`;
     for (const h of hypRes.data) {
-      const domains = Array.isArray(h.domain)
-        ? h.domain.join(", ")
-        : h.domain;
+      const domains = Array.isArray(h.domain) ? h.domain.join(", ") : h.domain;
       ctx += `- **${h.statement}**\n`;
       ctx += `  ${h.status} | ${h.source}${h.agentName ? ` / ${h.agentName}` : ""} | ${domains}\n`;
       ctx += `  Problem: ${h.problemStatement}\n`;
-      if (h.pValue != null)
-        ctx += `  Result: p=${h.pValue}, d=${h.effectSize}\n`;
+      if (h.pValue != null) ctx += `  Result: p=${h.pValue}, d=${h.effectSize}\n`;
       ctx += `\n`;
     }
 
@@ -655,22 +610,19 @@ server.prompt(
         },
       ],
     };
-  }
+  },
 );
 
 // ===================================================================
 // RESOURCES
 // ===================================================================
 
-server.resource(
-  "platform-guide",
-  "openexperiments://guide",
-  async (uri) => ({
-    contents: [
-      {
-        uri: uri.href,
-        mimeType: "text/markdown",
-        text: `# OpenExperiments Platform Guide
+server.resource("platform-guide", "openexperiments://guide", async (uri) => ({
+  contents: [
+    {
+      uri: uri.href,
+      mimeType: "text/markdown",
+      text: `# OpenExperiments Platform Guide
 
 ## What Is It?
 
@@ -727,10 +679,9 @@ Produces ELO-based rankings.
 
 Contact: experimentsopen@gmail.com
 Paper: https://arxiv.org/abs/2602.07983`,
-      },
-    ],
-  })
-);
+    },
+  ],
+}));
 
 // ===================================================================
 // START

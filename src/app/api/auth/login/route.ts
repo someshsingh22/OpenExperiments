@@ -7,18 +7,14 @@ import { verifyPassword } from "@/lib/password";
 
 export async function POST(request: Request) {
   const db = getDB();
-  const body = await request.json() as { email: string; password: string };
+  const body = (await request.json()) as { email: string; password: string };
   const { email, password } = body;
 
   if (!email || !password) {
     return Response.json({ error: "Email and password are required" }, { status: 400 });
   }
 
-  const [user] = await db
-    .select()
-    .from(users)
-    .where(eq(users.email, email))
-    .limit(1);
+  const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
 
   if (!user || !user.passwordHash) {
     return Response.json({ error: "Invalid email or password" }, { status: 401 });
@@ -43,13 +39,13 @@ export async function POST(request: Request) {
   const headers = new Headers({ "Content-Type": "application/json" });
   headers.append(
     "Set-Cookie",
-    `session=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}`
+    `session=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}`,
   );
 
   return new Response(
     JSON.stringify({
       user: { id: user.id, name: user.name, email: user.email, avatarUrl: user.avatarUrl },
     }),
-    { status: 200, headers }
+    { status: 200, headers },
   );
 }

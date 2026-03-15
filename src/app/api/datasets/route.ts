@@ -43,7 +43,7 @@ export async function GET(request: Request) {
         problemStatementCount: psCount.count,
         experimentCount: expCount.count,
       };
-    })
+    }),
   );
 
   // Datasets with 0 problem statements float to top

@@ -68,7 +68,10 @@ export default function DatasetDetailPage() {
     return (
       <div className="mx-auto max-w-4xl px-4 py-20 text-center">
         <p className="text-sm text-stone-500">{error || "Dataset not found"}</p>
-        <Link href="/data" className="mt-4 inline-block text-sm font-medium text-stone-600 hover:text-stone-900">
+        <Link
+          href="/data"
+          className="mt-4 inline-block text-sm font-medium text-stone-600 hover:text-stone-900"
+        >
           &larr; Back to datasets
         </Link>
       </div>
@@ -122,7 +125,7 @@ export default function DatasetDetailPage() {
 
       {/* Task Description */}
       <section className="mb-10">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-stone-400">
+        <h2 className="mb-3 text-sm font-semibold tracking-wider text-stone-400 uppercase">
           Task Description
         </h2>
         <div className="rounded-lg border border-stone-200 bg-stone-50/50 p-5">
@@ -133,7 +136,7 @@ export default function DatasetDetailPage() {
       {/* Description (if any) */}
       {dataset.description && (
         <section className="mb-10">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-stone-400">
+          <h2 className="mb-3 text-sm font-semibold tracking-wider text-stone-400 uppercase">
             About
           </h2>
           <p className="text-sm leading-relaxed text-stone-600">{dataset.description}</p>
@@ -142,12 +145,12 @@ export default function DatasetDetailPage() {
 
       {/* Schema */}
       <section className="mb-10">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-stone-400">
+        <h2 className="mb-3 text-sm font-semibold tracking-wider text-stone-400 uppercase">
           Schema
         </h2>
         <div className="rounded-lg border border-stone-200 bg-white p-5">
           <div className="mb-4">
-            <span className="text-xs font-medium uppercase tracking-wider text-stone-400">
+            <span className="text-xs font-medium tracking-wider text-stone-400 uppercase">
               Data Columns
             </span>
             <div className="mt-2 flex flex-wrap gap-2">
@@ -162,11 +165,11 @@ export default function DatasetDetailPage() {
             </div>
           </div>
           <div>
-            <span className="text-xs font-medium uppercase tracking-wider text-stone-400">
+            <span className="text-xs font-medium tracking-wider text-stone-400 uppercase">
               Target Column
             </span>
             <div className="mt-2">
-              <code className="rounded-md bg-teal-50 px-2.5 py-1 font-mono text-xs font-semibold text-teal-700 ring-1 ring-inset ring-teal-600/20">
+              <code className="rounded-md bg-teal-50 px-2.5 py-1 font-mono text-xs font-semibold text-teal-700 ring-1 ring-teal-600/20 ring-inset">
                 {dataset.targetColumnName}
               </code>
             </div>
@@ -176,7 +179,7 @@ export default function DatasetDetailPage() {
 
       {/* Linked Problem Statements */}
       <section className="mb-10">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-stone-400">
+        <h2 className="mb-3 text-sm font-semibold tracking-wider text-stone-400 uppercase">
           Problem Statements ({problemStatements.length})
         </h2>
         {problemStatements.length === 0 ? (
@@ -195,9 +198,7 @@ export default function DatasetDetailPage() {
                   <p className="text-sm font-medium text-stone-800">{ps.question}</p>
                   <DomainTag domain={ps.domain as Domain} />
                 </div>
-                <p className="mt-1 text-[11px] text-stone-400">
-                  {ps.hypothesisCount} hypotheses
-                </p>
+                <p className="mt-1 text-[11px] text-stone-400">{ps.hypothesisCount} hypotheses</p>
               </Link>
             ))}
           </div>
@@ -206,7 +207,7 @@ export default function DatasetDetailPage() {
 
       {/* Experiments using this dataset */}
       <section className="mb-10">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-stone-400">
+        <h2 className="mb-3 text-sm font-semibold tracking-wider text-stone-400 uppercase">
           Experiments ({experiments.length})
         </h2>
         {experiments.length === 0 ? (
@@ -224,19 +225,19 @@ export default function DatasetDetailPage() {
                   <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-semibold text-stone-600">
                     {EXP_TYPE_LABELS[exp.type] || exp.type}
                   </span>
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                    exp.status === "completed"
-                      ? "bg-teal-50 text-teal-700"
-                      : exp.status === "running"
-                        ? "bg-sky-50 text-sky-700"
-                        : "bg-stone-100 text-stone-600"
-                  }`}>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                      exp.status === "completed"
+                        ? "bg-teal-50 text-teal-700"
+                        : exp.status === "running"
+                          ? "bg-sky-50 text-sky-700"
+                          : "bg-stone-100 text-stone-600"
+                    }`}
+                  >
                     {exp.status}
                   </span>
                 </div>
-                <p className="mt-2 text-[13px] text-stone-600 line-clamp-2">
-                  {exp.methodology}
-                </p>
+                <p className="mt-2 line-clamp-2 text-[13px] text-stone-600">{exp.methodology}</p>
                 <p className="mt-1 text-[11px] text-stone-400">
                   Started {exp.startedAt} &middot; Hypothesis {exp.hypothesisId}
                 </p>

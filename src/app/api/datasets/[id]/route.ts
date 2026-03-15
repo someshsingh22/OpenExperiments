@@ -4,18 +4,11 @@ import { getDB } from "@/db";
 import { datasets, datasetProblemStatements, problemStatements, experiments } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const db = getDB();
 
-  const [dataset] = await db
-    .select()
-    .from(datasets)
-    .where(eq(datasets.id, id))
-    .limit(1);
+  const [dataset] = await db.select().from(datasets).where(eq(datasets.id, id)).limit(1);
 
   if (!dataset) {
     return Response.json({ error: "Dataset not found" }, { status: 404 });
@@ -32,15 +25,12 @@ export async function GET(
     .from(datasetProblemStatements)
     .innerJoin(
       problemStatements,
-      eq(datasetProblemStatements.problemStatementId, problemStatements.id)
+      eq(datasetProblemStatements.problemStatementId, problemStatements.id),
     )
     .where(eq(datasetProblemStatements.datasetId, id));
 
   // Experiments using this dataset
-  const exps = await db
-    .select()
-    .from(experiments)
-    .where(eq(experiments.datasetId, id));
+  const exps = await db.select().from(experiments).where(eq(experiments.datasetId, id));
 
   return Response.json({
     data: {

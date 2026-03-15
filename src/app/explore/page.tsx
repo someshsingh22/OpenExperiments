@@ -33,11 +33,13 @@ type SortOption = (typeof SORT_OPTIONS)[number]["value"];
 
 export default function ExplorePage() {
   return (
-    <Suspense fallback={
-      <div className="flex justify-center py-24">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-stone-300 border-t-stone-600" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="flex justify-center py-24">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-stone-300 border-t-stone-600" />
+        </div>
+      }
+    >
       <ExploreContent />
     </Suspense>
   );
@@ -86,8 +88,8 @@ function ExploreContent() {
             const data = (res as { data: { count: number; starred: boolean } }).data;
             return { id, count: data.count, starred: data.starred };
           })
-          .catch(() => ({ id, count: 0, starred: false }))
-      )
+          .catch(() => ({ id, count: 0, starred: false })),
+      ),
     ).then((results) => {
       const newStarred = new Set<string>();
       const newCounts = new Map<string, number>();
@@ -113,7 +115,7 @@ function ExploreContent() {
 
   const psQuestions = useMemo(
     () => problemStatementsData.map((ps) => ps.question),
-    [problemStatementsData]
+    [problemStatementsData],
   );
 
   const filtered = useMemo(() => {
@@ -121,28 +123,31 @@ function ExploreContent() {
     return hypothesesData.filter((h) => h.problemStatement === selectedPS);
   }, [hypothesesData, selectedPS]);
 
-  const handleStar = useCallback(async (id: string) => {
-    if (!user) {
-      setShowAuthModal(true);
-      return;
-    }
-    try {
-      const res = await toggleStar(id);
-      setStarredIds((prev) => {
-        const next = new Set(prev);
-        if (res.data.starred) next.add(id);
-        else next.delete(id);
-        return next;
-      });
-      setStarCounts((prev) => {
-        const next = new Map(prev);
-        next.set(id, res.data.count);
-        return next;
-      });
-    } catch {
-      // silent fail
-    }
-  }, [user, setShowAuthModal]);
+  const handleStar = useCallback(
+    async (id: string) => {
+      if (!user) {
+        setShowAuthModal(true);
+        return;
+      }
+      try {
+        const res = await toggleStar(id);
+        setStarredIds((prev) => {
+          const next = new Set(prev);
+          if (res.data.starred) next.add(id);
+          else next.delete(id);
+          return next;
+        });
+        setStarCounts((prev) => {
+          const next = new Map(prev);
+          next.set(id, res.data.count);
+          return next;
+        });
+      } catch {
+        // silent fail
+      }
+    },
+    [user, setShowAuthModal],
+  );
 
   const selectClass =
     "rounded-md border border-stone-200 bg-white px-2.5 py-2 text-sm text-stone-700 focus:border-stone-400 focus:outline-none focus:ring-1 focus:ring-stone-300";
@@ -150,31 +155,53 @@ function ExploreContent() {
   return (
     <div className="min-h-screen">
       <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-        <h1 className="mb-6 text-xl font-semibold text-stone-900">
-          Explore Hypotheses
-        </h1>
+        <h1 className="mb-6 text-xl font-semibold text-stone-900">Explore Hypotheses</h1>
 
         {/* Filters */}
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
           <div className="relative flex-1 sm:max-w-xs">
-            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-stone-300" />
+            <Search className="absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-stone-300" />
             <input
               type="text"
               placeholder="Search..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-md border border-stone-200 bg-white py-2 pl-8 pr-3 text-sm text-stone-700 placeholder-stone-400 focus:border-stone-400 focus:outline-none focus:ring-1 focus:ring-stone-300"
+              className="w-full rounded-md border border-stone-200 bg-white py-2 pr-3 pl-8 text-sm text-stone-700 placeholder-stone-400 focus:border-stone-400 focus:ring-1 focus:ring-stone-300 focus:outline-none"
             />
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <select value={domain} onChange={(e) => setDomain(e.target.value as DomainFilter)} className={selectClass}>
-              {DOMAIN_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            <select
+              value={domain}
+              onChange={(e) => setDomain(e.target.value as DomainFilter)}
+              className={selectClass}
+            >
+              {DOMAIN_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
             </select>
-            <select value={phase} onChange={(e) => setPhase(e.target.value as PhaseFilter)} className={selectClass}>
-              {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            <select
+              value={phase}
+              onChange={(e) => setPhase(e.target.value as PhaseFilter)}
+              className={selectClass}
+            >
+              {STATUS_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
             </select>
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortOption)} className={selectClass}>
-              {SORT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortOption)}
+              className={selectClass}
+            >
+              {SORT_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
             </select>
           </div>
           <div className="sm:ml-auto">
@@ -193,10 +220,11 @@ function ExploreContent() {
           <div className="flex gap-1.5 pb-1">
             <button
               onClick={() => setSelectedPS(null)}
-              className={`shrink-0 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${selectedPS === null
-                ? "bg-stone-900 text-white"
-                : "bg-white text-stone-600 ring-1 ring-stone-300 hover:ring-stone-400 hover:text-stone-900"
-                }`}
+              className={`shrink-0 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+                selectedPS === null
+                  ? "bg-stone-900 text-white"
+                  : "bg-white text-stone-600 ring-1 ring-stone-300 hover:text-stone-900 hover:ring-stone-400"
+              }`}
             >
               All
             </button>
@@ -204,10 +232,11 @@ function ExploreContent() {
               <button
                 key={ps}
                 onClick={() => setSelectedPS(ps)}
-                className={`shrink-0 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${selectedPS === ps
-                  ? "bg-stone-900 text-white"
-                  : "bg-white text-stone-600 ring-1 ring-stone-300 hover:ring-stone-400 hover:text-stone-900"
-                  }`}
+                className={`shrink-0 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  selectedPS === ps
+                    ? "bg-stone-900 text-white"
+                    : "bg-white text-stone-600 ring-1 ring-stone-300 hover:text-stone-900 hover:ring-stone-400"
+                }`}
               >
                 {ps}
               </button>
@@ -238,9 +267,7 @@ function ExploreContent() {
             <p className="mb-1 text-base font-semibold text-stone-700">
               No hypotheses match your filters.
             </p>
-            <p className="text-sm text-stone-500">
-              Be the first &mdash; submit one.
-            </p>
+            <p className="text-sm text-stone-500">Be the first &mdash; submit one.</p>
           </div>
         )}
       </div>

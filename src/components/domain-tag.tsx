@@ -21,7 +21,7 @@ export function DomainTag({ domain, size = "sm" }: DomainTagProps) {
         config.text,
         config.ring,
         size === "sm" && "px-1.5 py-0.5 text-[11px]",
-        size === "md" && "px-2 py-0.5 text-xs"
+        size === "md" && "px-2 py-0.5 text-xs",
       )}
     >
       {domain}

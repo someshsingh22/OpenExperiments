@@ -1,4 +1,11 @@
-import type { Hypothesis, Experiment, ExperimentVersion, Comment, ProblemStatement, ArenaMatchup, Dataset } from "./types";
+import type {
+  Hypothesis,
+  Experiment,
+  ExperimentVersion,
+  Comment,
+  ProblemStatement,
+  Dataset,
+} from "./types";
 
 const BASE = "";
 
@@ -64,7 +71,7 @@ export async function submitHypothesis(data: {
 
 export async function addCitation(
   hypothesisId: string,
-  citation: string
+  citation: string,
 ): Promise<{ data: { citationDois: string[] } }> {
   const res = await fetch(`${BASE}/api/hypotheses/${hypothesisId}`, {
     method: "PATCH",
@@ -84,7 +91,9 @@ export async function postComment(data: {
   content: string;
   doi?: string;
   parentId?: string;
-}): Promise<{ data: Comment & { author: { id: string; name: string | null; avatarUrl: string | null } } }> {
+}): Promise<{
+  data: Comment & { author: { id: string; name: string | null; avatarUrl: string | null } };
+}> {
   const res = await fetch(`${BASE}/api/comments`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -103,9 +112,18 @@ export async function getExperiments(hypothesisId?: string): Promise<{ data: Exp
   return fetchJSON(`/api/experiments${qs}`);
 }
 
-export async function getExperiment(id: string, version?: number): Promise<{
+export async function getExperiment(
+  id: string,
+  version?: number,
+): Promise<{
   data: Experiment;
-  hypothesis: { id: string; statement: string; status: string; phase: string; domains: string[] } | null;
+  hypothesis: {
+    id: string;
+    statement: string;
+    status: string;
+    phase: string;
+    domains: string[];
+  } | null;
   versions?: ExperimentVersion[];
 }> {
   const qs = version ? `?version=${version}` : "";
@@ -121,9 +139,7 @@ export async function getProblemStatements(params?: {
 }
 
 // Datasets
-export async function getDatasets(params?: {
-  domain?: string;
-}): Promise<{ data: Dataset[] }> {
+export async function getDatasets(params?: { domain?: string }): Promise<{ data: Dataset[] }> {
   const query = new URLSearchParams();
   if (params?.domain) query.set("domain", params.domain);
   const qs = query.toString();
@@ -132,8 +148,19 @@ export async function getDatasets(params?: {
 
 export async function getDataset(id: string): Promise<{
   data: Dataset;
-  problemStatements: Array<{ id: string; question: string; domain: string; hypothesisCount: number }>;
-  experiments: Array<{ id: string; hypothesisId: string; type: string; status: string; methodology: string }>;
+  problemStatements: Array<{
+    id: string;
+    question: string;
+    domain: string;
+    hypothesisCount: number;
+  }>;
+  experiments: Array<{
+    id: string;
+    hypothesisId: string;
+    type: string;
+    status: string;
+    methodology: string;
+  }>;
 }> {
   return fetchJSON(`/api/datasets/${id}`);
 }
@@ -171,21 +198,24 @@ export async function submitExperiment(data: {
 }
 
 // Update Experiment
-export async function updateExperiment(id: string, data: {
-  status?: string;
-  methodology?: string;
-  analysisPlan?: string;
-  osfLink?: string;
-  results?: {
-    pValue?: number;
-    effectSize?: number;
-    sampleSize?: number;
-    confidenceIntervalLow?: number;
-    confidenceIntervalHigh?: number;
-    summary?: string;
-  };
-  changeSummary?: string;
-}): Promise<{ data: { id: string; version: number } }> {
+export async function updateExperiment(
+  id: string,
+  data: {
+    status?: string;
+    methodology?: string;
+    analysisPlan?: string;
+    osfLink?: string;
+    results?: {
+      pValue?: number;
+      effectSize?: number;
+      sampleSize?: number;
+      confidenceIntervalLow?: number;
+      confidenceIntervalHigh?: number;
+      summary?: string;
+    };
+    changeSummary?: string;
+  },
+): Promise<{ data: { id: string; version: number } }> {
   const res = await fetch(`${BASE}/api/experiments/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
@@ -226,7 +256,7 @@ export async function getArenaRankings(): Promise<{
 
 export async function castVote(
   matchupId: string,
-  vote: "a" | "b" | "tie" | "both_weak"
+  vote: "a" | "b" | "tie" | "both_weak",
 ): Promise<{
   data: { id: string; totalVotes: number; votesA: number; votesB: number; votesTie: number };
 }> {
@@ -243,7 +273,9 @@ export async function castVote(
 }
 
 // Stars
-export async function toggleStar(hypothesisId: string): Promise<{ data: { count: number; starred: boolean } }> {
+export async function toggleStar(
+  hypothesisId: string,
+): Promise<{ data: { count: number; starred: boolean } }> {
   const res = await fetch(`${BASE}/api/hypotheses/${hypothesisId}/star`, {
     method: "POST",
   });
@@ -254,20 +286,25 @@ export async function toggleStar(hypothesisId: string): Promise<{ data: { count:
   return res.json();
 }
 
-export async function getStarStatus(hypothesisId: string): Promise<{ data: { count: number; starred: boolean } }> {
+export async function getStarStatus(
+  hypothesisId: string,
+): Promise<{ data: { count: number; starred: boolean } }> {
   return fetchJSON(`/api/hypotheses/${hypothesisId}/star`);
 }
 
 // Profile update
-export async function updateProfile(userId: string, data: {
-  name?: string;
-  position?: string;
-  scholarUrl?: string;
-  website?: string;
-  bio?: string;
-  orcid?: string;
-  twitterHandle?: string;
-}): Promise<{ ok: boolean }> {
+export async function updateProfile(
+  userId: string,
+  data: {
+    name?: string;
+    position?: string;
+    scholarUrl?: string;
+    website?: string;
+    bio?: string;
+    orcid?: string;
+    twitterHandle?: string;
+  },
+): Promise<{ ok: boolean }> {
   const res = await fetch(`${BASE}/api/users/${userId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },

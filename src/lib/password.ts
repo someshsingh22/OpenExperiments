@@ -25,24 +25,23 @@ export async function verifyPassword(password: string, stored: string): Promise<
 
 async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
   const enc = new TextEncoder();
-  const keyMaterial = await crypto.subtle.importKey(
-    "raw",
-    enc.encode(password),
-    "PBKDF2",
-    false,
-    ["deriveBits", "deriveKey"]
-  );
+  const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, [
+    "deriveBits",
+    "deriveKey",
+  ]);
   return crypto.subtle.deriveKey(
     { name: "PBKDF2", salt: salt.buffer as ArrayBuffer, iterations: ITERATIONS, hash: "SHA-256" },
     keyMaterial,
     { name: "AES-GCM", length: KEY_LENGTH * 8 },
     true,
-    ["encrypt"]
+    ["encrypt"],
   );
 }
 
 function toHex(buf: Uint8Array): string {
-  return Array.from(buf).map((b) => b.toString(16).padStart(2, "0")).join("");
+  return Array.from(buf)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 function fromHex(hex: string): Uint8Array {

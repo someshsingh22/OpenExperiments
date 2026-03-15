@@ -36,8 +36,9 @@ export default function DataPage() {
           Datasets
         </h1>
         <p className="mt-3 text-base leading-relaxed text-stone-600">
-          Curated Hugging Face datasets powering our hypothesis testing and experiments.
-          Each dataset comes with a clear task description, schema, and links to related problem statements.
+          Curated Hugging Face datasets powering our hypothesis testing and experiments. Each
+          dataset comes with a clear task description, schema, and links to related problem
+          statements.
         </p>
       </header>
 
@@ -69,7 +70,7 @@ export default function DataPage() {
             <section className="mb-10">
               <div className="mb-4 flex items-center gap-2">
                 <AlertCircle className="h-4 w-4 text-amber-500" />
-                <h2 className="text-sm font-semibold uppercase tracking-wider text-amber-700">
+                <h2 className="text-sm font-semibold tracking-wider text-amber-700 uppercase">
                   Needs Problem Statements
                 </h2>
               </div>
@@ -93,13 +94,11 @@ export default function DataPage() {
       {/* Suggest a Dataset CTA */}
       <section className="mt-16 rounded-2xl border border-stone-200 bg-stone-50/50 p-8 text-center">
         <Database className="mx-auto mb-3 h-8 w-8 text-stone-400" />
-        <h2 className="text-xl font-semibold text-stone-900">
-          Have a dataset to suggest?
-        </h2>
+        <h2 className="text-xl font-semibold text-stone-900">Have a dataset to suggest?</h2>
         <p className="mx-auto mt-3 max-w-2xl text-base leading-relaxed text-stone-600">
-          Datasets and problem statements are reviewed weekly by our team.
-          To suggest a new dataset, open a pull request on GitHub with the Hugging Face link,
-          task description, column names, and target column.
+          Datasets and problem statements are reviewed weekly by our team. To suggest a new dataset,
+          open a pull request on GitHub with the Hugging Face link, task description, column names,
+          and target column.
         </p>
         <div className="mt-6 flex justify-center">
           <a
@@ -137,13 +136,13 @@ function DatasetCard({ dataset, highlighted }: { dataset: Dataset; highlighted?:
       <div className="mb-2 flex flex-wrap gap-1.5">
         {dataset.domain && <DomainTag domain={dataset.domain as Domain} />}
         {highlighted && (
-          <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 ring-1 ring-inset ring-amber-600/20">
+          <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 ring-1 ring-amber-600/20 ring-inset">
             Needs Problem Statements
           </span>
         )}
       </div>
 
-      <p className="text-[13px] leading-relaxed text-stone-600 line-clamp-2">
+      <p className="line-clamp-2 text-[13px] leading-relaxed text-stone-600">
         {dataset.taskDescription}
       </p>
 

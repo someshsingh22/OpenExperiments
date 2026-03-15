@@ -44,6 +44,8 @@ export async function GET() {
             statement: hypA.statement,
             domain: hypA.domains,
             arenaElo: hypA.arenaElo,
+            source: hypA.source,
+            agentName: hypA.agentName,
           }
         : null,
       hypothesisB: hypB
@@ -52,6 +54,8 @@ export async function GET() {
             statement: hypB.statement,
             domain: hypB.domains,
             arenaElo: hypB.arenaElo,
+            source: hypB.source,
+            agentName: hypB.agentName,
           }
         : null,
     },

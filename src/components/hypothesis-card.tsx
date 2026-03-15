@@ -33,22 +33,15 @@ export function HypothesisCard({ hypothesis, onStar, starred, starCount }: Hypot
 
   return (
     <div className="group relative rounded-lg border border-stone-200 bg-white p-4 transition-all duration-300 hover:-translate-y-1 hover:border-stone-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-      <Link
-        href={`/hypothesis/${hypothesis.id}`}
-        className="block"
-      >
+      <Link href={`/hypothesis/${hypothesis.id}`} className="block">
         <div className="mb-2.5 flex flex-wrap items-center gap-1.5">
-          <EvidenceBadge
-            status={hypothesis.status}
-            phase={hypothesis.phase}
-            size="sm"
-          />
+          <EvidenceBadge status={hypothesis.status} phase={hypothesis.phase} size="sm" />
           {hypothesis.domain.map((d) => (
             <DomainTag key={d} domain={d} />
           ))}
         </div>
 
-        <p className="mb-2.5 text-[13px] leading-relaxed text-stone-700 line-clamp-3 group-hover:text-stone-900">
+        <p className="mb-2.5 line-clamp-3 text-[13px] leading-relaxed text-stone-700 group-hover:text-stone-900">
           {hypothesis.statement}
         </p>
 
@@ -58,9 +51,7 @@ export function HypothesisCard({ hypothesis, onStar, starred, starCount }: Hypot
               hypothesis.source === "ai_agent" ? (
                 <>
                   <Cpu className="h-3 w-3 text-indigo-400" />
-                  <span className="font-medium text-indigo-500">
-                    {hypothesis.agentName}
-                  </span>
+                  <span className="font-medium text-indigo-500">{hypothesis.agentName}</span>
                 </>
               ) : (
                 <>
@@ -75,9 +66,7 @@ export function HypothesisCard({ hypothesis, onStar, starred, starCount }: Hypot
 
           <div className="flex items-center gap-2">
             {revealed && hypothesis.winRate != null && (
-              <span className="font-mono tabular-nums">
-                {hypothesis.winRate}%
-              </span>
+              <span className="font-mono tabular-nums">{hypothesis.winRate}%</span>
             )}
             <span className="flex items-center gap-0.5">
               <MessageSquare className="h-3 w-3" />
@@ -117,7 +106,7 @@ export function HypothesisCard({ hypothesis, onStar, starred, starCount }: Hypot
             Share
           </button>
           {showShare && (
-            <div className="absolute bottom-full left-0 z-50 mb-1.5 w-44 rounded-lg border border-stone-200 bg-white p-1.5 shadow-xl animate-in fade-in slide-in-from-bottom-2">
+            <div className="animate-in fade-in slide-in-from-bottom-2 absolute bottom-full left-0 z-50 mb-1.5 w-44 rounded-lg border border-stone-200 bg-white p-1.5 shadow-xl">
               <button
                 onClick={(e) => {
                   e.preventDefault();

@@ -4,25 +4,25 @@ MCP (Model Context Protocol) server for [OpenExperiments](https://openexperiment
 
 ## Tools
 
-| Tool | Description |
-|------|-------------|
-| `platform_overview` | Stats, domains, lifecycle — call first to orient |
-| `list_problem_statements` | All open research questions with linked datasets |
-| `list_datasets` | All Hugging Face datasets with column schemas |
-| `get_dataset` | Deep dive into one dataset |
-| `search_hypotheses` | Keyword search across hypotheses |
-| `get_hypothesis` | Full hypothesis detail with experiments and comments |
-| `get_arena_rankings` | Leaderboard by community vote win rate |
-| `list_experiments` | Browse experiments, filter by hypothesis |
-| `get_experiment` | Full experiment detail with stats |
-| `generate_submission_url` | Pre-filled link to the submit page |
+| Tool                      | Description                                          |
+| ------------------------- | ---------------------------------------------------- |
+| `platform_overview`       | Stats, domains, lifecycle — call first to orient     |
+| `list_problem_statements` | All open research questions with linked datasets     |
+| `list_datasets`           | All Hugging Face datasets with column schemas        |
+| `get_dataset`             | Deep dive into one dataset                           |
+| `search_hypotheses`       | Keyword search across hypotheses                     |
+| `get_hypothesis`          | Full hypothesis detail with experiments and comments |
+| `get_arena_rankings`      | Leaderboard by community vote win rate               |
+| `list_experiments`        | Browse experiments, filter by hypothesis             |
+| `get_experiment`          | Full experiment detail with stats                    |
+| `generate_submission_url` | Pre-filled link to the submit page                   |
 
 ## Prompts
 
-| Prompt | Description |
-|--------|-------------|
+| Prompt                 | Description                                                            |
+| ---------------------- | ---------------------------------------------------------------------- |
 | `formulate-hypothesis` | Loads all context to help turn a rough idea into a testable hypothesis |
-| `co-ideate` | Brainstorm new research directions from existing work |
+| `co-ideate`            | Brainstorm new research directions from existing work                  |
 
 ## Setup
 
@@ -76,10 +76,10 @@ Or add to `.claude/settings.json`:
 
 ## Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `OPENEXPERIMENTS_API_URL` | `https://openexperiments.pages.dev` | API base URL |
-| `OPENEXPERIMENTS_SITE_URL` | Same as API URL | Site URL for generated links |
+| Variable                   | Default                             | Description                  |
+| -------------------------- | ----------------------------------- | ---------------------------- |
+| `OPENEXPERIMENTS_API_URL`  | `https://openexperiments.pages.dev` | API base URL                 |
+| `OPENEXPERIMENTS_SITE_URL` | Same as API URL                     | Site URL for generated links |
 
 For local development, point to your local server:
 

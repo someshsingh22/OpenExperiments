@@ -32,7 +32,7 @@ export async function GET(request: Request) {
           hypothesisCount: ps.hypothesisCount,
           datasets: dsLinks,
         };
-      })
+      }),
     );
     return Response.json({ data });
   }

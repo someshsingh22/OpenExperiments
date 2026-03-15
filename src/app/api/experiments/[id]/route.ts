@@ -16,32 +16,40 @@ function buildResultsResponse(result: {
 }) {
   const obj: Record<string, unknown> = {};
   let has = false;
-  if (result.pValue) { obj.pValue = result.pValue; has = true; }
-  if (result.effectSize) { obj.effectSize = result.effectSize; has = true; }
-  if (result.sampleSize) { obj.sampleSize = result.sampleSize; has = true; }
+  if (result.pValue) {
+    obj.pValue = result.pValue;
+    has = true;
+  }
+  if (result.effectSize) {
+    obj.effectSize = result.effectSize;
+    has = true;
+  }
+  if (result.sampleSize) {
+    obj.sampleSize = result.sampleSize;
+    has = true;
+  }
   if (result.confidenceIntervalLow || result.confidenceIntervalHigh) {
     obj.confidenceInterval = [result.confidenceIntervalLow, result.confidenceIntervalHigh];
     has = true;
   }
-  if (result.summary) { obj.summary = result.summary; has = true; }
-  if (result.uplift) { obj.uplift = result.uplift; has = true; }
+  if (result.summary) {
+    obj.summary = result.summary;
+    has = true;
+  }
+  if (result.uplift) {
+    obj.uplift = result.uplift;
+    has = true;
+  }
   return has ? obj : undefined;
 }
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const url = new URL(request.url);
   const versionParam = url.searchParams.get("version");
   const db = getDB();
 
-  const [exp] = await db
-    .select()
-    .from(experiments)
-    .where(eq(experiments.id, id))
-    .limit(1);
+  const [exp] = await db.select().from(experiments).where(eq(experiments.id, id)).limit(1);
 
   if (!exp) {
     return Response.json({ error: "Experiment not found" }, { status: 404 });
@@ -120,14 +128,26 @@ export async function GET(
 
     const vResults: Record<string, unknown> = {};
     let hasVResults = false;
-    if (ver.pValue) { vResults.pValue = ver.pValue; hasVResults = true; }
-    if (ver.effectSize) { vResults.effectSize = ver.effectSize; hasVResults = true; }
-    if (ver.sampleSize) { vResults.sampleSize = ver.sampleSize; hasVResults = true; }
+    if (ver.pValue) {
+      vResults.pValue = ver.pValue;
+      hasVResults = true;
+    }
+    if (ver.effectSize) {
+      vResults.effectSize = ver.effectSize;
+      hasVResults = true;
+    }
+    if (ver.sampleSize) {
+      vResults.sampleSize = ver.sampleSize;
+      hasVResults = true;
+    }
     if (ver.confidenceIntervalLow || ver.confidenceIntervalHigh) {
       vResults.confidenceInterval = [ver.confidenceIntervalLow, ver.confidenceIntervalHigh];
       hasVResults = true;
     }
-    if (ver.summary) { vResults.summary = ver.summary; hasVResults = true; }
+    if (ver.summary) {
+      vResults.summary = ver.summary;
+      hasVResults = true;
+    }
 
     return Response.json({
       data: {
@@ -198,10 +218,7 @@ export async function GET(
   });
 }
 
-export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await getSession(request);
   if (!user) {
@@ -210,11 +227,7 @@ export async function PATCH(
 
   const db = getDB();
 
-  const [exp] = await db
-    .select()
-    .from(experiments)
-    .where(eq(experiments.id, id))
-    .limit(1);
+  const [exp] = await db.select().from(experiments).where(eq(experiments.id, id)).limit(1);
 
   if (!exp) {
     return Response.json({ error: "Experiment not found" }, { status: 404 });
@@ -224,15 +237,8 @@ export async function PATCH(
     return Response.json({ error: "Only the author can edit this experiment" }, { status: 403 });
   }
 
-  const body = await request.json() as Record<string, unknown>;
-  const {
-    status,
-    methodology,
-    analysisPlan,
-    osfLink,
-    results,
-    changeSummary,
-  } = body;
+  const body = (await request.json()) as Record<string, unknown>;
+  const { status, methodology, analysisPlan, osfLink, results, changeSummary } = body;
 
   const newStatus = (status as string) || exp.status;
   const newMethodology = methodology !== undefined ? (methodology as string) : exp.methodology;
@@ -241,10 +247,16 @@ export async function PATCH(
 
   // Status-conditional validation
   if ((newStatus === "running" || newStatus === "completed") && !newMethodology) {
-    return Response.json({ error: "Methodology is required for running/completed experiments" }, { status: 400 });
+    return Response.json(
+      { error: "Methodology is required for running/completed experiments" },
+      { status: 400 },
+    );
   }
   if (newStatus === "completed" && !newAnalysisPlan) {
-    return Response.json({ error: "Analysis plan is required for completed experiments" }, { status: 400 });
+    return Response.json(
+      { error: "Analysis plan is required for completed experiments" },
+      { status: 400 },
+    );
   }
 
   // Check results summary requirement for completed status
@@ -257,7 +269,10 @@ export async function PATCH(
       .limit(1);
     const hasSummary = (r && r.summary) || existingRes?.summary;
     if (!hasSummary) {
-      return Response.json({ error: "Results summary is required for completed experiments" }, { status: 400 });
+      return Response.json(
+        { error: "Results summary is required for completed experiments" },
+        { status: 400 },
+      );
     }
   }
 
@@ -299,18 +314,22 @@ export async function PATCH(
   }
 
   // Update experiment
-  await db.update(experiments).set({
-    status: newStatus,
-    methodology: newMethodology || null,
-    analysisPlan: newAnalysisPlan || null,
-    osfLink: newOsfLink || null,
-    completedAt: newStatus === "completed" && !exp.completedAt ? now : exp.completedAt,
-    version: newVersion,
-    updatedAt: now,
-  }).where(eq(experiments.id, id));
+  await db
+    .update(experiments)
+    .set({
+      status: newStatus,
+      methodology: newMethodology || null,
+      analysisPlan: newAnalysisPlan || null,
+      osfLink: newOsfLink || null,
+      completedAt: newStatus === "completed" && !exp.completedAt ? now : exp.completedAt,
+      version: newVersion,
+      updatedAt: now,
+    })
+    .where(eq(experiments.id, id));
 
   // Handle results
-  const hasNewResults = r && (r.summary || r.pValue != null || r.effectSize != null || r.sampleSize != null);
+  const hasNewResults =
+    r && (r.summary || r.pValue != null || r.effectSize != null || r.sampleSize != null);
 
   if (hasNewResults) {
     const [existingResult] = await db
@@ -320,14 +339,23 @@ export async function PATCH(
       .limit(1);
 
     if (existingResult) {
-      await db.update(experimentResults).set({
-        pValue: r.pValue != null ? (r.pValue as number) : existingResult.pValue,
-        effectSize: r.effectSize != null ? (r.effectSize as number) : existingResult.effectSize,
-        sampleSize: r.sampleSize != null ? (r.sampleSize as number) : existingResult.sampleSize,
-        confidenceIntervalLow: r.confidenceIntervalLow != null ? (r.confidenceIntervalLow as number) : existingResult.confidenceIntervalLow,
-        confidenceIntervalHigh: r.confidenceIntervalHigh != null ? (r.confidenceIntervalHigh as number) : existingResult.confidenceIntervalHigh,
-        summary: r.summary != null ? (r.summary as string) : existingResult.summary,
-      }).where(eq(experimentResults.experimentId, id));
+      await db
+        .update(experimentResults)
+        .set({
+          pValue: r.pValue != null ? (r.pValue as number) : existingResult.pValue,
+          effectSize: r.effectSize != null ? (r.effectSize as number) : existingResult.effectSize,
+          sampleSize: r.sampleSize != null ? (r.sampleSize as number) : existingResult.sampleSize,
+          confidenceIntervalLow:
+            r.confidenceIntervalLow != null
+              ? (r.confidenceIntervalLow as number)
+              : existingResult.confidenceIntervalLow,
+          confidenceIntervalHigh:
+            r.confidenceIntervalHigh != null
+              ? (r.confidenceIntervalHigh as number)
+              : existingResult.confidenceIntervalHigh,
+          summary: r.summary != null ? (r.summary as string) : existingResult.summary,
+        })
+        .where(eq(experimentResults.experimentId, id));
     } else {
       await db.insert(experimentResults).values({
         experimentId: id,

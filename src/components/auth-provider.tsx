@@ -36,7 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refresh = useCallback(async () => {
     try {
       const res = await fetch("/api/auth/me");
-      const data = await res.json() as { user: AuthUser | null };
+      const data = (await res.json()) as { user: AuthUser | null };
       setUser(data.user || null);
     } catch {
       setUser(null);
@@ -55,7 +55,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signOut, refresh, showAuthModal, setShowAuthModal }}>
+    <AuthContext.Provider
+      value={{ user, loading, signOut, refresh, showAuthModal, setShowAuthModal }}
+    >
       {children}
     </AuthContext.Provider>
   );

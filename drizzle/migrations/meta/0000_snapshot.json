@@ -81,12 +81,8 @@
           "name": "arena_matchups_hypothesis_a_id_hypotheses_id_fk",
           "tableFrom": "arena_matchups",
           "tableTo": "hypotheses",
-          "columnsFrom": [
-            "hypothesis_a_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["hypothesis_a_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -94,12 +90,8 @@
           "name": "arena_matchups_hypothesis_b_id_hypotheses_id_fk",
           "tableFrom": "arena_matchups",
           "tableTo": "hypotheses",
-          "columnsFrom": [
-            "hypothesis_b_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["hypothesis_b_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -157,17 +149,12 @@
       "indexes": {
         "idx_arena_votes_matchup_id": {
           "name": "idx_arena_votes_matchup_id",
-          "columns": [
-            "matchup_id"
-          ],
+          "columns": ["matchup_id"],
           "isUnique": false
         },
         "idx_arena_votes_ip_matchup": {
           "name": "idx_arena_votes_ip_matchup",
-          "columns": [
-            "matchup_id",
-            "voter_ip_hash"
-          ],
+          "columns": ["matchup_id", "voter_ip_hash"],
           "isUnique": true
         }
       },
@@ -176,12 +163,8 @@
           "name": "arena_votes_matchup_id_arena_matchups_id_fk",
           "tableFrom": "arena_votes",
           "tableTo": "arena_matchups",
-          "columnsFrom": [
-            "matchup_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["matchup_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -189,12 +172,8 @@
           "name": "arena_votes_user_id_users_id_fk",
           "tableFrom": "arena_votes",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -266,23 +245,17 @@
       "indexes": {
         "idx_comments_hypothesis_id": {
           "name": "idx_comments_hypothesis_id",
-          "columns": [
-            "hypothesis_id"
-          ],
+          "columns": ["hypothesis_id"],
           "isUnique": false
         },
         "idx_comments_user_id": {
           "name": "idx_comments_user_id",
-          "columns": [
-            "user_id"
-          ],
+          "columns": ["user_id"],
           "isUnique": false
         },
         "idx_comments_parent_id": {
           "name": "idx_comments_parent_id",
-          "columns": [
-            "parent_id"
-          ],
+          "columns": ["parent_id"],
           "isUnique": false
         }
       },
@@ -291,12 +264,8 @@
           "name": "comments_hypothesis_id_hypotheses_id_fk",
           "tableFrom": "comments",
           "tableTo": "hypotheses",
-          "columnsFrom": [
-            "hypothesis_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["hypothesis_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -304,12 +273,8 @@
           "name": "comments_user_id_users_id_fk",
           "tableFrom": "comments",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -339,16 +304,12 @@
       "indexes": {
         "idx_dps_dataset_id": {
           "name": "idx_dps_dataset_id",
-          "columns": [
-            "dataset_id"
-          ],
+          "columns": ["dataset_id"],
           "isUnique": false
         },
         "idx_dps_ps_id": {
           "name": "idx_dps_ps_id",
-          "columns": [
-            "problem_statement_id"
-          ],
+          "columns": ["problem_statement_id"],
           "isUnique": false
         }
       },
@@ -357,12 +318,8 @@
           "name": "dataset_problem_statements_dataset_id_datasets_id_fk",
           "tableFrom": "dataset_problem_statements",
           "tableTo": "datasets",
-          "columnsFrom": [
-            "dataset_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["dataset_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -370,22 +327,15 @@
           "name": "dataset_problem_statements_problem_statement_id_problem_statements_id_fk",
           "tableFrom": "dataset_problem_statements",
           "tableTo": "problem_statements",
-          "columnsFrom": [
-            "problem_statement_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["problem_statement_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "dataset_problem_statements_dataset_id_problem_statement_id_pk": {
-          "columns": [
-            "dataset_id",
-            "problem_statement_id"
-          ],
+          "columns": ["dataset_id", "problem_statement_id"],
           "name": "dataset_problem_statements_dataset_id_problem_statement_id_pk"
         }
       },
@@ -476,16 +426,12 @@
       "indexes": {
         "idx_datasets_domain": {
           "name": "idx_datasets_domain",
-          "columns": [
-            "domain"
-          ],
+          "columns": ["domain"],
           "isUnique": false
         },
         "idx_datasets_submitted_by": {
           "name": "idx_datasets_submitted_by",
-          "columns": [
-            "submitted_by"
-          ],
+          "columns": ["submitted_by"],
           "isUnique": false
         }
       },
@@ -494,12 +440,8 @@
           "name": "datasets_submitted_by_users_id_fk",
           "tableFrom": "datasets",
           "tableTo": "users",
-          "columnsFrom": [
-            "submitted_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["submitted_by"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -581,12 +523,8 @@
           "name": "experiment_results_experiment_id_experiments_id_fk",
           "tableFrom": "experiment_results",
           "tableTo": "experiments",
-          "columnsFrom": [
-            "experiment_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["experiment_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -707,23 +645,17 @@
       "indexes": {
         "idx_experiments_hypothesis_id": {
           "name": "idx_experiments_hypothesis_id",
-          "columns": [
-            "hypothesis_id"
-          ],
+          "columns": ["hypothesis_id"],
           "isUnique": false
         },
         "idx_experiments_status": {
           "name": "idx_experiments_status",
-          "columns": [
-            "status"
-          ],
+          "columns": ["status"],
           "isUnique": false
         },
         "idx_experiments_dataset_id": {
           "name": "idx_experiments_dataset_id",
-          "columns": [
-            "dataset_id"
-          ],
+          "columns": ["dataset_id"],
           "isUnique": false
         }
       },
@@ -732,12 +664,8 @@
           "name": "experiments_hypothesis_id_hypotheses_id_fk",
           "tableFrom": "experiments",
           "tableTo": "hypotheses",
-          "columnsFrom": [
-            "hypothesis_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["hypothesis_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -745,12 +673,8 @@
           "name": "experiments_dataset_id_datasets_id_fk",
           "tableFrom": "experiments",
           "tableTo": "datasets",
-          "columnsFrom": [
-            "dataset_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["dataset_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -758,12 +682,8 @@
           "name": "experiments_submitted_by_users_id_fk",
           "tableFrom": "experiments",
           "tableTo": "users",
-          "columnsFrom": [
-            "submitted_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["submitted_by"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -928,30 +848,22 @@
       "indexes": {
         "idx_hypotheses_status": {
           "name": "idx_hypotheses_status",
-          "columns": [
-            "status"
-          ],
+          "columns": ["status"],
           "isUnique": false
         },
         "idx_hypotheses_phase": {
           "name": "idx_hypotheses_phase",
-          "columns": [
-            "phase"
-          ],
+          "columns": ["phase"],
           "isUnique": false
         },
         "idx_hypotheses_submitted_at": {
           "name": "idx_hypotheses_submitted_at",
-          "columns": [
-            "submitted_at"
-          ],
+          "columns": ["submitted_at"],
           "isUnique": false
         },
         "idx_hypotheses_arena_elo": {
           "name": "idx_hypotheses_arena_elo",
-          "columns": [
-            "arena_elo"
-          ],
+          "columns": ["arena_elo"],
           "isUnique": false
         }
       },
@@ -960,12 +872,8 @@
           "name": "hypotheses_submitted_by_users_id_fk",
           "tableFrom": "hypotheses",
           "tableTo": "users",
-          "columnsFrom": [
-            "submitted_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["submitted_by"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1031,9 +939,7 @@
       "indexes": {
         "idx_problem_statements_domain": {
           "name": "idx_problem_statements_domain",
-          "columns": [
-            "domain"
-          ],
+          "columns": ["domain"],
           "isUnique": false
         }
       },
@@ -1077,16 +983,12 @@
       "indexes": {
         "idx_sessions_user_id": {
           "name": "idx_sessions_user_id",
-          "columns": [
-            "user_id"
-          ],
+          "columns": ["user_id"],
           "isUnique": false
         },
         "idx_sessions_expires_at": {
           "name": "idx_sessions_expires_at",
-          "columns": [
-            "expires_at"
-          ],
+          "columns": ["expires_at"],
           "isUnique": false
         }
       },
@@ -1095,12 +997,8 @@
           "name": "sessions_user_id_users_id_fk",
           "tableFrom": "sessions",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1222,16 +1120,12 @@
       "indexes": {
         "users_google_id_unique": {
           "name": "users_google_id_unique",
-          "columns": [
-            "google_id"
-          ],
+          "columns": ["google_id"],
           "isUnique": true
         },
         "users_email_unique": {
           "name": "users_email_unique",
-          "columns": [
-            "email"
-          ],
+          "columns": ["email"],
           "isUnique": true
         }
       },

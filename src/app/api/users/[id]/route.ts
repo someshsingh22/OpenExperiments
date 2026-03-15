@@ -2,12 +2,9 @@ export const runtime = "edge";
 
 import { getDB } from "@/db";
 import { users, hypotheses, comments, stars, experiments, arenaVotes } from "@/db/schema";
-import { eq, and, sql, desc, inArray } from "drizzle-orm";
+import { eq, sql, desc, inArray } from "drizzle-orm";
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { getSession } = await import("@/lib/auth");
   const viewer = await getSession(request);
   const { id } = await params;
@@ -81,9 +78,7 @@ export async function GET(
     : allHypotheses.filter((h) => h.isAnonymous !== 1);
 
   // Derive affiliation from email domain
-  const emailAffiliation = user.email
-    ? extractAffiliation(user.email)
-    : null;
+  const emailAffiliation = user.email ? extractAffiliation(user.email) : null;
 
   return Response.json({
     data: {
@@ -129,10 +124,7 @@ export async function GET(
   });
 }
 
-export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { getSession, requireSession } = await import("@/lib/auth");
   const viewer = await getSession(request);
   const unauthorized = requireSession(viewer);
@@ -144,7 +136,7 @@ export async function PATCH(
   }
 
   const db = getDB();
-  const body = await request.json() as Record<string, unknown>;
+  const body = (await request.json()) as Record<string, unknown>;
 
   const { validateProfile } = await import("@/lib/validation");
   const nameValue = body.name || viewer!.name || "";
@@ -156,16 +148,19 @@ export async function PATCH(
   const { name, position, scholarUrl, website, bio, orcid, twitterHandle } = result.data;
   const now = Math.floor(Date.now() / 1000);
 
-  await db.update(users).set({
-    name,
-    position: position || null,
-    scholarUrl: scholarUrl || null,
-    website: website || null,
-    bio: bio || null,
-    orcid: orcid || null,
-    twitterHandle: twitterHandle || null,
-    updatedAt: now,
-  }).where(eq(users.id, id));
+  await db
+    .update(users)
+    .set({
+      name,
+      position: position || null,
+      scholarUrl: scholarUrl || null,
+      website: website || null,
+      bio: bio || null,
+      orcid: orcid || null,
+      twitterHandle: twitterHandle || null,
+      updatedAt: now,
+    })
+    .where(eq(users.id, id));
 
   return Response.json({ ok: true });
 }
@@ -174,7 +169,16 @@ function extractAffiliation(email: string): string | null {
   const domain = email.split("@")[1];
   if (!domain) return null;
   // Common email providers → no affiliation
-  const generic = ["gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "protonmail.com", "icloud.com", "mail.com", "aol.com"];
+  const generic = [
+    "gmail.com",
+    "yahoo.com",
+    "hotmail.com",
+    "outlook.com",
+    "protonmail.com",
+    "icloud.com",
+    "mail.com",
+    "aol.com",
+  ];
   if (generic.includes(domain.toLowerCase())) return null;
   // Return the domain without TLD as affiliation hint
   const parts = domain.split(".");

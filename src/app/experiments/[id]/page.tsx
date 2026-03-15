@@ -39,7 +39,11 @@ const STATUS_OPTIONS = [
 ] as const;
 
 function fmtDate(d: string) {
-  return new Date(d).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+  return new Date(d).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 export default function ExperimentDetailPage() {
@@ -102,10 +106,22 @@ export default function ExperimentDetailPage() {
     setEditOsfLink(experiment.osfLink || "");
     setEditSummary(experiment.results?.summary || "");
     setEditPValue(experiment.results?.pValue != null ? String(experiment.results.pValue) : "");
-    setEditEffectSize(experiment.results?.effectSize != null ? String(experiment.results.effectSize) : "");
-    setEditSampleSize(experiment.results?.sampleSize != null ? String(experiment.results.sampleSize) : "");
-    setEditCILow(experiment.results?.confidenceInterval?.[0] != null ? String(experiment.results.confidenceInterval[0]) : "");
-    setEditCIHigh(experiment.results?.confidenceInterval?.[1] != null ? String(experiment.results.confidenceInterval[1]) : "");
+    setEditEffectSize(
+      experiment.results?.effectSize != null ? String(experiment.results.effectSize) : "",
+    );
+    setEditSampleSize(
+      experiment.results?.sampleSize != null ? String(experiment.results.sampleSize) : "",
+    );
+    setEditCILow(
+      experiment.results?.confidenceInterval?.[0] != null
+        ? String(experiment.results.confidenceInterval[0])
+        : "",
+    );
+    setEditCIHigh(
+      experiment.results?.confidenceInterval?.[1] != null
+        ? String(experiment.results.confidenceInterval[1])
+        : "",
+    );
     setEditChangeSummary("");
     setSaveError("");
     setEditing(true);
@@ -155,7 +171,10 @@ export default function ExperimentDetailPage() {
     return (
       <div className="mx-auto max-w-4xl px-4 py-20 text-center">
         <p className="text-sm text-stone-500">{error || "Experiment not found"}</p>
-        <Link href="/experiments" className="mt-4 inline-block text-sm font-medium text-stone-600 hover:text-stone-900">
+        <Link
+          href="/experiments"
+          className="mt-4 inline-block text-sm font-medium text-stone-600 hover:text-stone-900"
+        >
           &larr; Back to experiments
         </Link>
       </div>
@@ -165,7 +184,8 @@ export default function ExperimentDetailPage() {
   const typeMeta = EXP_TYPE_LABELS[experiment.type] || EXP_TYPE_LABELS.observational;
   const statusMeta = STATUS_LABELS[experiment.status] || STATUS_LABELS.planned;
   const isAuthor = user && experiment.submitter && user.id === experiment.submitter.id;
-  const isViewingOld = viewingVersion != null && viewingVersion < (experiment.totalVersions ?? experiment.version);
+  const isViewingOld =
+    viewingVersion != null && viewingVersion < (experiment.totalVersions ?? experiment.version);
 
   const inputClass =
     "w-full rounded-md border border-stone-200 px-3 py-2.5 text-sm text-stone-800 placeholder-stone-400 transition-colors focus:border-stone-300 focus:outline-none focus:ring-1 focus:ring-stone-300";
@@ -190,7 +210,9 @@ export default function ExperimentDetailPage() {
       {/* Version banner */}
       {isViewingOld && (
         <div className="mb-4 flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50/50 px-4 py-2.5 text-sm text-amber-700">
-          <span>You are viewing version {viewingVersion} of {experiment.totalVersions}.</span>
+          <span>
+            You are viewing version {viewingVersion} of {experiment.totalVersions}.
+          </span>
           <button
             onClick={() => router.push(`/experiments/${id}`)}
             className="font-medium underline underline-offset-2 hover:text-amber-900"
@@ -202,18 +224,21 @@ export default function ExperimentDetailPage() {
 
       {/* Header */}
       <header className="mb-10">
-        <div className="flex flex-wrap items-center gap-2 mb-3">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
           <FlaskConical className="h-5 w-5 text-stone-400" />
-          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${typeMeta.cls}`}>
+          <span
+            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${typeMeta.cls}`}
+          >
             {typeMeta.label}
           </span>
-          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${statusMeta.cls}`}>
+          <span
+            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${statusMeta.cls}`}
+          >
             {statusMeta.label}
           </span>
           {(experiment.totalVersions ?? 1) > 1 && (
             <span className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-medium text-stone-500">
-              <History className="h-3 w-3" />
-              v{experiment.version}
+              <History className="h-3 w-3" />v{experiment.version}
             </span>
           )}
           {isAuthor && !editing && !isViewingOld && (
@@ -277,7 +302,7 @@ export default function ExperimentDetailPage() {
       {/* Hypothesis */}
       {hypothesis && (
         <section className="mb-10">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-stone-400">
+          <h2 className="mb-3 text-sm font-semibold tracking-wider text-stone-400 uppercase">
             Hypothesis Being Tested
           </h2>
           <Link
@@ -289,9 +314,7 @@ export default function ExperimentDetailPage() {
                 <DomainTag key={d} domain={d as Domain} />
               ))}
             </div>
-            <p className="text-[13px] leading-relaxed text-stone-700">
-              {hypothesis.statement}
-            </p>
+            <p className="text-[13px] leading-relaxed text-stone-700">{hypothesis.statement}</p>
           </Link>
         </section>
       )}
@@ -300,7 +323,7 @@ export default function ExperimentDetailPage() {
       {editing && (
         <section className="mb-10 rounded-xl border border-stone-300 bg-stone-50/50 p-6">
           <div className="mb-5 flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500">
+            <h2 className="text-sm font-semibold tracking-wider text-stone-500 uppercase">
               Edit Experiment
             </h2>
             <button
@@ -321,7 +344,7 @@ export default function ExperimentDetailPage() {
                 {STATUS_OPTIONS.map((opt) => (
                   <label
                     key={opt.value}
-                    className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium cursor-pointer transition-colors ${
+                    className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
                       editStatus === opt.value
                         ? "border-stone-900 bg-stone-900 text-white"
                         : "border-stone-200 bg-white text-stone-700 hover:border-stone-300"
@@ -345,9 +368,11 @@ export default function ExperimentDetailPage() {
             <div>
               <label className="mb-1.5 block text-sm font-semibold text-stone-700">
                 Methodology
-                {editMethodologyRequired
-                  ? <span className="ml-1 text-red-400">*</span>
-                  : <span className="ml-1 font-normal text-stone-400">(optional)</span>}
+                {editMethodologyRequired ? (
+                  <span className="ml-1 text-red-400">*</span>
+                ) : (
+                  <span className="ml-1 font-normal text-stone-400">(optional)</span>
+                )}
               </label>
               <textarea
                 value={editMethodology}
@@ -363,9 +388,11 @@ export default function ExperimentDetailPage() {
               <div>
                 <label className="mb-1.5 block text-sm font-semibold text-stone-700">
                   Analysis Plan
-                  {editAnalysisRequired
-                    ? <span className="ml-1 text-red-400">*</span>
-                    : <span className="ml-1 font-normal text-stone-400">(optional)</span>}
+                  {editAnalysisRequired ? (
+                    <span className="ml-1 text-red-400">*</span>
+                  ) : (
+                    <span className="ml-1 font-normal text-stone-400">(optional)</span>
+                  )}
                 </label>
                 <textarea
                   value={editAnalysis}
@@ -395,72 +422,72 @@ export default function ExperimentDetailPage() {
                 <div>
                   <label className="mb-2 block text-sm font-semibold text-stone-700">
                     Key Metrics <span className="font-normal text-stone-400">(optional)</span>
-                </label>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <div>
-                    <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-stone-400">
-                      p-value
-                    </label>
-                    <input
-                      type="number"
-                      step="any"
-                      value={editPValue}
-                      onChange={(e) => setEditPValue(e.target.value)}
-                      placeholder="0.002"
-                      className={metricInputClass}
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-stone-400">
-                      Effect Size
-                    </label>
-                    <input
-                      type="number"
-                      step="any"
-                      value={editEffectSize}
-                      onChange={(e) => setEditEffectSize(e.target.value)}
-                      placeholder="0.33"
-                      className={metricInputClass}
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-stone-400">
-                      Sample Size
-                    </label>
-                    <input
-                      type="number"
-                      step="1"
-                      value={editSampleSize}
-                      onChange={(e) => setEditSampleSize(e.target.value)}
-                      placeholder="2500"
-                      className={metricInputClass}
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-stone-400">
-                      95% CI
-                    </label>
-                    <div className="flex items-center gap-1">
+                  </label>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div>
+                      <label className="mb-1 block text-[11px] font-medium tracking-wider text-stone-400 uppercase">
+                        p-value
+                      </label>
                       <input
                         type="number"
                         step="any"
-                        value={editCILow}
-                        onChange={(e) => setEditCILow(e.target.value)}
-                        placeholder="0.18"
-                        className={metricInputClass}
-                      />
-                      <span className="text-stone-300">&ndash;</span>
-                      <input
-                        type="number"
-                        step="any"
-                        value={editCIHigh}
-                        onChange={(e) => setEditCIHigh(e.target.value)}
-                        placeholder="0.48"
+                        value={editPValue}
+                        onChange={(e) => setEditPValue(e.target.value)}
+                        placeholder="0.002"
                         className={metricInputClass}
                       />
                     </div>
+                    <div>
+                      <label className="mb-1 block text-[11px] font-medium tracking-wider text-stone-400 uppercase">
+                        Effect Size
+                      </label>
+                      <input
+                        type="number"
+                        step="any"
+                        value={editEffectSize}
+                        onChange={(e) => setEditEffectSize(e.target.value)}
+                        placeholder="0.33"
+                        className={metricInputClass}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-[11px] font-medium tracking-wider text-stone-400 uppercase">
+                        Sample Size
+                      </label>
+                      <input
+                        type="number"
+                        step="1"
+                        value={editSampleSize}
+                        onChange={(e) => setEditSampleSize(e.target.value)}
+                        placeholder="2500"
+                        className={metricInputClass}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-[11px] font-medium tracking-wider text-stone-400 uppercase">
+                        95% CI
+                      </label>
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          step="any"
+                          value={editCILow}
+                          onChange={(e) => setEditCILow(e.target.value)}
+                          placeholder="0.18"
+                          className={metricInputClass}
+                        />
+                        <span className="text-stone-300">&ndash;</span>
+                        <input
+                          type="number"
+                          step="any"
+                          value={editCIHigh}
+                          onChange={(e) => setEditCIHigh(e.target.value)}
+                          placeholder="0.48"
+                          className={metricInputClass}
+                        />
+                      </div>
+                    </div>
                   </div>
-                </div>
                 </div>
               </div>
             )}
@@ -521,11 +548,11 @@ export default function ExperimentDetailPage() {
       {/* Methodology */}
       {!editing && experiment.methodology && (
         <section className="mb-10">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-stone-400">
+          <h2 className="mb-3 text-sm font-semibold tracking-wider text-stone-400 uppercase">
             Methodology
           </h2>
           <div className="rounded-lg border border-stone-200 bg-stone-50/50 p-5">
-            <p className="text-sm leading-relaxed text-stone-700 whitespace-pre-wrap">
+            <p className="text-sm leading-relaxed whitespace-pre-wrap text-stone-700">
               {experiment.methodology}
             </p>
           </div>
@@ -535,11 +562,11 @@ export default function ExperimentDetailPage() {
       {/* Analysis Plan */}
       {!editing && experiment.analysisPlan && (
         <section className="mb-10">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-stone-400">
+          <h2 className="mb-3 text-sm font-semibold tracking-wider text-stone-400 uppercase">
             Analysis Plan
           </h2>
           <div className="rounded-lg border border-stone-200 bg-stone-50/50 p-5">
-            <p className="text-sm leading-relaxed text-stone-700 whitespace-pre-wrap">
+            <p className="text-sm leading-relaxed whitespace-pre-wrap text-stone-700">
               {experiment.analysisPlan}
             </p>
           </div>
@@ -549,19 +576,19 @@ export default function ExperimentDetailPage() {
       {/* Results */}
       {!editing && experiment.results && (
         <section className="mb-10">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-stone-400">
+          <h2 className="mb-3 text-sm font-semibold tracking-wider text-stone-400 uppercase">
             Results
           </h2>
           <div className="rounded-lg border border-stone-200 bg-white p-5">
             {experiment.results.summary && (
-              <p className="text-sm leading-relaxed text-stone-700 mb-4">
+              <p className="mb-4 text-sm leading-relaxed text-stone-700">
                 {experiment.results.summary}
               </p>
             )}
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
               {experiment.results.pValue != null && (
                 <div>
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-stone-400">
+                  <span className="text-[10px] font-medium tracking-wider text-stone-400 uppercase">
                     p-value
                   </span>
                   <p className="mt-0.5 font-mono text-sm font-semibold text-stone-800">
@@ -571,7 +598,7 @@ export default function ExperimentDetailPage() {
               )}
               {experiment.results.effectSize != null && (
                 <div>
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-stone-400">
+                  <span className="text-[10px] font-medium tracking-wider text-stone-400 uppercase">
                     Effect Size
                   </span>
                   <p className="mt-0.5 font-mono text-sm font-semibold text-stone-800">
@@ -581,7 +608,7 @@ export default function ExperimentDetailPage() {
               )}
               {experiment.results.sampleSize != null && (
                 <div>
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-stone-400">
+                  <span className="text-[10px] font-medium tracking-wider text-stone-400 uppercase">
                     Sample Size
                   </span>
                   <p className="mt-0.5 font-mono text-sm font-semibold text-stone-800">
@@ -591,11 +618,12 @@ export default function ExperimentDetailPage() {
               )}
               {experiment.results.confidenceInterval && (
                 <div>
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-stone-400">
+                  <span className="text-[10px] font-medium tracking-wider text-stone-400 uppercase">
                     95% CI
                   </span>
                   <p className="mt-0.5 font-mono text-sm font-semibold text-stone-800">
-                    [{experiment.results.confidenceInterval[0]}, {experiment.results.confidenceInterval[1]}]
+                    [{experiment.results.confidenceInterval[0]},{" "}
+                    {experiment.results.confidenceInterval[1]}]
                   </p>
                 </div>
               )}
@@ -614,7 +642,7 @@ export default function ExperimentDetailPage() {
       {/* Version History */}
       {(experiment.totalVersions ?? 1) > 1 && versions.length > 0 && (
         <section className="mb-10">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-stone-400 flex items-center gap-1.5">
+          <h2 className="mb-3 flex items-center gap-1.5 text-sm font-semibold tracking-wider text-stone-400 uppercase">
             <History className="h-3.5 w-3.5" />
             Version History
           </h2>
@@ -636,16 +664,20 @@ export default function ExperimentDetailPage() {
                       : "border-stone-200 bg-white hover:border-stone-300"
                   }`}
                 >
-                  <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold ${
-                    isViewing ? "bg-stone-800 text-white" : "bg-stone-100 text-stone-500"
-                  }`}>
+                  <span
+                    className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold ${
+                      isViewing ? "bg-stone-800 text-white" : "bg-stone-100 text-stone-500"
+                    }`}
+                  >
                     {v.version}
                   </span>
-                  <div className="flex-1 min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold ring-1 ring-inset ${
-                        STATUS_LABELS[v.status]?.cls || ""
-                      }`}>
+                      <span
+                        className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold ring-1 ring-inset ${
+                          STATUS_LABELS[v.status]?.cls || ""
+                        }`}
+                      >
                         {STATUS_LABELS[v.status]?.label || v.status}
                       </span>
                       {isCurrent && (
@@ -653,10 +685,12 @@ export default function ExperimentDetailPage() {
                       )}
                     </div>
                     {v.changeSummary && (
-                      <p className="mt-0.5 text-[12px] text-stone-500 truncate">{v.changeSummary}</p>
+                      <p className="mt-0.5 truncate text-[12px] text-stone-500">
+                        {v.changeSummary}
+                      </p>
                     )}
                   </div>
-                  <span className="text-[11px] text-stone-400 shrink-0">
+                  <span className="shrink-0 text-[11px] text-stone-400">
                     {fmtDate(v.createdAt)}
                   </span>
                 </button>

@@ -25,18 +25,16 @@ export async function POST(request: Request) {
     const [existing] = await db
       .select()
       .from(arenaVotes)
-      .where(
-        and(
-          eq(arenaVotes.matchupId, matchupId),
-          eq(arenaVotes.userId, user.id)
-        )
-      )
+      .where(and(eq(arenaVotes.matchupId, matchupId), eq(arenaVotes.userId, user.id)))
       .limit(1);
     if (existing) {
       return Response.json({ error: "Already voted on this matchup" }, { status: 409 });
     }
   } else {
-    const ip = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "unknown";
+    const ip =
+      request.headers.get("cf-connecting-ip") ||
+      request.headers.get("x-forwarded-for") ||
+      "unknown";
     const encoder = new TextEncoder();
     const hashData = encoder.encode(ip + "-openexperiments-salt");
     const hashBuffer = await crypto.subtle.digest("SHA-256", hashData);
@@ -47,12 +45,7 @@ export async function POST(request: Request) {
     const [existing] = await db
       .select()
       .from(arenaVotes)
-      .where(
-        and(
-          eq(arenaVotes.matchupId, matchupId),
-          eq(arenaVotes.voterIpHash, ipHash)
-        )
-      )
+      .where(and(eq(arenaVotes.matchupId, matchupId), eq(arenaVotes.voterIpHash, ipHash)))
       .limit(1);
     if (existing) {
       return Response.json({ error: "Already voted on this matchup" }, { status: 409 });
@@ -83,16 +76,25 @@ export async function POST(request: Request) {
     createdAt: now,
   });
 
-  // Update aggregate counts
+  // Update aggregate counts (both_weak only increments total_votes, not any vote column)
   const voteColumn =
-    vote === "a" ? "votes_a" : vote === "b" ? "votes_b" : "votes_tie";
-  await db.run(sql`
-    UPDATE arena_matchups
-    SET total_votes = total_votes + 1,
-        ${sql.raw(voteColumn)} = ${sql.raw(voteColumn)} + 1,
-        updated_at = ${now}
-    WHERE id = ${matchupId}
-  `);
+    vote === "a" ? "votes_a" : vote === "b" ? "votes_b" : vote === "tie" ? "votes_tie" : null;
+  if (voteColumn) {
+    await db.run(sql`
+      UPDATE arena_matchups
+      SET total_votes = total_votes + 1,
+          ${sql.raw(voteColumn)} = ${sql.raw(voteColumn)} + 1,
+          updated_at = ${now}
+      WHERE id = ${matchupId}
+    `);
+  } else {
+    await db.run(sql`
+      UPDATE arena_matchups
+      SET total_votes = total_votes + 1,
+          updated_at = ${now}
+      WHERE id = ${matchupId}
+    `);
+  }
 
   // Return updated matchup
   const [updated] = await db

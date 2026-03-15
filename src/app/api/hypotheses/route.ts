@@ -28,8 +28,8 @@ export async function GET(request: Request) {
       or(
         like(hypotheses.statement, term),
         like(hypotheses.rationale, term),
-        like(hypotheses.problemStatement, term)
-      )!
+        like(hypotheses.problemStatement, term),
+      )!,
     );
   }
   if (domain) {
@@ -66,8 +66,8 @@ export async function GET(request: Request) {
 
   // Compute actual comment counts from comments table
   const hypothesisIds = rows.map((r) => r.id);
-  let commentCounts = new Map<string, number>();
-  let experimentCounts = new Map<string, number>();
+  const commentCounts = new Map<string, number>();
+  const experimentCounts = new Map<string, number>();
   if (hypothesisIds.length > 0) {
     const ccRows = await db
       .select({
@@ -114,7 +114,16 @@ export async function POST(request: Request) {
     return Response.json({ errors: result.errors }, { status: 400 });
   }
 
-  const { statement, rationale, problemStatement, domains, source, agentName, citationDois, isAnonymous } = result.data;
+  const {
+    statement,
+    rationale,
+    problemStatement,
+    domains,
+    source,
+    agentName,
+    citationDois,
+    isAnonymous,
+  } = result.data;
 
   const id = crypto.randomUUID();
   const now = Math.floor(Date.now() / 1000);

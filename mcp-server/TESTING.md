@@ -139,6 +139,7 @@ User: "I think questions are more persuasive than statements in arguments"
 ```
 
 **Expected LLM behavior:**
+
 1. Calls `list_problem_statements` to see active research areas
 2. Calls `list_datasets` to understand available data
 3. Calls `search_hypotheses` with "question" to check for duplicates
@@ -149,6 +150,7 @@ User: "I think questions are more persuasive than statements in arguments"
 7. User gets a clickable link to `/submit` with pre-filled form
 
 **Evaluate:**
+
 - [ ] LLM correctly identifies relevant problem statements
 - [ ] LLM correctly identifies which dataset(s) apply
 - [ ] LLM checks for duplicate hypotheses
@@ -165,6 +167,7 @@ User: "I think video thumbnails with text overlays get more clicks"
 ```
 
 **Expected LLM behavior:**
+
 1. Calls `list_problem_statements` and `list_datasets`
 2. Recognizes no dataset covers video thumbnails or click-through rates
 3. Clearly tells the user: no suitable dataset exists
@@ -172,6 +175,7 @@ User: "I think video thumbnails with text overlays get more clicks"
 5. Optionally: still helps frame the hypothesis for when data becomes available
 
 **Evaluate:**
+
 - [ ] LLM does NOT hallucinate a matching dataset
 - [ ] LLM clearly communicates the gap
 - [ ] LLM provides actionable next step (GitHub link)
@@ -185,6 +189,7 @@ User: "What hasn't been explored in memorability yet?"
 ```
 
 **Expected LLM behavior:**
+
 1. Uses `co-ideate` prompt or calls `search_hypotheses` with domain filter
 2. Lists what HAS been tested (faces, color, focal points, physical violations)
 3. Identifies gaps (texture, emotional content, cultural context, motion blur,
@@ -193,6 +198,7 @@ User: "What hasn't been explored in memorability yet?"
 5. Helps develop the user's preferred direction into a hypothesis
 
 **Evaluate:**
+
 - [ ] LLM accurately summarizes existing coverage
 - [ ] Suggestions are genuinely novel (not duplicates)
 - [ ] Suggestions are testable with available datasets (LaMem, Visual Attention)
@@ -206,12 +212,14 @@ User: "Show me the most successful hypotheses about persuasion"
 ```
 
 **Expected LLM behavior:**
+
 1. Calls `search_hypotheses` or `get_arena_rankings`
 2. Presents top-rated persuasion hypotheses
 3. For the top one (h-1), calls `get_hypothesis` for full detail
 4. Summarizes the evidence landscape
 
 **Evaluate:**
+
 - [ ] Correct data presented
 - [ ] Statistical results accurately conveyed
 - [ ] LLM doesn't misinterpret p-values or effect sizes
@@ -225,6 +233,7 @@ User: "How should I test hypothesis h-5 (statistics vs anecdotes)?"
 ```
 
 **Expected LLM behavior:**
+
 1. Calls `get_hypothesis` for h-5
 2. Calls `list_experiments` for similar hypotheses (h-1, h-4, h-8)
 3. Reviews past methodologies (logistic regression on CMV data, LLM annotation)
@@ -233,6 +242,7 @@ User: "How should I test hypothesis h-5 (statistics vs anecdotes)?"
 5. Recommends the Reddit CMV dataset (ds-1)
 
 **Evaluate:**
+
 - [ ] LLM references past experiment methodologies
 - [ ] Suggested methodology is sound
 - [ ] Correct dataset recommended
@@ -245,17 +255,18 @@ User: "How should I test hypothesis h-5 (statistics vs anecdotes)?"
 
 Run the prompt 5 times with different ideas. For each, score (1-5):
 
-| Criteria | Score |
-|----------|-------|
-| Correctly identifies relevant problem statement | /5 |
-| Correctly identifies relevant dataset(s) | /5 |
-| Checks for duplicate hypotheses | /5 |
-| Generated hypothesis is specific/falsifiable | /5 |
-| Rationale is well-grounded | /5 |
-| Correctly handles "no dataset" case | /5 |
-| Generates working submission URL | /5 |
+| Criteria                                        | Score |
+| ----------------------------------------------- | ----- |
+| Correctly identifies relevant problem statement | /5    |
+| Correctly identifies relevant dataset(s)        | /5    |
+| Checks for duplicate hypotheses                 | /5    |
+| Generated hypothesis is specific/falsifiable    | /5    |
+| Rationale is well-grounded                      | /5    |
+| Correctly handles "no dataset" case             | /5    |
+| Generates working submission URL                | /5    |
 
 **Test ideas:**
+
 1. "Longer arguments are more persuasive" (partially overlaps with existing)
 2. "Symmetry makes images memorable" (testable with LaMem)
 3. "Sarcasm hurts persuasion" (testable with CMV)
@@ -311,26 +322,34 @@ Test against a fresh database with no seed data:
 After running Phases 1-5, use this process to improve:
 
 ### Tool Descriptions
+
 If the LLM calls the wrong tool or doesn't call a tool when it should:
+
 1. Note which tool should have been called and what was called instead
 2. Update the tool's `description` string to be more specific about when to use it
 3. Re-test the failing workflow
 
 ### Prompt Context
+
 If the formulation prompt produces weak hypotheses:
+
 1. Add more examples (especially edge cases that failed)
 2. Make the "What Makes a Good Hypothesis" section more specific
 3. Add negative examples ("Do NOT generate hypotheses like...")
 4. Consider adding the top 3 experiment methodologies as reference
 
 ### Tool Output Format
+
 If the LLM misinterprets tool output:
+
 1. Check if the output format is ambiguous
 2. Add labels, headers, or separators
 3. Consider switching from markdown to structured JSON for that tool
 
 ### Missing Tools
+
 If a workflow reveals a need for a tool that doesn't exist:
+
 - Related hypotheses graph traversal
 - Citation lookup by DOI
 - User profile/contribution history
@@ -338,12 +357,12 @@ If a workflow reveals a need for a tool that doesn't exist:
 
 ### Metrics to Track
 
-| Metric | How to Measure |
-|--------|---------------|
-| Tool call efficiency | Count tool calls per workflow (lower = better) |
-| Hypothesis quality | Manual 1-5 rating on specificity, testability, novelty |
-| Dataset match accuracy | Does the LLM pick the right dataset? (binary) |
-| Duplicate detection | Does the LLM catch overlap? (binary) |
-| "No dataset" accuracy | When there's no match, does it say so? (binary) |
-| URL correctness | Does the generated URL pre-fill correctly? (binary) |
-| Time to hypothesis | Turns from idea to submission URL (lower = better) |
+| Metric                 | How to Measure                                         |
+| ---------------------- | ------------------------------------------------------ |
+| Tool call efficiency   | Count tool calls per workflow (lower = better)         |
+| Hypothesis quality     | Manual 1-5 rating on specificity, testability, novelty |
+| Dataset match accuracy | Does the LLM pick the right dataset? (binary)          |
+| Duplicate detection    | Does the LLM catch overlap? (binary)                   |
+| "No dataset" accuracy  | When there's no match, does it say so? (binary)        |
+| URL correctness        | Does the generated URL pre-fill correctly? (binary)    |
+| Time to hypothesis     | Turns from idea to submission URL (lower = better)     |

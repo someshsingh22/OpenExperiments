@@ -9,12 +9,18 @@ export function Footer() {
         <div className="xl:grid xl:grid-cols-3 xl:gap-8">
           <div className="space-y-8 xl:col-span-1">
             <Link href="/" className="flex items-center gap-2">
-              <Image src="/logo.svg" alt={SITE_CONFIG.name} width={24} height={24} className="h-6 w-auto" />
+              <Image
+                src="/logo.svg"
+                alt={SITE_CONFIG.name}
+                width={24}
+                height={24}
+                className="h-6 w-auto"
+              />
               <span className="text-lg font-semibold tracking-tight text-stone-900">
                 {SITE_CONFIG.name}
               </span>
             </Link>
-            <p className="text-sm text-stone-500 leading-relaxed max-w-xs">
+            <p className="max-w-xs text-sm leading-relaxed text-stone-500">
               {SITE_CONFIG.description}
             </p>
           </div>
@@ -24,17 +30,26 @@ export function Footer() {
                 <h3 className="text-sm font-semibold text-stone-900">Navigation</h3>
                 <ul role="list" className="mt-4 space-y-3">
                   <li>
-                    <Link href="/about" className="text-sm text-stone-500 hover:text-stone-900 transition-colors">
+                    <Link
+                      href="/about"
+                      className="text-sm text-stone-500 transition-colors hover:text-stone-900"
+                    >
                       About
                     </Link>
                   </li>
                   <li>
-                    <Link href="/explore" className="text-sm text-stone-500 hover:text-stone-900 transition-colors">
+                    <Link
+                      href="/explore"
+                      className="text-sm text-stone-500 transition-colors hover:text-stone-900"
+                    >
                       Explore
                     </Link>
                   </li>
                   <li>
-                    <Link href="/arena" className="text-sm text-stone-500 hover:text-stone-900 transition-colors">
+                    <Link
+                      href="/arena"
+                      className="text-sm text-stone-500 transition-colors hover:text-stone-900"
+                    >
                       Arena
                     </Link>
                   </li>
@@ -44,17 +59,26 @@ export function Footer() {
                 <h3 className="text-sm font-semibold text-stone-900">Contributing</h3>
                 <ul role="list" className="mt-4 space-y-3">
                   <li>
-                    <Link href="/contribute" className="text-sm text-stone-500 hover:text-stone-900 transition-colors">
+                    <Link
+                      href="/contribute"
+                      className="text-sm text-stone-500 transition-colors hover:text-stone-900"
+                    >
                       Contribute
                     </Link>
                   </li>
                   <li>
-                    <Link href="/experiments" className="text-sm text-stone-500 hover:text-stone-900 transition-colors">
+                    <Link
+                      href="/experiments"
+                      className="text-sm text-stone-500 transition-colors hover:text-stone-900"
+                    >
                       Experiments
                     </Link>
                   </li>
                   <li>
-                    <Link href="/submit" className="text-sm text-stone-500 hover:text-stone-900 transition-colors">
+                    <Link
+                      href="/submit"
+                      className="text-sm text-stone-500 transition-colors hover:text-stone-900"
+                    >
                       Submit Hypothesis
                     </Link>
                   </li>
@@ -66,17 +90,30 @@ export function Footer() {
                 <h3 className="text-sm font-semibold text-stone-900">Research</h3>
                 <ul role="list" className="mt-4 space-y-3">
                   <li>
-                    <Link href={SITE_CONFIG.paperUrl} className="text-sm text-stone-500 hover:text-stone-900 transition-colors">
+                    <Link
+                      href={SITE_CONFIG.paperUrl}
+                      className="text-sm text-stone-500 transition-colors hover:text-stone-900"
+                    >
                       Original Paper
                     </Link>
                   </li>
                   <li>
-                    <a href={SITE_CONFIG.links.labUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-stone-500 hover:text-stone-900 transition-colors">
+                    <a
+                      href={SITE_CONFIG.links.labUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-stone-500 transition-colors hover:text-stone-900"
+                    >
                       Lab / Research Group
                     </a>
                   </li>
                   <li>
-                    <a href={SITE_CONFIG.links.github} target="_blank" rel="noopener noreferrer" className="text-sm text-stone-500 hover:text-stone-900 transition-colors">
+                    <a
+                      href={SITE_CONFIG.links.github}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-stone-500 transition-colors hover:text-stone-900"
+                    >
                       GitHub Repository
                     </a>
                   </li>
@@ -86,12 +123,20 @@ export function Footer() {
                 <h3 className="text-sm font-semibold text-stone-900">Contact</h3>
                 <ul role="list" className="mt-4 space-y-3">
                   <li>
-                    <a href={`mailto:${SITE_CONFIG.contactEmail}`} className="text-sm text-stone-500 hover:text-stone-900 transition-colors">
+                    <a
+                      href={`mailto:${SITE_CONFIG.contactEmail}`}
+                      className="text-sm text-stone-500 transition-colors hover:text-stone-900"
+                    >
                       {SITE_CONFIG.contactEmail}
                     </a>
                   </li>
                   <li>
-                    <a href={SITE_CONFIG.links.twitter} target="_blank" rel="noopener noreferrer" className="text-sm text-stone-500 hover:text-stone-900 transition-colors">
+                    <a
+                      href={SITE_CONFIG.links.twitter}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-stone-500 transition-colors hover:text-stone-900"
+                    >
                       Twitter / X
                     </a>
                   </li>
@@ -100,7 +145,7 @@ export function Footer() {
             </div>
           </div>
         </div>
-        <div className="mt-12 border-t border-stone-200 pt-8 flex items-center justify-between">
+        <div className="mt-12 flex items-center justify-between border-t border-stone-200 pt-8">
           <p className="text-xs text-stone-400">
             &copy; {new Date().getFullYear()} {SITE_CONFIG.name}. All rights reserved.
           </p>

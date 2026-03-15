@@ -1,49 +1,149 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { getArenaRankings, getMatchup, castVote } from "@/lib/api";
+import { useState, useEffect, useRef, useCallback } from "react";
+import Link from "next/link";
+import { Star, Share2, Copy, Twitter, Linkedin, Brain, Cpu } from "lucide-react";
+import { getArenaRankings, getMatchup, castVote, toggleStar } from "@/lib/api";
+import { useAuth } from "@/components/auth-provider";
 import { DomainTag } from "@/components/domain-tag";
 import type { Domain } from "@/lib/types";
 
 function ArenaCard({
   hypothesis,
   label,
+  starred,
+  starCount,
+  onStar,
 }: {
   hypothesis: { id: string; statement: string; domain: string[] };
   label: string;
+  starred?: boolean;
+  starCount?: number;
+  onStar?: (id: string) => void;
 }) {
+  const [showShare, setShowShare] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const shareRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (shareRef.current && !shareRef.current.contains(event.target as Node)) {
+        setShowShare(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   return (
-    <div className="flex flex-col rounded-lg border border-stone-200 bg-white p-5">
-      <span className="mb-2 text-[11px] font-medium uppercase tracking-wider text-stone-300">
-        {label}
-      </span>
-      <div className="mb-2 flex flex-wrap gap-1.5">
-        {hypothesis.domain.map((d) => (
-          <DomainTag key={d} domain={d as Domain} />
-        ))}
+    <div className="flex flex-col rounded-lg border border-stone-200 bg-white transition-all duration-300 hover:border-stone-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+      <Link href={`/hypothesis/${hypothesis.id}`} className="block p-5">
+        <span className="mb-2 block text-[11px] font-medium tracking-wider text-stone-300 uppercase">
+          {label}
+        </span>
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {hypothesis.domain.map((d) => (
+            <DomainTag key={d} domain={d as Domain} />
+          ))}
+        </div>
+        <p className="text-sm leading-relaxed font-medium text-stone-800">{hypothesis.statement}</p>
+      </Link>
+
+      <div className="flex items-center gap-2 border-t border-stone-100 px-5 py-2.5">
+        <button
+          onClick={() => onStar?.(hypothesis.id)}
+          className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
+            starred
+              ? "bg-amber-50 text-amber-600 hover:bg-amber-100"
+              : "text-stone-400 hover:bg-stone-50 hover:text-stone-600"
+          }`}
+        >
+          <Star className={`h-3 w-3 ${starred ? "fill-amber-400" : ""}`} />
+          {starCount != null ? starCount : "Star"}
+        </button>
+        <div className="relative" ref={shareRef}>
+          <button
+            onClick={() => setShowShare(!showShare)}
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-stone-400 transition-colors hover:bg-stone-50 hover:text-stone-600"
+          >
+            <Share2 className="h-3 w-3" />
+            Share
+          </button>
+          {showShare && (
+            <div className="animate-in fade-in slide-in-from-bottom-2 absolute bottom-full left-0 z-50 mb-1.5 w-44 rounded-lg border border-stone-200 bg-white p-1.5 shadow-xl">
+              <button
+                onClick={() => {
+                  const url = `${window.location.origin}/hypothesis/${hypothesis.id}`;
+                  navigator.clipboard.writeText(url);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                  setShowShare(false);
+                }}
+                className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[11px] font-medium text-stone-600 transition-colors hover:bg-stone-50 hover:text-stone-900"
+              >
+                <Copy className="h-3 w-3" />
+                {copied ? "Copied!" : "Copy Link"}
+              </button>
+              <a
+                href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(`${typeof window !== "undefined" ? window.location.origin : ""}/hypothesis/${hypothesis.id}`)}&text=${encodeURIComponent(hypothesis.statement)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setShowShare(false)}
+                className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[11px] font-medium text-stone-600 transition-colors hover:bg-stone-50 hover:text-stone-900"
+              >
+                <Twitter className="h-3 w-3 text-[#1DA1F2]" />
+                Share on Twitter
+              </a>
+              <a
+                href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(`${typeof window !== "undefined" ? window.location.origin : ""}/hypothesis/${hypothesis.id}`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setShowShare(false)}
+                className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[11px] font-medium text-stone-600 transition-colors hover:bg-stone-50 hover:text-stone-900"
+              >
+                <Linkedin className="h-3 w-3 text-[#0077b5]" />
+                Share on LinkedIn
+              </a>
+            </div>
+          )}
+        </div>
       </div>
-      <p className="mb-3 text-sm font-medium leading-relaxed text-stone-800">
-        {hypothesis.statement}
-      </p>
     </div>
   );
 }
 
 export default function ArenaPage() {
+  const { user, setShowAuthModal } = useAuth();
   const [matchup, setMatchup] = useState<{
     id: string;
     totalVotes: number;
     votesA: number;
     votesB: number;
     votesTie: number;
-    hypothesisA: { id: string; statement: string; domain: string[] } | null;
-    hypothesisB: { id: string; statement: string; domain: string[] } | null;
+    hypothesisA: {
+      id: string;
+      statement: string;
+      domain: string[];
+      source?: string;
+      agentName?: string | null;
+    } | null;
+    hypothesisB: {
+      id: string;
+      statement: string;
+      domain: string[];
+      source?: string;
+      agentName?: string | null;
+    } | null;
   } | null>(null);
   const [hasVoted, setHasVoted] = useState(false);
   const [voteError, setVoteError] = useState("");
   const [loading, setLoading] = useState(true);
   const [voting, setVoting] = useState(false);
-  const [leaderboard, setLeaderboard] = useState<{ id: string; statement: string; domain: string[]; winRate: number }[]>([]);
+  const [leaderboard, setLeaderboard] = useState<
+    { id: string; statement: string; domain: string[]; winRate: number }[]
+  >([]);
+  const [starredIds, setStarredIds] = useState<Set<string>>(new Set());
+  const [starCounts, setStarCounts] = useState<Map<string, number>>(new Map());
 
   const loadMatchup = () => {
     setLoading(true);
@@ -59,23 +159,71 @@ export default function ArenaPage() {
     getArenaRankings().then((res) => setLeaderboard(res.data));
   }, []);
 
+  // Load star status for matchup hypotheses
+  useEffect(() => {
+    if (!user || !matchup) return;
+    const ids = [matchup.hypothesisA?.id, matchup.hypothesisB?.id].filter(Boolean) as string[];
+    if (ids.length === 0) return;
+    Promise.all(
+      ids.map((id) =>
+        fetch(`/api/hypotheses/${id}/star`)
+          .then((res) => res.json())
+          .then((res) => {
+            const data = (res as { data: { count: number; starred: boolean } }).data;
+            return { id, count: data.count, starred: data.starred };
+          })
+          .catch(() => ({ id, count: 0, starred: false })),
+      ),
+    ).then((results) => {
+      const newStarred = new Set<string>(starredIds);
+      const newCounts = new Map<string, number>(starCounts);
+      for (const r of results) {
+        if (r.starred) newStarred.add(r.id);
+        else newStarred.delete(r.id);
+        newCounts.set(r.id, r.count);
+      }
+      setStarredIds(newStarred);
+      setStarCounts(newCounts);
+    });
+  }, [user, matchup]);
+
+  const handleStar = useCallback(
+    async (id: string) => {
+      if (!user) {
+        setShowAuthModal(true);
+        return;
+      }
+      try {
+        const res = await toggleStar(id);
+        setStarredIds((prev) => {
+          const next = new Set(prev);
+          if (res.data.starred) next.add(id);
+          else next.delete(id);
+          return next;
+        });
+        setStarCounts((prev) => {
+          const next = new Map(prev);
+          next.set(id, res.data.count);
+          return next;
+        });
+      } catch {
+        // silent fail
+      }
+    },
+    [user, setShowAuthModal],
+  );
+
   const handleVote = async (vote: "a" | "b" | "tie" | "both_weak") => {
     if (!matchup) return;
     setVoting(true);
     setVoteError("");
     try {
       const res = await castVote(matchup.id, vote);
-      setMatchup((prev) =>
-        prev ? { ...prev, ...res.data } : prev
-      );
+      setMatchup((prev) => (prev ? { ...prev, ...res.data } : prev));
       setHasVoted(true);
-      // Refresh leaderboard after voting
       getArenaRankings().then((res) => setLeaderboard(res.data));
     } catch (err) {
-      setVoteError(
-        err instanceof Error ? err.message : "Failed to submit vote"
-      );
-      // If already voted, show results anyway
+      setVoteError(err instanceof Error ? err.message : "Failed to submit vote");
       if (err instanceof Error && err.message.includes("Already voted")) {
         setHasVoted(true);
       }
@@ -84,28 +232,26 @@ export default function ArenaPage() {
     }
   };
 
-  const pctA =
-    matchup && matchup.totalVotes > 0
-      ? (matchup.votesA / matchup.totalVotes) * 100
-      : 0;
-  const pctB =
-    matchup && matchup.totalVotes > 0
-      ? (matchup.votesB / matchup.totalVotes) * 100
-      : 0;
-  const pctTie =
-    matchup && matchup.totalVotes > 0
-      ? (matchup.votesTie / matchup.totalVotes) * 100
-      : 0;
+  // Source labels (revealed after voting)
+  const sourceLabel = (h: { source?: string; agentName?: string | null } | null) => {
+    if (!h) return "Unknown";
+    return h.source === "ai_agent" ? h.agentName || "AI Agent" : "Human";
+  };
+  const sourceIsAI = (h: { source?: string } | null) => h?.source === "ai_agent";
+
+  // Percentages from meaningful votes only (A + B + Tie), excluding both_weak
+  const meaningful = matchup ? matchup.votesA + matchup.votesB + matchup.votesTie : 0;
+  const pctA = meaningful > 0 ? (matchup!.votesA / meaningful) * 100 : 0;
+  const pctB = meaningful > 0 ? (matchup!.votesB / meaningful) * 100 : 0;
+  const pctTie = meaningful > 0 ? (matchup!.votesTie / meaningful) * 100 : 0;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
       <div className="mb-8">
-        <h1 className="text-lg font-semibold text-stone-800">
-          Which idea has more potential?
-        </h1>
+        <h1 className="text-lg font-semibold text-stone-800">Which idea has more potential?</h1>
         <p className="mt-1 text-[13px] text-stone-400">
-          Read both hypotheses and their rationale, then vote. Source and scores
-          are hidden to prevent bias.
+          Read both hypotheses and their rationale, then vote. Source and scores are hidden to
+          prevent bias.
         </p>
       </div>
 
@@ -123,6 +269,9 @@ export default function ArenaPage() {
                   <ArenaCard
                     hypothesis={matchup.hypothesisA}
                     label="Hypothesis A"
+                    starred={starredIds.has(matchup.hypothesisA.id)}
+                    starCount={starCounts.get(matchup.hypothesisA.id)}
+                    onStar={handleStar}
                   />
                 ) : (
                   <div className="rounded-lg border border-stone-200 p-5 text-stone-400">
@@ -140,6 +289,9 @@ export default function ArenaPage() {
                   <ArenaCard
                     hypothesis={matchup.hypothesisB}
                     label="Hypothesis B"
+                    starred={starredIds.has(matchup.hypothesisB.id)}
+                    starCount={starCounts.get(matchup.hypothesisB.id)}
+                    onStar={handleStar}
                   />
                 ) : (
                   <div className="rounded-lg border border-stone-200 p-5 text-stone-400">
@@ -156,26 +308,22 @@ export default function ArenaPage() {
                     {
                       key: "a" as const,
                       label: "A is better",
-                      style:
-                        "border-stone-800 text-stone-800 hover:bg-stone-800 hover:text-white",
+                      style: "border-stone-800 text-stone-800 hover:bg-stone-800 hover:text-white",
                     },
                     {
                       key: "tie" as const,
                       label: "Tie",
-                      style:
-                        "border-stone-300 text-stone-500 hover:bg-stone-100",
+                      style: "border-stone-300 text-stone-500 hover:bg-stone-100",
                     },
                     {
                       key: "b" as const,
                       label: "B is better",
-                      style:
-                        "border-stone-800 text-stone-800 hover:bg-stone-800 hover:text-white",
+                      style: "border-stone-800 text-stone-800 hover:bg-stone-800 hover:text-white",
                     },
                     {
                       key: "both_weak" as const,
                       label: "Both weak",
-                      style:
-                        "border-stone-300 text-stone-400 hover:bg-stone-100",
+                      style: "border-stone-300 text-stone-400 hover:bg-stone-100",
                     },
                   ].map((btn) => (
                     <button
@@ -188,12 +336,40 @@ export default function ArenaPage() {
                     </button>
                   ))}
                 </div>
-                {voteError && (
-                  <p className="text-xs text-red-500">{voteError}</p>
-                )}
+                {voteError && <p className="text-xs text-red-500">{voteError}</p>}
               </div>
             ) : (
-              <div className="mt-6 space-y-3">
+              <div className="mt-6 space-y-4">
+                {/* Source reveal */}
+                <div className="flex items-center justify-between gap-4 text-[13px]">
+                  <div className="flex items-center gap-1.5">
+                    {sourceIsAI(matchup.hypothesisA) ? (
+                      <Cpu className="h-3.5 w-3.5 text-indigo-400" />
+                    ) : (
+                      <Brain className="h-3.5 w-3.5 text-stone-400" />
+                    )}
+                    <span
+                      className={`font-medium ${sourceIsAI(matchup.hypothesisA) ? "text-indigo-600" : "text-stone-700"}`}
+                    >
+                      {sourceLabel(matchup.hypothesisA)}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-stone-300">vs</span>
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className={`font-medium ${sourceIsAI(matchup.hypothesisB) ? "text-indigo-600" : "text-stone-700"}`}
+                    >
+                      {sourceLabel(matchup.hypothesisB)}
+                    </span>
+                    {sourceIsAI(matchup.hypothesisB) ? (
+                      <Cpu className="h-3.5 w-3.5 text-indigo-400" />
+                    ) : (
+                      <Brain className="h-3.5 w-3.5 text-stone-400" />
+                    )}
+                  </div>
+                </div>
+
+                {/* Vote distribution bar */}
                 <div className="flex h-6 overflow-hidden rounded-md border border-stone-200">
                   <div
                     className="flex items-center justify-center bg-stone-700 text-[10px] font-medium text-white"
@@ -214,6 +390,7 @@ export default function ArenaPage() {
                     {pctB > 12 ? `${Math.round(pctB)}%` : ""}
                   </div>
                 </div>
+
                 <div className="flex justify-center">
                   <button
                     onClick={loadMatchup}
@@ -226,9 +403,7 @@ export default function ArenaPage() {
             )}
           </>
         ) : (
-          <p className="text-center text-sm text-stone-400">
-            No matchups available.
-          </p>
+          <p className="text-center text-sm text-stone-400">No matchups available.</p>
         )}
       </section>
 
@@ -236,21 +411,19 @@ export default function ArenaPage() {
       <section>
         <h2 className="mb-4 text-sm font-semibold text-stone-700">
           Arena Rankings
-          <span className="ml-2 text-[11px] font-normal text-stone-400">
-            completed only
-          </span>
+          <span className="ml-2 text-[11px] font-normal text-stone-400">completed only</span>
         </h2>
         <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
           <table className="w-full">
             <thead>
               <tr className="border-b border-stone-100">
-                <th className="px-3 py-2.5 text-left text-[11px] font-medium uppercase tracking-wider text-stone-400">
+                <th className="px-3 py-2.5 text-left text-[11px] font-medium tracking-wider text-stone-400 uppercase">
                   #
                 </th>
-                <th className="px-3 py-2.5 text-left text-[11px] font-medium uppercase tracking-wider text-stone-400">
+                <th className="px-3 py-2.5 text-left text-[11px] font-medium tracking-wider text-stone-400 uppercase">
                   Hypothesis
                 </th>
-                <th className="px-3 py-2.5 text-right text-[11px] font-medium uppercase tracking-wider text-stone-400">
+                <th className="px-3 py-2.5 text-right text-[11px] font-medium tracking-wider text-stone-400 uppercase">
                   Win Rate
                 </th>
               </tr>
@@ -259,15 +432,20 @@ export default function ArenaPage() {
               {leaderboard.map((h, i) => (
                 <tr
                   key={h.id}
-                  className="border-b border-stone-50 last:border-b-0"
+                  className="group border-b border-stone-50 transition-colors last:border-b-0 hover:bg-stone-50"
                 >
-                  <td className="px-3 py-2.5 font-mono text-[12px] text-stone-400">
+                  <td className="px-3 py-2.5 align-top font-mono text-[12px] text-stone-400">
                     {i + 1}
                   </td>
-                  <td className="max-w-md truncate px-3 py-2.5 text-[13px] text-stone-700">
-                    {h.statement}
+                  <td className="max-w-md px-3 py-2.5 align-top text-[13px] text-stone-700">
+                    <Link
+                      href={`/hypothesis/${h.id}`}
+                      className="block truncate transition-colors group-hover:whitespace-normal group-hover:text-stone-900"
+                    >
+                      {h.statement}
+                    </Link>
                   </td>
-                  <td className="px-3 py-2.5 text-right font-mono text-[12px] font-medium text-stone-600">
+                  <td className="px-3 py-2.5 text-right align-top font-mono text-[12px] font-medium text-stone-600">
                     {h.winRate}%
                   </td>
                 </tr>

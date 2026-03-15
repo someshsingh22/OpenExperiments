@@ -7,7 +7,7 @@ import { hashPassword } from "@/lib/password";
 
 export async function POST(request: Request) {
   const db = getDB();
-  const body = await request.json() as { email: string; password: string; name: string };
+  const body = (await request.json()) as { email: string; password: string; name: string };
   const { email, password, name } = body;
 
   if (!email || !password || !name) {
@@ -19,11 +19,7 @@ export async function POST(request: Request) {
   }
 
   // Check if email already exists
-  const [existing] = await db
-    .select()
-    .from(users)
-    .where(eq(users.email, email))
-    .limit(1);
+  const [existing] = await db.select().from(users).where(eq(users.email, email)).limit(1);
 
   if (existing) {
     return Response.json({ error: "An account with this email already exists" }, { status: 409 });
@@ -56,11 +52,11 @@ export async function POST(request: Request) {
   const headers = new Headers({ "Content-Type": "application/json" });
   headers.append(
     "Set-Cookie",
-    `session=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}`
+    `session=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}`,
   );
 
-  return new Response(
-    JSON.stringify({ user: { id: userId, name, email, avatarUrl: null } }),
-    { status: 201, headers }
-  );
+  return new Response(JSON.stringify({ user: { id: userId, name, email, avatarUrl: null } }), {
+    status: 201,
+    headers,
+  });
 }

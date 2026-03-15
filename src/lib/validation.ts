@@ -5,7 +5,13 @@ function trimmed(s: unknown): string {
   return typeof s === "string" ? s.trim() : "";
 }
 
-function between(s: string, min: number, max: number, field: string, label: string): FieldError | null {
+function between(
+  s: string,
+  min: number,
+  max: number,
+  field: string,
+  label: string,
+): FieldError | null {
   if (s.length < min) return { field, message: `${label} must be at least ${min} characters` };
   if (s.length > max) return { field, message: `${label} must be at most ${max} characters` };
   return null;
@@ -13,7 +19,6 @@ function between(s: string, min: number, max: number, field: string, label: stri
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const URL_RE = /^https?:\/\/.+/;
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DOI_RE = /^10\.\d{4,9}\/[^\s]+$/;
 const ORCID_RE = /^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/;
 
@@ -34,10 +39,14 @@ export function validateHypothesis(body: Record<string, unknown>): ValidationRes
   const statement = trimmed(body.statement);
   const rationale = trimmed(body.rationale);
   const problemStatement = trimmed(body.problemStatement);
-  const domains = Array.isArray(body.domains) ? body.domains.filter((d): d is string => typeof d === "string") : [];
+  const domains = Array.isArray(body.domains)
+    ? body.domains.filter((d): d is string => typeof d === "string")
+    : [];
   const source = trimmed(body.source);
   const agentName = body.agentName ? trimmed(body.agentName) : null;
-  const citationDois = Array.isArray(body.citationDois) ? body.citationDois.filter((d): d is string => typeof d === "string") : [];
+  const citationDois = Array.isArray(body.citationDois)
+    ? body.citationDois.filter((d): d is string => typeof d === "string")
+    : [];
   const isAnonymous = !!body.isAnonymous;
 
   if (!statement) errors.push({ field: "statement", message: "Please provide your hypothesis" });
@@ -52,18 +61,23 @@ export function validateHypothesis(body: Record<string, unknown>): ValidationRes
     if (e) errors.push(e);
   }
 
-  if (!problemStatement) errors.push({ field: "problemStatement", message: "Please select or enter a problem statement" });
+  if (!problemStatement)
+    errors.push({
+      field: "problemStatement",
+      message: "Please select or enter a problem statement",
+    });
   else {
     const e = between(problemStatement, 5, 500, "problemStatement", "Problem statement");
     if (e) errors.push(e);
   }
 
-  if (domains.length === 0) errors.push({ field: "domains", message: "Please select at least one domain" });
-  else if (domains.some((d) => !VALID_DOMAINS.includes(d as typeof VALID_DOMAINS[number]))) {
+  if (domains.length === 0)
+    errors.push({ field: "domains", message: "Please select at least one domain" });
+  else if (domains.some((d) => !VALID_DOMAINS.includes(d as (typeof VALID_DOMAINS)[number]))) {
     errors.push({ field: "domains", message: "Invalid domain selected" });
   }
 
-  if (source && !VALID_SOURCES.includes(source as typeof VALID_SOURCES[number])) {
+  if (source && !VALID_SOURCES.includes(source as (typeof VALID_SOURCES)[number])) {
     errors.push({ field: "source", message: "Source must be 'human' or 'ai_agent'" });
   }
 
@@ -87,7 +101,7 @@ export function validateHypothesis(body: Record<string, unknown>): ValidationRes
       rationale,
       problemStatement,
       domains,
-      source: VALID_SOURCES.includes(source as typeof VALID_SOURCES[number]) ? source : "human",
+      source: VALID_SOURCES.includes(source as (typeof VALID_SOURCES)[number]) ? source : "human",
       agentName,
       citationDois,
       isAnonymous,
@@ -129,8 +143,8 @@ export function validateComment(body: Record<string, unknown>): ValidationResult
   return { ok: true, data: { hypothesisId, content, doi, parentId } };
 }
 
-const ARXIV_RE = /^https?:\/\/(www\.)?arxiv\.org\/(abs|pdf)\/\d{4}\.\d{4,5}(v\d+)?$/;
-const CITATION_RE = /^(10\.\d{4,9}\/[^\s]+|https?:\/\/(www\.)?arxiv\.org\/(abs|pdf)\/\d{4}\.\d{4,5}(v\d+)?)$/;
+const CITATION_RE =
+  /^(10\.\d{4,9}\/[^\s]+|https?:\/\/(www\.)?arxiv\.org\/(abs|pdf)\/\d{4}\.\d{4,5}(v\d+)?)$/;
 
 export function validateProfile(body: Record<string, unknown>): ValidationResult<{
   name: string;
@@ -175,7 +189,10 @@ export function validateProfile(body: Record<string, unknown>): ValidationResult
   }
 
   if (orcid && !ORCID_RE.test(orcid)) {
-    errors.push({ field: "orcid", message: "Please enter a valid ORCID (e.g., 0000-0002-1825-0097)" });
+    errors.push({
+      field: "orcid",
+      message: "Please enter a valid ORCID (e.g., 0000-0002-1825-0097)",
+    });
   }
 
   if (twitterHandle) {
@@ -204,10 +221,12 @@ export function validateRegistration(body: Record<string, unknown>): ValidationR
   const name = trimmed(body.name);
 
   if (!email) errors.push({ field: "email", message: "Please provide your email address" });
-  else if (!EMAIL_RE.test(email)) errors.push({ field: "email", message: "Please enter a valid email address" });
+  else if (!EMAIL_RE.test(email))
+    errors.push({ field: "email", message: "Please enter a valid email address" });
 
   if (!password) errors.push({ field: "password", message: "Please create a password" });
-  else if (password.length < 8) errors.push({ field: "password", message: "Password must be at least 8 characters" });
+  else if (password.length < 8)
+    errors.push({ field: "password", message: "Password must be at least 8 characters" });
 
   if (!name) errors.push({ field: "name", message: "Please provide your name" });
   else {

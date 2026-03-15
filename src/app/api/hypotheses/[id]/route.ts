@@ -2,41 +2,27 @@ export const runtime = "edge";
 
 import { getDB } from "@/db";
 import { hypotheses, experiments, experimentResults, comments } from "@/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { getWinRate } from "@/lib/arena-stats";
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { getSession } = await import("@/lib/auth");
   const viewer = await getSession(request);
   const { id } = await params;
   const db = getDB();
 
-  const [hypothesis] = await db
-    .select()
-    .from(hypotheses)
-    .where(eq(hypotheses.id, id))
-    .limit(1);
+  const [hypothesis] = await db.select().from(hypotheses).where(eq(hypotheses.id, id)).limit(1);
 
   if (!hypothesis) {
     return Response.json({ error: "Not found" }, { status: 404 });
   }
 
   // Fetch related experiments with results
-  const exps = await db
-    .select()
-    .from(experiments)
-    .where(eq(experiments.hypothesisId, id));
+  const exps = await db.select().from(experiments).where(eq(experiments.hypothesisId, id));
 
   const expIds = exps.map((e) => e.id);
-  let results: Record<string, typeof experimentResults.$inferSelect> = {};
+  const results: Record<string, typeof experimentResults.$inferSelect> = {};
   if (expIds.length > 0) {
-    const resultRows = await db
-      .select()
-      .from(experimentResults)
-      .where(eq(experimentResults.experimentId, exps[0].id));
     // Fetch all results for all experiments
     for (const exp of exps) {
       const [result] = await db
@@ -49,10 +35,7 @@ export async function GET(
   }
 
   // Fetch comments with author info
-  const comms = await db
-    .select()
-    .from(comments)
-    .where(eq(comments.hypothesisId, id));
+  const comms = await db.select().from(comments).where(eq(comments.hypothesisId, id));
 
   // Compute win rate
   const winRate = await getWinRate(db, id);
@@ -124,10 +107,7 @@ export async function GET(
   });
 }
 
-export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const db = getDB();
   const body = await request.json();
@@ -141,16 +121,15 @@ export async function PATCH(
   const { validateCitation } = await import("@/lib/validation");
   if (!validateCitation(addCitation)) {
     return Response.json(
-      { error: "Citation must be a valid arXiv URL (https://arxiv.org/abs/...) or DOI (10.xxxx/...)" },
-      { status: 400 }
+      {
+        error:
+          "Citation must be a valid arXiv URL (https://arxiv.org/abs/...) or DOI (10.xxxx/...)",
+      },
+      { status: 400 },
     );
   }
 
-  const [hypothesis] = await db
-    .select()
-    .from(hypotheses)
-    .where(eq(hypotheses.id, id))
-    .limit(1);
+  const [hypothesis] = await db.select().from(hypotheses).where(eq(hypotheses.id, id)).limit(1);
 
   if (!hypothesis) {
     return Response.json({ error: "Not found" }, { status: 404 });

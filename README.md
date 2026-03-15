@@ -194,6 +194,7 @@ wrangler d1 execute openexperiments-db --remote --command="SELECT name FROM sqli
 ```
 
 **Expected tables:**
+
 - users
 - sessions
 - hypotheses
@@ -433,6 +434,7 @@ npx wrangler pages deployment rollback <DEPLOYMENT_ID> --project-name=openexperi
 ```
 
 Or via Dashboard:
+
 1. Go to Cloudflare Dashboard → Pages → Your Project
 2. Click "View build" on a previous successful deployment
 3. Click "Rollback to this deployment"
@@ -440,6 +442,7 @@ Or via Dashboard:
 ## Contributing
 
 Contributions are welcome! Please ensure:
+
 - All API routes use `export const runtime = "edge"`
 - Database queries use Drizzle ORM
 - TypeScript types are properly defined

@@ -43,7 +43,11 @@ const EXP_STATUS_LABELS: Record<Experiment["status"], { label: string; cls: stri
 };
 
 function fmtDate(d: string): string {
-  return new Date(d).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+  return new Date(d).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 function doiUrl(doi: string): string {
@@ -51,10 +55,13 @@ function doiUrl(doi: string): string {
 }
 
 function generateBibtex(h: Hypothesis): string {
-  const author = h.source === "ai_agent" ? h.agentName ?? "AI Agent" : "Anonymous";
+  const author = h.source === "ai_agent" ? (h.agentName ?? "AI Agent") : "Anonymous";
   const year = new Date(h.submittedAt).getFullYear();
   const id = h.id.replace(/-/g, "_");
-  const siteUrl = SITE_CONFIG.links.github.replace("https://github.com/someshsingh22/EvidenceR1", "https://openexperiments.ai");
+  const siteUrl = SITE_CONFIG.links.github.replace(
+    "https://github.com/someshsingh22/EvidenceR1",
+    "https://openexperiments.ai",
+  );
   return `@misc{openexperiments_${id},
   title = {${h.statement}},
   author = {${author}},
@@ -111,7 +118,7 @@ export default function HypothesisDetailPage() {
         if (res.data.relatedHypothesisIds.length > 0) {
           const allHyps = await getHypotheses({ limit: 50 });
           const relatedHyps = allHyps.data.filter((h) =>
-            res.data.relatedHypothesisIds.includes(h.id)
+            res.data.relatedHypothesisIds.includes(h.id),
           );
           setRelated(relatedHyps);
         }
@@ -132,7 +139,9 @@ export default function HypothesisDetailPage() {
     return (
       <div className="mx-auto max-w-2xl px-4 py-16 text-center">
         <h1 className="mb-1 text-lg font-semibold text-stone-800">Not found</h1>
-        <p className="text-sm text-stone-400">This hypothesis does not exist or has been removed.</p>
+        <p className="text-sm text-stone-400">
+          This hypothesis does not exist or has been removed.
+        </p>
       </div>
     );
   }
@@ -142,9 +151,10 @@ export default function HypothesisDetailPage() {
   const abWithUplift = hExperiments.find((e) => e.type === "ab_test" && e.results?.uplift);
 
   const tabClass = (t: string) =>
-    `pb-2.5 text-sm font-medium transition-colors ${activeTab === t
-      ? "border-b-2 border-stone-800 text-stone-800"
-      : "text-stone-400 hover:text-stone-600"
+    `pb-2.5 text-sm font-medium transition-colors ${
+      activeTab === t
+        ? "border-b-2 border-stone-800 text-stone-800"
+        : "text-stone-400 hover:text-stone-600"
     }`;
 
   return (
@@ -153,17 +163,15 @@ export default function HypothesisDetailPage() {
         {/* Header */}
         <header className="mb-8">
           <div className="mb-3">
-            <EvidenceBadge
-              status={hypothesis.status}
-              phase={hypothesis.phase}
-              size="lg"
-            />
+            <EvidenceBadge status={hypothesis.status} phase={hypothesis.phase} size="lg" />
           </div>
-          <h1 className="mb-4 text-2xl font-semibold leading-snug text-stone-900 sm:text-3xl">
+          <h1 className="mb-4 text-2xl leading-snug font-semibold text-stone-900 sm:text-3xl">
             {hypothesis.statement}
           </h1>
           <div className="flex flex-wrap items-center gap-1.5">
-            {hypothesis.domain.map((d) => <DomainTag key={d} domain={d as Domain} size="md" />)}
+            {hypothesis.domain.map((d) => (
+              <DomainTag key={d} domain={d as Domain} size="md" />
+            ))}
             <div className="relative ml-auto" ref={shareRef}>
               <button
                 onClick={() => setShowShare(!showShare)}
@@ -174,7 +182,7 @@ export default function HypothesisDetailPage() {
               </button>
 
               {showShare && (
-                <div className="absolute right-0 top-full z-50 mt-2 w-48 rounded-lg border border-stone-200 bg-white p-2 shadow-xl animate-in fade-in slide-in-from-top-2">
+                <div className="animate-in fade-in slide-in-from-top-2 absolute top-full right-0 z-50 mt-2 w-48 rounded-lg border border-stone-200 bg-white p-2 shadow-xl">
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(window.location.href);
@@ -188,7 +196,7 @@ export default function HypothesisDetailPage() {
                     {copying ? "Copied!" : "Copy Link"}
                   </button>
                   <a
-                    href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(typeof window !== 'undefined' ? window.location.href : '')}&text=${encodeURIComponent(hypothesis.statement)}`}
+                    href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(typeof window !== "undefined" ? window.location.href : "")}&text=${encodeURIComponent(hypothesis.statement)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={() => setShowShare(false)}
@@ -198,7 +206,7 @@ export default function HypothesisDetailPage() {
                     Share on Twitter
                   </a>
                   <a
-                    href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(typeof window !== 'undefined' ? window.location.href : '')}`}
+                    href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(typeof window !== "undefined" ? window.location.href : "")}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={() => setShowShare(false)}
@@ -218,7 +226,9 @@ export default function HypothesisDetailPage() {
                 {hypothesis.source === "ai_agent" ? (
                   <>
                     <Cpu className="h-4 w-4 text-indigo-400" />
-                    <span className="font-medium text-indigo-500">{hypothesis.agentName ?? "AI Agent"}</span>
+                    <span className="font-medium text-indigo-500">
+                      {hypothesis.agentName ?? "AI Agent"}
+                    </span>
                   </>
                 ) : (
                   <>
@@ -228,7 +238,7 @@ export default function HypothesisDetailPage() {
                 )}
               </span>
             ) : (
-              <span className="flex items-center gap-1 italic text-stone-400">
+              <span className="flex items-center gap-1 text-stone-400 italic">
                 <Lock className="h-3.5 w-3.5" /> Source hidden during evaluation
               </span>
             )}
@@ -238,9 +248,7 @@ export default function HypothesisDetailPage() {
             </span>
           </div>
           {hypothesis.problemStatement && (
-            <p className="mt-2 text-sm text-stone-500">
-              Problem: {hypothesis.problemStatement}
-            </p>
+            <p className="mt-2 text-sm text-stone-500">Problem: {hypothesis.problemStatement}</p>
           )}
           <div className="mt-6 flex flex-col gap-6">
             <div>
@@ -256,8 +264,10 @@ export default function HypothesisDetailPage() {
               </Link>
             </div>
             <div className="w-full">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold uppercase tracking-wider text-stone-500">BibTeX Citation</span>
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs font-semibold tracking-wider text-stone-500 uppercase">
+                  BibTeX Citation
+                </span>
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(generateBibtex(hypothesis));
@@ -270,7 +280,7 @@ export default function HypothesisDetailPage() {
                 </button>
               </div>
               <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
-                <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap font-mono text-xs leading-relaxed text-stone-700">
+                <pre className="max-h-40 overflow-y-auto font-mono text-xs leading-relaxed whitespace-pre-wrap text-stone-700">
                   {generateBibtex(hypothesis)}
                 </pre>
               </div>
@@ -280,7 +290,7 @@ export default function HypothesisDetailPage() {
 
         {/* Rationale */}
         <section className="mb-8 rounded-lg border border-stone-200 bg-stone-50/50 p-5">
-          <h2 className="mb-2 text-xs font-medium uppercase tracking-wider text-stone-500">
+          <h2 className="mb-2 text-xs font-medium tracking-wider text-stone-500 uppercase">
             Rationale
           </h2>
           <p className="text-base leading-relaxed text-stone-700">{hypothesis.rationale}</p>
@@ -289,7 +299,8 @@ export default function HypothesisDetailPage() {
         {/* Live notice */}
         {!revealed && (
           <div className="mb-8 rounded-lg border border-amber-200 bg-amber-50/50 p-4 text-sm text-amber-700">
-            This hypothesis is currently live. Evidence, scores, and source identity will be revealed once evaluation completes.
+            This hypothesis is currently live. Evidence, scores, and source identity will be
+            revealed once evaluation completes.
           </div>
         )}
 
@@ -297,15 +308,24 @@ export default function HypothesisDetailPage() {
         <div className="mb-6">
           <div className="flex gap-5 border-b border-stone-200">
             <button onClick={() => setActiveTab("community")} className={tabClass("community")}>
-              <span className="flex items-center gap-1.5"><MessageSquare className="h-3.5 w-3.5" /> Community</span>
+              <span className="flex items-center gap-1.5">
+                <MessageSquare className="h-3.5 w-3.5" /> Community
+              </span>
             </button>
             {revealed && (
               <>
                 <button onClick={() => setActiveTab("evidence")} className={tabClass("evidence")}>
-                  <span className="flex items-center gap-1.5"><TrendingUp className="h-3.5 w-3.5" /> Evidence</span>
+                  <span className="flex items-center gap-1.5">
+                    <TrendingUp className="h-3.5 w-3.5" /> Evidence
+                  </span>
                 </button>
-                <button onClick={() => setActiveTab("experiments")} className={tabClass("experiments")}>
-                  <span className="flex items-center gap-1.5"><FlaskConical className="h-3.5 w-3.5" /> Experiments</span>
+                <button
+                  onClick={() => setActiveTab("experiments")}
+                  className={tabClass("experiments")}
+                >
+                  <span className="flex items-center gap-1.5">
+                    <FlaskConical className="h-3.5 w-3.5" /> Experiments
+                  </span>
                 </button>
               </>
             )}
@@ -319,11 +339,16 @@ export default function HypothesisDetailPage() {
                   <div className="rounded-lg border border-stone-200 bg-white p-5">
                     <h3 className="mb-2 text-sm font-medium text-stone-600">Arena Win Rate</h3>
                     <div className="mb-2 flex items-baseline gap-2">
-                      <span className="font-mono text-3xl font-semibold text-stone-800">{hypothesis.winRate}%</span>
+                      <span className="font-mono text-3xl font-semibold text-stone-800">
+                        {hypothesis.winRate}%
+                      </span>
                       <span className="text-sm text-stone-400">win rate</span>
                     </div>
                     <div className="h-1.5 overflow-hidden rounded-full bg-stone-100">
-                      <div className="h-full rounded-full bg-stone-600 transition-all" style={{ width: `${hypothesis.winRate}%` }} />
+                      <div
+                        className="h-full rounded-full bg-stone-600 transition-all"
+                        style={{ width: `${hypothesis.winRate}%` }}
+                      />
                     </div>
                   </div>
                 )}
@@ -332,17 +357,19 @@ export default function HypothesisDetailPage() {
                   <h3 className="mb-3 text-sm font-medium text-stone-600">Discussion</h3>
                   <div className="space-y-2">
                     {hComments.length > 0 ? (
-                      hComments.filter((c) => !c.parentId).map((root) => (
-                        <CommentThread
-                          key={root.id}
-                          comment={root}
-                          allComments={hComments}
-                          hypothesisId={id}
-                          user={user}
-                          onReply={(c) => setComments((prev) => [...prev, c])}
-                          setShowAuthModal={setShowAuthModal}
-                        />
-                      ))
+                      hComments
+                        .filter((c) => !c.parentId)
+                        .map((root) => (
+                          <CommentThread
+                            key={root.id}
+                            comment={root}
+                            allComments={hComments}
+                            hypothesisId={id}
+                            user={user}
+                            onReply={(c) => setComments((prev) => [...prev, c])}
+                            setShowAuthModal={setShowAuthModal}
+                          />
+                        ))
                     ) : (
                       <p className="text-sm text-stone-400">No comments yet.</p>
                     )}
@@ -355,7 +382,7 @@ export default function HypothesisDetailPage() {
                           rows={2}
                           value={commentText}
                           onChange={(e) => setCommentText(e.target.value)}
-                          className="mb-2 w-full rounded-md border border-stone-200 px-3 py-2 text-sm text-stone-700 placeholder-stone-300 focus:border-stone-400 focus:outline-none focus:ring-1 focus:ring-stone-300"
+                          className="mb-2 w-full rounded-md border border-stone-200 px-3 py-2 text-sm text-stone-700 placeholder-stone-300 focus:border-stone-400 focus:ring-1 focus:ring-stone-300 focus:outline-none"
                         />
                         <div className="flex items-center gap-2">
                           <button
@@ -398,8 +425,8 @@ export default function HypothesisDetailPage() {
                             className="font-medium text-stone-600 underline underline-offset-2 hover:text-stone-800"
                           >
                             Sign in
-                          </button>
-                          {" "}to join the discussion
+                          </button>{" "}
+                          to join the discussion
                         </p>
                       </div>
                     )}
@@ -411,17 +438,23 @@ export default function HypothesisDetailPage() {
             {/* Evidence */}
             {activeTab === "evidence" && revealed && (
               <div>
-                {(hypothesis.status === "data_tested" || hypothesis.status === "field_validated") && completedExp?.results ? (
+                {(hypothesis.status === "data_tested" || hypothesis.status === "field_validated") &&
+                completedExp?.results ? (
                   <div className="space-y-4 rounded-lg border border-stone-200 bg-white p-5">
                     <h3 className="text-sm font-medium text-stone-600">Results</h3>
                     {hypothesis.evidenceScore != null && (
                       <div>
                         <div className="mb-1.5 flex justify-between text-sm">
                           <span className="text-stone-500">Evidence Score</span>
-                          <span className="font-medium text-stone-700">{hypothesis.evidenceScore}/100</span>
+                          <span className="font-medium text-stone-700">
+                            {hypothesis.evidenceScore}/100
+                          </span>
                         </div>
                         <div className="h-2 overflow-hidden rounded-full bg-stone-100">
-                          <div className="h-full rounded-full bg-teal-500" style={{ width: `${hypothesis.evidenceScore}%` }} />
+                          <div
+                            className="h-full rounded-full bg-teal-500"
+                            style={{ width: `${hypothesis.evidenceScore}%` }}
+                          />
                         </div>
                       </div>
                     )}
@@ -429,20 +462,25 @@ export default function HypothesisDetailPage() {
                       {completedExp.results.pValue != null && (
                         <div>
                           <p className="text-xs text-stone-400">p-value</p>
-                          <p className="font-mono text-sm font-medium text-stone-700">{completedExp.results.pValue.toExponential(2)}</p>
+                          <p className="font-mono text-sm font-medium text-stone-700">
+                            {completedExp.results.pValue.toExponential(2)}
+                          </p>
                         </div>
                       )}
                       {completedExp.results.effectSize != null && (
                         <div>
                           <p className="text-xs text-stone-400">Effect Size</p>
-                          <p className="font-mono text-sm font-medium text-stone-700">{completedExp.results.effectSize}</p>
+                          <p className="font-mono text-sm font-medium text-stone-700">
+                            {completedExp.results.effectSize}
+                          </p>
                         </div>
                       )}
                       {completedExp.results.confidenceInterval && (
                         <div>
                           <p className="text-xs text-stone-400">95% CI</p>
                           <p className="font-mono text-sm font-medium text-stone-700">
-                            [{completedExp.results.confidenceInterval[0].toFixed(2)}, {completedExp.results.confidenceInterval[1].toFixed(2)}]
+                            [{completedExp.results.confidenceInterval[0].toFixed(2)},{" "}
+                            {completedExp.results.confidenceInterval[1].toFixed(2)}]
                           </p>
                         </div>
                       )}
@@ -463,7 +501,9 @@ export default function HypothesisDetailPage() {
                   </div>
                 ) : (
                   <div className="rounded-lg border border-dashed border-stone-300 p-8 text-center">
-                    <p className="text-sm text-stone-400">Not yet tested against observational data.</p>
+                    <p className="text-sm text-stone-400">
+                      Not yet tested against observational data.
+                    </p>
                   </div>
                 )}
               </div>
@@ -478,8 +518,12 @@ export default function HypothesisDetailPage() {
                       <TrendingUp className="h-4 w-4" />
                       <span className="text-[12px] font-medium">Field Validation</span>
                     </div>
-                    <p className="text-2xl font-semibold text-teal-700">{abWithUplift.results?.uplift}</p>
-                    <p className="mt-0.5 text-[12px] text-teal-600">uplift in {abWithUplift.datasetName}</p>
+                    <p className="text-2xl font-semibold text-teal-700">
+                      {abWithUplift.results?.uplift}
+                    </p>
+                    <p className="mt-0.5 text-[12px] text-teal-600">
+                      uplift in {abWithUplift.datasetName}
+                    </p>
                   </div>
                 )}
                 {hExperiments.length > 0 ? (
@@ -494,23 +538,27 @@ export default function HypothesisDetailPage() {
 
         {/* Related & Bibliography */}
         <section className="mb-8">
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-[0.1em] text-stone-500">Related & Bibliography</h2>
+          <h2 className="mb-4 text-sm font-semibold tracking-[0.1em] text-stone-500 uppercase">
+            Related & Bibliography
+          </h2>
 
           <div className="mb-6">
             <h3 className="mb-3 text-sm font-medium text-stone-800">Similar Ideas</h3>
             <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
-              {related.length > 0 ? related.map((h) => (
-                <div key={h.id} className="min-w-[260px] max-w-[300px] shrink-0">
-                  <HypothesisCard hypothesis={h} />
-                </div>
-              )) : (
+              {related.length > 0 ? (
+                related.map((h) => (
+                  <div key={h.id} className="max-w-[300px] min-w-[260px] shrink-0">
+                    <HypothesisCard hypothesis={h} />
+                  </div>
+                ))
+              ) : (
                 <p className="text-sm text-stone-400">No related hypotheses found.</p>
               )}
             </div>
           </div>
 
           <div className="rounded-lg border border-stone-200 bg-stone-50/50 p-5">
-            <h3 className="mb-4 text-sm font-medium text-stone-800 flex items-center gap-2">
+            <h3 className="mb-4 flex items-center gap-2 text-sm font-medium text-stone-800">
               <Link2 className="h-4 w-4" />
               Bibliography
             </h3>
@@ -518,12 +566,12 @@ export default function HypothesisDetailPage() {
             <div className="mb-6 space-y-3">
               {hypothesis.citationDois.map((doi) => (
                 <div key={doi} className="flex items-start gap-2">
-                  <FileText className="h-4 w-4 mt-0.5 text-stone-400" />
+                  <FileText className="mt-0.5 h-4 w-4 text-stone-400" />
                   <a
                     href={doiUrl(doi)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm text-stone-600 hover:text-stone-900 hover:underline decoration-stone-300"
+                    className="text-sm text-stone-600 decoration-stone-300 hover:text-stone-900 hover:underline"
                   >
                     {doi}
                   </a>
@@ -546,9 +594,14 @@ export default function HypothesisDetailPage() {
                   type="text"
                   placeholder="https://arxiv.org/abs/xxxx.xxxxx or 10.xxxx/..."
                   value={arxivLink}
-                  onChange={(e) => { setArxivLink(e.target.value); setCitationError(""); }}
+                  onChange={(e) => {
+                    setArxivLink(e.target.value);
+                    setCitationError("");
+                  }}
                   className={`flex-1 rounded-md border px-3 py-2 text-sm text-stone-700 placeholder-stone-300 focus:outline-none ${
-                    citationError ? "border-red-300 focus:border-red-400 focus:ring-1 focus:ring-red-200" : "border-stone-200 focus:border-stone-400"
+                    citationError
+                      ? "border-red-300 focus:border-red-400 focus:ring-1 focus:ring-red-200"
+                      : "border-stone-200 focus:border-stone-400"
                   }`}
                 />
                 <button
@@ -558,11 +611,13 @@ export default function HypothesisDetailPage() {
                     try {
                       const res = await addCitation(id, arxivLink);
                       setHypothesis((prev) =>
-                        prev ? { ...prev, citationDois: res.data.citationDois } : prev
+                        prev ? { ...prev, citationDois: res.data.citationDois } : prev,
                       );
                       setArxivLink("");
                     } catch (err) {
-                      setCitationError(err instanceof Error ? err.message : "Failed to add citation");
+                      setCitationError(
+                        err instanceof Error ? err.message : "Failed to add citation",
+                      );
                     }
                   }}
                   className="inline-flex items-center gap-1.5 rounded-md border border-stone-800 bg-stone-800 px-4 py-2 text-sm font-medium text-white hover:bg-stone-700"
@@ -571,9 +626,7 @@ export default function HypothesisDetailPage() {
                   Add
                 </button>
               </div>
-              {citationError && (
-                <p className="mt-2 text-sm text-red-600">{citationError}</p>
-              )}
+              {citationError && <p className="mt-2 text-sm text-red-600">{citationError}</p>}
             </div>
           </div>
         </section>
@@ -590,17 +643,23 @@ function CommentThread({
   onReply,
   setShowAuthModal,
 }: {
-  comment: any;
-  allComments: any[];
+  comment: Comment & {
+    author?: { id: string; name: string | null; avatarUrl: string | null } | null;
+  };
+  allComments: (Comment & {
+    author?: { id: string; name: string | null; avatarUrl: string | null } | null;
+  })[];
   hypothesisId: string;
-  user: any;
-  onReply: (c: any) => void;
+  user: { id: string; name: string | null; avatarUrl: string | null } | null;
+  onReply: (
+    c: Comment & { author?: { id: string; name: string | null; avatarUrl: string | null } | null },
+  ) => void;
   setShowAuthModal: (v: boolean) => void;
 }) {
   const [replying, setReplying] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [posting, setPosting] = useState(false);
-  const replies = allComments.filter((c: any) => c.parentId === comment.id);
+  const replies = allComments.filter((c) => c.parentId === comment.id);
   const author = comment.author;
 
   const handleReply = async () => {
@@ -662,13 +721,13 @@ function CommentThread({
         </div>
       </div>
       {replying && (
-        <div className="ml-4 mt-1.5 space-y-1.5">
+        <div className="mt-1.5 ml-4 space-y-1.5">
           <textarea
             placeholder="Write a reply..."
             rows={2}
             value={replyText}
             onChange={(e) => setReplyText(e.target.value)}
-            className="w-full rounded-md border border-stone-200 px-2.5 py-1.5 text-[12px] text-stone-700 placeholder-stone-300 focus:border-stone-400 focus:outline-none focus:ring-1 focus:ring-stone-300"
+            className="w-full rounded-md border border-stone-200 px-2.5 py-1.5 text-[12px] text-stone-700 placeholder-stone-300 focus:border-stone-400 focus:ring-1 focus:ring-stone-300 focus:outline-none"
           />
           <div className="flex gap-1.5">
             <button
@@ -679,7 +738,10 @@ function CommentThread({
               {posting ? "Posting..." : "Post"}
             </button>
             <button
-              onClick={() => { setReplying(false); setReplyText(""); }}
+              onClick={() => {
+                setReplying(false);
+                setReplyText("");
+              }}
               className="rounded-md px-2.5 py-1 text-[11px] text-stone-400 hover:text-stone-600"
             >
               Cancel
@@ -712,17 +774,19 @@ function ExperimentCard({ experiment }: { experiment: Experiment }) {
   return (
     <div className="rounded-lg border border-stone-200 bg-white p-5">
       <div className="mb-2.5 flex flex-wrap gap-1.5">
-        <span className={`rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${t.cls}`}>{t.label}</span>
-        <span className={`rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${s.cls}`}>{s.label}</span>
+        <span className={`rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${t.cls}`}>
+          {t.label}
+        </span>
+        <span className={`rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${s.cls}`}>
+          {s.label}
+        </span>
       </div>
       <p className="mb-1.5 text-sm font-medium text-stone-700">{experiment.datasetName}</p>
       <div className="mb-1.5 flex gap-3 text-xs text-stone-400">
         <span>Started: {fmtDate(experiment.startedAt)}</span>
         {experiment.completedAt && <span>Completed: {fmtDate(experiment.completedAt)}</span>}
       </div>
-      {experiment.results && (
-        <p className="text-sm text-stone-500">{experiment.results.summary}</p>
-      )}
+      {experiment.results && <p className="text-sm text-stone-500">{experiment.results.summary}</p>}
       <div className="mt-4">
         <a
           href={experiment.osfLink ?? "https://osf.io/"}

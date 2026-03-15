@@ -7,18 +7,20 @@ import { getProblemStatements, submitHypothesis } from "@/lib/api";
 import { EvidenceBadge } from "@/components/evidence-badge";
 import { DomainTag } from "@/components/domain-tag";
 import { useAuth } from "@/components/auth-provider";
-import { Brain, ChevronDown, Check, EyeOff, User } from "lucide-react";
+import { ChevronDown, Check, EyeOff, User } from "lucide-react";
 import type { Domain, ProblemStatement } from "@/lib/types";
 
 const DOMAINS: Domain[] = ["persuasion", "memorability"];
 
 export default function SubmitPage() {
   return (
-    <Suspense fallback={
-      <div className="flex justify-center py-24">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-stone-300 border-t-stone-600" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="flex justify-center py-24">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-stone-300 border-t-stone-600" />
+        </div>
+      }
+    >
       <SubmitContent />
     </Suspense>
   );
@@ -42,7 +44,9 @@ function SubmitContent() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [isAnonymous, setIsAnonymous] = useState(false);
-  const [generatorType, setGeneratorType] = useState<"Human" | "AI" | "Collaborated" | "Agent">("Human");
+  const [generatorType, setGeneratorType] = useState<"Human" | "AI" | "Collaborated" | "Agent">(
+    "Human",
+  );
   const [problemStatements, setProblemStatements] = useState<ProblemStatement[]>([]);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [redirectCountdown, setRedirectCountdown] = useState(3);
@@ -84,9 +88,7 @@ function SubmitContent() {
   }, [searchParams]);
 
   const toggleDomain = (d: Domain) => {
-    setSelectedDomains((prev) =>
-      prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]
-    );
+    setSelectedDomains((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));
   };
 
   const resetForm = () => {
@@ -130,17 +132,20 @@ function SubmitContent() {
           <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-teal-50">
             <Check className="h-5 w-5 text-teal-600" />
           </div>
-          <h2 className="mb-1 text-lg font-semibold text-stone-800">
-            Hypothesis submitted
-          </h2>
+          <h2 className="mb-1 text-lg font-semibold text-stone-800">Hypothesis submitted</h2>
           <p className="mb-2 text-sm text-stone-500">
-            Reference: <code className="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-xs text-stone-600">{submittedId}</code>
+            Reference:{" "}
+            <code className="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-xs text-stone-600">
+              {submittedId}
+            </code>
           </p>
           <p className="mb-5 text-xs text-stone-400">
             Redirecting in {redirectCountdown}s...{" "}
             <button
               type="button"
-              onClick={() => { if (redirectTimerRef.current) clearInterval(redirectTimerRef.current); }}
+              onClick={() => {
+                if (redirectTimerRef.current) clearInterval(redirectTimerRef.current);
+              }}
               className="underline hover:text-stone-600"
             >
               stay here
@@ -169,7 +174,7 @@ function SubmitContent() {
   // Auth gate
   if (!authLoading && !user) {
     return (
-      <div className="mx-auto max-w-lg px-4 py-16 sm:px-6 text-center">
+      <div className="mx-auto max-w-lg px-4 py-16 text-center sm:px-6">
         <h1 className="mb-2 text-xl font-semibold text-stone-900">Sign in to submit</h1>
         <p className="mb-6 text-sm text-stone-500">
           You need to be signed in to submit a hypothesis.
@@ -208,13 +213,16 @@ function SubmitContent() {
           // Client-side basic validation
           const errors: Record<string, string> = {};
           if (!statement.trim()) errors.statement = "Please provide your hypothesis";
-          else if (statement.trim().length < 10) errors.statement = "Hypothesis must be at least 10 characters";
+          else if (statement.trim().length < 10)
+            errors.statement = "Hypothesis must be at least 10 characters";
           if (!rationale.trim()) errors.rationale = "Please provide your rationale";
-          else if (rationale.trim().length < 10) errors.rationale = "Rationale must be at least 10 characters";
+          else if (rationale.trim().length < 10)
+            errors.rationale = "Rationale must be at least 10 characters";
           const psQuestion = showCustom
             ? customQ
             : problemStatements.find((ps) => ps.id === selectedPS)?.question || "";
-          if (!psQuestion.trim()) errors.problemStatement = "Please select or enter a problem statement";
+          if (!psQuestion.trim())
+            errors.problemStatement = "Please select or enter a problem statement";
           if (selectedDomains.length === 0) errors.domains = "Please select at least one domain";
 
           if (Object.keys(errors).length > 0) {
@@ -224,7 +232,8 @@ function SubmitContent() {
           }
 
           try {
-            const source = generatorType === "AI" || generatorType === "Collaborated" ? "ai_agent" : "human";
+            const source =
+              generatorType === "AI" || generatorType === "Collaborated" ? "ai_agent" : "human";
             const res = await submitHypothesis({
               statement,
               rationale,
@@ -252,7 +261,9 @@ function SubmitContent() {
             onClick={() => setIsAnonymous(!isAnonymous)}
             className={`mt-0.5 flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors ${isAnonymous ? "bg-stone-800" : "bg-stone-300"}`}
           >
-            <span className={`block h-4 w-4 rounded-full bg-white transition-transform ${isAnonymous ? "translate-x-4" : "translate-x-0"}`} />
+            <span
+              className={`block h-4 w-4 rounded-full bg-white transition-transform ${isAnonymous ? "translate-x-4" : "translate-x-0"}`}
+            />
           </button>
           <div>
             <p className="flex items-center gap-1.5 text-sm font-semibold text-stone-700">
@@ -272,13 +283,18 @@ function SubmitContent() {
           </label>
           <div className="flex flex-wrap gap-2">
             {(["Human", "AI", "Collaborated"] as const).map((type) => (
-              <label key={type} className="flex items-center gap-2 rounded-md border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:border-stone-300 cursor-pointer">
+              <label
+                key={type}
+                className="flex cursor-pointer items-center gap-2 rounded-md border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:border-stone-300"
+              >
                 <input
                   type="radio"
                   name="generatorType"
                   value={type}
                   checked={generatorType === type}
-                  onChange={(e) => setGeneratorType(e.target.value as any)}
+                  onChange={(e) =>
+                    setGeneratorType(e.target.value as "Human" | "AI" | "Collaborated")
+                  }
                   className="text-stone-900 focus:ring-stone-900"
                 />
                 {type}
@@ -286,7 +302,7 @@ function SubmitContent() {
             ))}
           </div>
           {(generatorType === "AI" || generatorType === "Collaborated") && (
-            <p className="mt-3 text-xs font-semibold text-amber-800 bg-amber-50 px-3 py-2.5 rounded-md border border-amber-200">
+            <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs font-semibold text-amber-800">
               Note: Please raise a request at our GitHub to register your AI Agent.
             </p>
           )}
@@ -297,7 +313,9 @@ function SubmitContent() {
           <label htmlFor="ps" className="mb-1.5 block text-sm font-semibold text-stone-700">
             Problem statement
           </label>
-          {fieldErrors.problemStatement && <p className="mb-1.5 text-xs text-red-500">{fieldErrors.problemStatement}</p>}
+          {fieldErrors.problemStatement && (
+            <p className="mb-1.5 text-xs text-red-500">{fieldErrors.problemStatement}</p>
+          )}
           {!showCustom ? (
             <>
               <div className="relative">
@@ -309,10 +327,12 @@ function SubmitContent() {
                 >
                   <option value="">Select a question...</option>
                   {problemStatements.map((ps) => (
-                    <option key={ps.id} value={ps.id}>{ps.question}</option>
+                    <option key={ps.id} value={ps.id}>
+                      {ps.question}
+                    </option>
                   ))}
                 </select>
-                <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-300" />
+                <ChevronDown className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-stone-300" />
               </div>
               <button
                 type="button"
@@ -347,11 +367,16 @@ function SubmitContent() {
           <label htmlFor="hyp" className="mb-1.5 block text-sm font-semibold text-stone-700">
             Your hypothesis
           </label>
-          {fieldErrors.statement && <p className="mb-1.5 text-xs text-red-500">{fieldErrors.statement}</p>}
+          {fieldErrors.statement && (
+            <p className="mb-1.5 text-xs text-red-500">{fieldErrors.statement}</p>
+          )}
           <textarea
             id="hyp"
             value={statement}
-            onChange={(e) => { setStatement(e.target.value); setFieldErrors((p) => ({ ...p, statement: "" })); }}
+            onChange={(e) => {
+              setStatement(e.target.value);
+              setFieldErrors((p) => ({ ...p, statement: "" }));
+            }}
             placeholder="e.g., Counterarguments that acknowledge the original viewpoint are more persuasive."
             rows={3}
             className={inputClass}
@@ -365,11 +390,16 @@ function SubmitContent() {
           <label htmlFor="rat" className="mb-1.5 block text-sm font-semibold text-stone-700">
             Your rationale
           </label>
-          {fieldErrors.rationale && <p className="mb-1.5 text-xs text-red-500">{fieldErrors.rationale}</p>}
+          {fieldErrors.rationale && (
+            <p className="mb-1.5 text-xs text-red-500">{fieldErrors.rationale}</p>
+          )}
           <textarea
             id="rat"
             value={rationale}
-            onChange={(e) => { setRationale(e.target.value); setFieldErrors((p) => ({ ...p, rationale: "" })); }}
+            onChange={(e) => {
+              setRationale(e.target.value);
+              setFieldErrors((p) => ({ ...p, rationale: "" }));
+            }}
             placeholder="Why do you believe this? What observation or intuition led you here?"
             rows={3}
             className={inputClass}
@@ -380,10 +410,10 @@ function SubmitContent() {
 
         {/* Domain tags */}
         <div>
-          <label className="mb-1.5 block text-sm font-semibold text-stone-700">
-            Domain
-          </label>
-          {fieldErrors.domains && <p className="mb-1.5 text-xs text-red-500">{fieldErrors.domains}</p>}
+          <label className="mb-1.5 block text-sm font-semibold text-stone-700">Domain</label>
+          {fieldErrors.domains && (
+            <p className="mb-1.5 text-xs text-red-500">{fieldErrors.domains}</p>
+          )}
           <div className="flex gap-2">
             {DOMAINS.map((d) => {
               const sel = selectedDomains.includes(d);
@@ -392,10 +422,11 @@ function SubmitContent() {
                   key={d}
                   type="button"
                   onClick={() => toggleDomain(d)}
-                  className={`inline-flex items-center rounded-md px-3 py-1.5 text-sm font-semibold capitalize transition-colors ${sel
-                    ? "bg-stone-900 text-white"
-                    : "border border-stone-200 text-stone-600 hover:border-stone-300 hover:text-stone-800"
-                    }`}
+                  className={`inline-flex items-center rounded-md px-3 py-1.5 text-sm font-semibold capitalize transition-colors ${
+                    sel
+                      ? "bg-stone-900 text-white"
+                      : "border border-stone-200 text-stone-600 hover:border-stone-300 hover:text-stone-800"
+                  }`}
                 >
                   {sel && <Check className="mr-1.5 h-3.5 w-3.5" />}
                   {d}
@@ -420,13 +451,27 @@ function SubmitContent() {
                 <label htmlFor="doi" className="mb-1 block text-[12px] font-medium text-stone-500">
                   DOI / paper link
                 </label>
-                <input id="doi" type="text" value={doi} onChange={(e) => setDoi(e.target.value)} placeholder="10.1145/3411764.3445124" className={inputClass} />
+                <input
+                  id="doi"
+                  type="text"
+                  value={doi}
+                  onChange={(e) => setDoi(e.target.value)}
+                  placeholder="10.1145/3411764.3445124"
+                  className={inputClass}
+                />
               </div>
               <div>
                 <label htmlFor="test" className="mb-1 block text-[12px] font-medium text-stone-500">
                   Suggested test
                 </label>
-                <textarea id="test" value={suggestedTest} onChange={(e) => setSuggestedTest(e.target.value)} placeholder="How would you test this?" rows={2} className={inputClass} />
+                <textarea
+                  id="test"
+                  value={suggestedTest}
+                  onChange={(e) => setSuggestedTest(e.target.value)}
+                  placeholder="How would you test this?"
+                  rows={2}
+                  className={inputClass}
+                />
               </div>
             </div>
           )}
@@ -434,25 +479,35 @@ function SubmitContent() {
 
         {/* Preview */}
         <div className="rounded-md border border-stone-200 bg-white p-4">
-          <span className="mb-2 block text-[11px] font-medium uppercase tracking-wider text-stone-300">
+          <span className="mb-2 block text-[11px] font-medium tracking-wider text-stone-300 uppercase">
             Preview
           </span>
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-1.5">
               <EvidenceBadge status="proposed" phase="live" size="sm" />
-              {selectedDomains.map((d) => <DomainTag key={d} domain={d} />)}
+              {selectedDomains.map((d) => (
+                <DomainTag key={d} domain={d} />
+              ))}
               {selectedDomains.length === 0 && (
-                <span className="text-[11px] italic text-stone-300">Select domains above</span>
+                <span className="text-[11px] text-stone-300 italic">Select domains above</span>
               )}
             </div>
             <p className="text-[13px] leading-relaxed text-stone-700">
-              {statement || <span className="italic text-stone-300">Your hypothesis appears here</span>}
+              {statement || (
+                <span className="text-stone-300 italic">Your hypothesis appears here</span>
+              )}
             </p>
             <div className="flex items-center gap-1 text-[11px] text-stone-300">
               {isAnonymous ? (
-                <><EyeOff className="h-3 w-3" /><span>Anonymous</span></>
+                <>
+                  <EyeOff className="h-3 w-3" />
+                  <span>Anonymous</span>
+                </>
               ) : (
-                <><User className="h-3 w-3" /><span>{user?.name || "You"}</span></>
+                <>
+                  <User className="h-3 w-3" />
+                  <span>{user?.name || "You"}</span>
+                </>
               )}
             </div>
           </div>

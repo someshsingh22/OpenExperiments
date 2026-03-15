@@ -1,9 +1,24 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Calendar, MessageSquare, FlaskConical, Briefcase, GraduationCap, Globe, ExternalLink, EyeOff, Star, Pencil, X, Check, Lightbulb, Vote } from "lucide-react";
+import {
+  Calendar,
+  MessageSquare,
+  FlaskConical,
+  Briefcase,
+  GraduationCap,
+  Globe,
+  ExternalLink,
+  EyeOff,
+  Star,
+  Pencil,
+  X,
+  Check,
+  Lightbulb,
+  Vote,
+} from "lucide-react";
 import { EvidenceBadge } from "@/components/evidence-badge";
 import { DomainTag } from "@/components/domain-tag";
 import { updateProfile } from "@/lib/api";
@@ -69,20 +84,20 @@ export default function ProfilePage() {
   const [editOrcid, setEditOrcid] = useState("");
   const [editTwitter, setEditTwitter] = useState("");
 
-  const loadProfile = () => {
+  const loadProfile = useCallback(() => {
     fetch(`/api/users/${id}`)
       .then(async (res) => {
         if (!res.ok) throw new Error("Not found");
-        const json = await res.json() as { data: ProfileData };
+        const json = (await res.json()) as { data: ProfileData };
         setData(json.data);
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
-  };
+  }, [id]);
 
   useEffect(() => {
     loadProfile();
-  }, [id]);
+  }, [loadProfile]);
 
   const startEditing = () => {
     if (!data) return;
@@ -146,8 +161,6 @@ export default function ProfilePage() {
 
   const { user, hypotheses, starredHypotheses, stats, isOwner } = data;
 
-  const hasLinks = user.scholarUrl || user.website || user.orcid || user.twitterHandle;
-
   const inputClass =
     "w-full rounded-md border border-stone-200 px-3 py-2 text-sm text-stone-800 placeholder-stone-400 focus:border-stone-300 focus:outline-none focus:ring-1 focus:ring-stone-300";
 
@@ -169,9 +182,7 @@ export default function ProfilePage() {
         )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-semibold text-stone-900">
-              {user.name || "Anonymous"}
-            </h1>
+            <h1 className="text-xl font-semibold text-stone-900">{user.name || "Anonymous"}</h1>
             {isOwner && !editing && (
               <button
                 onClick={startEditing}
@@ -188,11 +199,7 @@ export default function ProfilePage() {
               {user.position}
             </p>
           )}
-          {user.affiliation && (
-            <p className="mt-0.5 text-xs text-stone-400">
-              {user.affiliation}
-            </p>
-          )}
+          {user.affiliation && <p className="mt-0.5 text-xs text-stone-400">{user.affiliation}</p>}
           <div className="mt-1 flex items-center gap-3 text-sm text-stone-400">
             <span className="flex items-center gap-1">
               <Calendar className="h-3.5 w-3.5" />
@@ -204,7 +211,7 @@ export default function ProfilePage() {
 
       {/* Edit form */}
       {editing && (
-        <div className="mb-8 rounded-lg border border-stone-200 bg-white p-5 space-y-4">
+        <div className="mb-8 space-y-4 rounded-lg border border-stone-200 bg-white p-5">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-stone-700">Edit Profile</h2>
             <button onClick={cancelEditing} className="text-stone-400 hover:text-stone-600">
@@ -214,7 +221,12 @@ export default function ProfilePage() {
 
           <div>
             <label className="mb-1 block text-xs font-medium text-stone-500">Name</label>
-            <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} className={inputClass} />
+            <input
+              type="text"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              className={inputClass}
+            />
           </div>
 
           <div>
@@ -229,7 +241,9 @@ export default function ProfilePage() {
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-stone-500">Google Scholar Profile</label>
+            <label className="mb-1 block text-xs font-medium text-stone-500">
+              Google Scholar Profile
+            </label>
             <input
               type="url"
               value={editScholarUrl}
@@ -240,7 +254,9 @@ export default function ProfilePage() {
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-stone-500">Personal Website</label>
+            <label className="mb-1 block text-xs font-medium text-stone-500">
+              Personal Website
+            </label>
             <input
               type="url"
               value={editWebsite}
@@ -275,7 +291,9 @@ export default function ProfilePage() {
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-stone-500">X / Twitter Handle</label>
+            <label className="mb-1 block text-xs font-medium text-stone-500">
+              X / Twitter Handle
+            </label>
             <input
               type="text"
               value={editTwitter}
@@ -316,7 +334,7 @@ export default function ProfilePage() {
           {user.bio ? (
             <p className="text-sm leading-relaxed text-stone-600">{user.bio}</p>
           ) : isOwner ? (
-            <p className="text-sm italic text-stone-300">No bio set. Click Edit to add one.</p>
+            <p className="text-sm text-stone-300 italic">No bio set. Click Edit to add one.</p>
           ) : null}
         </div>
       )}
@@ -325,7 +343,12 @@ export default function ProfilePage() {
       {!editing && (
         <div className="mb-6 flex flex-wrap items-center gap-3">
           {user.scholarUrl ? (
-            <a href={user.scholarUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-stone-500 hover:text-stone-800">
+            <a
+              href={user.scholarUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs font-medium text-stone-500 hover:text-stone-800"
+            >
               <GraduationCap className="h-3.5 w-3.5" /> Scholar
             </a>
           ) : isOwner ? (
@@ -334,7 +357,12 @@ export default function ProfilePage() {
             </span>
           ) : null}
           {user.website ? (
-            <a href={user.website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-stone-500 hover:text-stone-800">
+            <a
+              href={user.website}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs font-medium text-stone-500 hover:text-stone-800"
+            >
               <Globe className="h-3.5 w-3.5" /> Website
             </a>
           ) : isOwner ? (
@@ -343,7 +371,12 @@ export default function ProfilePage() {
             </span>
           ) : null}
           {user.orcid ? (
-            <a href={`https://orcid.org/${user.orcid}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-stone-500 hover:text-stone-800">
+            <a
+              href={`https://orcid.org/${user.orcid}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs font-medium text-stone-500 hover:text-stone-800"
+            >
               <ExternalLink className="h-3.5 w-3.5" /> ORCID
             </a>
           ) : isOwner ? (
@@ -352,7 +385,12 @@ export default function ProfilePage() {
             </span>
           ) : null}
           {user.twitterHandle ? (
-            <a href={`https://x.com/${user.twitterHandle.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-stone-500 hover:text-stone-800">
+            <a
+              href={`https://x.com/${user.twitterHandle.replace(/^@/, "")}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs font-medium text-stone-500 hover:text-stone-800"
+            >
               <ExternalLink className="h-3.5 w-3.5" /> @{user.twitterHandle.replace(/^@/, "")}
             </a>
           ) : isOwner ? (
@@ -365,7 +403,7 @@ export default function ProfilePage() {
 
       {/* Stats */}
       <div className="mb-8">
-        <div className="grid grid-cols-2 gap-3 mb-3">
+        <div className="mb-3 grid grid-cols-2 gap-3">
           <div className="rounded-lg border border-stone-200 bg-white p-4 text-center">
             <p className="text-2xl font-semibold text-stone-800">{stats.hypothesisCount}</p>
             <p className="text-xs text-stone-400">
@@ -396,7 +434,7 @@ export default function ProfilePage() {
       {/* Starred Hypotheses */}
       {starredHypotheses.length > 0 && (
         <section className="mb-8">
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-stone-500">
+          <h2 className="mb-4 text-sm font-semibold tracking-wider text-stone-500 uppercase">
             <Star className="mr-1 inline h-3.5 w-3.5" />
             Starred Hypotheses
           </h2>
@@ -414,9 +452,7 @@ export default function ProfilePage() {
                   ))}
                   <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
                 </div>
-                <p className="text-[13px] leading-relaxed text-stone-700">
-                  {h.statement}
-                </p>
+                <p className="text-[13px] leading-relaxed text-stone-700">{h.statement}</p>
                 <p className="mt-1.5 text-[11px] text-stone-400">{h.submittedAt}</p>
               </Link>
             ))}
@@ -426,7 +462,7 @@ export default function ProfilePage() {
 
       {/* Hypotheses */}
       <section>
-        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-stone-500">
+        <h2 className="mb-4 text-sm font-semibold tracking-wider text-stone-500 uppercase">
           Hypotheses
         </h2>
         {hypotheses.length > 0 ? (
@@ -448,9 +484,7 @@ export default function ProfilePage() {
                     </span>
                   )}
                 </div>
-                <p className="text-[13px] leading-relaxed text-stone-700">
-                  {h.statement}
-                </p>
+                <p className="text-[13px] leading-relaxed text-stone-700">{h.statement}</p>
                 <p className="mt-1.5 text-[11px] text-stone-400">{h.submittedAt}</p>
               </Link>
             ))}
