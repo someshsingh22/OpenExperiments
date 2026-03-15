@@ -21,12 +21,12 @@ export async function POST(request: Request) {
     return Response.json({ errors: result.errors }, { status: 400 });
   }
 
-  const { name, affiliation, scholarUrl, website, bio, orcid, twitterHandle } = result.data;
+  const { name, position, scholarUrl, website, bio, orcid, twitterHandle } = result.data;
 
   const now = Math.floor(Date.now() / 1000);
   await db.update(users).set({
     name,
-    affiliation: affiliation || null,
+    position: position || null,
     scholarUrl: scholarUrl || null,
     website: website || null,
     bio: bio || null,

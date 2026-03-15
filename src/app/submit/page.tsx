@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { getProblemStatements, submitHypothesis } from "@/lib/api";
 import { EvidenceBadge } from "@/components/evidence-badge";
 import { DomainTag } from "@/components/domain-tag";
@@ -13,8 +13,21 @@ import type { Domain, ProblemStatement } from "@/lib/types";
 const DOMAINS: Domain[] = ["persuasion", "memorability"];
 
 export default function SubmitPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex justify-center py-24">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-stone-300 border-t-stone-600" />
+      </div>
+    }>
+      <SubmitContent />
+    </Suspense>
+  );
+}
+
+function SubmitContent() {
   const { user, loading: authLoading, setShowAuthModal } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [selectedPS, setSelectedPS] = useState<string | null>(null);
   const [customQ, setCustomQ] = useState("");
   const [showCustom, setShowCustom] = useState(false);
@@ -44,6 +57,31 @@ export default function SubmitPage() {
       if (redirectTimerRef.current) clearInterval(redirectTimerRef.current);
     };
   }, []);
+
+  // Pre-fill from URL params (e.g., MCP-generated submission links)
+  useEffect(() => {
+    const urlStatement = searchParams.get("statement");
+    const urlRationale = searchParams.get("rationale");
+    const urlPS = searchParams.get("ps");
+    const urlCustomPS = searchParams.get("customPS");
+    const urlDomains = searchParams.get("domains");
+    const urlSource = searchParams.get("source");
+
+    if (urlStatement) setStatement(urlStatement);
+    if (urlRationale) setRationale(urlRationale);
+    if (urlPS) setSelectedPS(urlPS);
+    if (urlCustomPS) {
+      setShowCustom(true);
+      setCustomQ(urlCustomPS);
+    }
+    if (urlDomains) {
+      const parsed = urlDomains
+        .split(",")
+        .filter((d): d is Domain => DOMAINS.includes(d as Domain));
+      if (parsed.length > 0) setSelectedDomains(parsed);
+    }
+    if (urlSource === "ai_agent") setGeneratorType("AI");
+  }, [searchParams]);
 
   const toggleDomain = (d: Domain) => {
     setSelectedDomains((prev) =>

@@ -22,6 +22,7 @@ export interface Hypothesis {
   submittedBy?: string | null;
   winRate?: number | null;
   commentCount: number;
+  experimentCount?: number;
   citationDois: string[];
   relatedHypothesisIds: string[];
 }
@@ -44,22 +45,35 @@ export interface Experiment {
   status: "running" | "completed" | "planned";
   datasetId?: string;
   datasetName: string;
-  methodology: string;
+  methodology?: string;
   analysisPlan?: string;
   results?: ExperimentResult;
   submitter?: { id: string; name: string | null; avatarUrl: string | null } | null;
   startedAt: string;
   completedAt?: string;
   osfLink?: string;
+  version: number;
+  totalVersions?: number;
 }
 
 export interface ExperimentResult {
-  pValue: number;
-  effectSize: number;
-  confidenceInterval: [number, number];
-  sampleSize: number;
-  summary: string;
+  pValue?: number;
+  effectSize?: number;
+  confidenceInterval?: [number, number];
+  sampleSize?: number;
+  summary?: string;
   uplift?: string;
+}
+
+export interface ExperimentVersion {
+  version: number;
+  status: string;
+  methodology?: string;
+  analysisPlan?: string;
+  osfLink?: string;
+  results?: Partial<ExperimentResult>;
+  changeSummary?: string;
+  createdAt: string;
 }
 
 

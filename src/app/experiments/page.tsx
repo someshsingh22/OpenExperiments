@@ -50,7 +50,6 @@ export default function ExperimentsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Scroll to #submit on mount if hash is present
   useEffect(() => {
     if (window.location.hash === "#submit" && submitRef.current) {
       setTimeout(() => submitRef.current?.scrollIntoView({ behavior: "smooth" }), 300);
@@ -69,7 +68,6 @@ export default function ExperimentsPage() {
         </p>
       </header>
 
-      {/* Submit section — first */}
       <div ref={submitRef} id="submit" className="mb-16">
         <ExperimentSubmitForm
           onSubmitted={() => {
@@ -78,7 +76,6 @@ export default function ExperimentsPage() {
         />
       </div>
 
-      {/* Experiments list */}
       <section>
         <h2 className="mb-6 text-xl font-semibold text-stone-900">
           All Experiments
@@ -124,9 +121,11 @@ function ExperimentCard({ experiment }: { experiment: Experiment }) {
       <p className="mb-1 text-[13px] font-medium text-stone-800 group-hover:text-stone-900">
         {experiment.datasetName}
       </p>
-      <p className="mb-2.5 text-[13px] leading-relaxed text-stone-600 line-clamp-3">
-        {experiment.methodology}
-      </p>
+      {experiment.methodology && (
+        <p className="mb-2.5 text-[13px] leading-relaxed text-stone-600 line-clamp-3">
+          {experiment.methodology}
+        </p>
+      )}
 
       <div className="flex items-center justify-between text-[11px] text-stone-400">
         <div className="flex items-center gap-1">
@@ -140,7 +139,7 @@ function ExperimentCard({ experiment }: { experiment: Experiment }) {
           )}
         </div>
         <div className="flex items-center gap-2">
-          {experiment.results && (
+          {experiment.results?.pValue != null && (
             <span className="font-mono tabular-nums">
               p={experiment.results.pValue}
             </span>
@@ -171,10 +170,19 @@ function ExperimentSubmitForm({
   const [datasetMode, setDatasetMode] = useState<"platform" | "custom">("platform");
   const [selectedDataset, setSelectedDataset] = useState("");
   const [customDatasetName, setCustomDatasetName] = useState("");
+  const [status, setStatus] = useState("planned");
   const [methodology, setMethodology] = useState("");
   const [analysisPlan, setAnalysisPlan] = useState("");
   const [osfLink, setOsfLink] = useState("");
-  const [status, setStatus] = useState("planned");
+
+  // Results fields
+  const [resSummary, setResSummary] = useState("");
+  const [resPValue, setResPValue] = useState("");
+  const [resEffectSize, setResEffectSize] = useState("");
+  const [resSampleSize, setResSampleSize] = useState("");
+  const [resCILow, setResCILow] = useState("");
+  const [resCIHigh, setResCIHigh] = useState("");
+
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [submitted, setSubmitted] = useState(false);
@@ -201,6 +209,29 @@ function ExperimentSubmitForm({
 
   const inputClass =
     "w-full rounded-md border border-stone-200 px-3 py-2.5 text-base text-stone-800 placeholder-stone-400 transition-colors focus:border-stone-300 focus:outline-none focus:ring-1 focus:ring-stone-300";
+  const metricInputClass =
+    "w-full rounded-md border border-stone-200 px-3 py-2 text-sm font-mono text-stone-800 placeholder-stone-400 transition-colors focus:border-stone-300 focus:outline-none focus:ring-1 focus:ring-stone-300";
+
+  function resetForm() {
+    setSubmitted(false);
+    setSubmittedId("");
+    setSelectedPS("");
+    setSelectedHypothesis("");
+    setStudyType("observational");
+    setStatus("planned");
+    setMethodology("");
+    setAnalysisPlan("");
+    setOsfLink("");
+    setSelectedDataset("");
+    setCustomDatasetName("");
+    setResSummary("");
+    setResPValue("");
+    setResEffectSize("");
+    setResSampleSize("");
+    setResCILow("");
+    setResCIHigh("");
+    setSubmitError("");
+  }
 
   if (submitted) {
     return (
@@ -222,20 +253,7 @@ function ExperimentSubmitForm({
             View experiment
           </Link>
           <button
-            onClick={() => {
-              setSubmitted(false);
-              setSubmittedId("");
-              setSelectedPS("");
-              setSelectedHypothesis("");
-              setMethodology("");
-              setAnalysisPlan("");
-              setOsfLink("");
-              setStudyType("observational");
-              setStatus("planned");
-              setSelectedDataset("");
-              setCustomDatasetName("");
-              setSubmitError("");
-            }}
+            onClick={resetForm}
             className="rounded-md border border-stone-300 px-4 py-2 text-[13px] font-medium text-stone-600 hover:bg-stone-50"
           >
             Submit another
@@ -244,6 +262,11 @@ function ExperimentSubmitForm({
       </section>
     );
   }
+
+  const methodologyRequired = status === "running" || status === "completed";
+  const analysisRequired = status === "completed";
+  const showAnalysis = status === "running" || status === "completed";
+  const showResults = status === "completed";
 
   return (
     <section className="rounded-2xl border border-stone-200 bg-stone-50/50 p-8">
@@ -274,6 +297,7 @@ function ExperimentSubmitForm({
             setSubmitError("");
             try {
               const ds = datasets.find((d) => d.id === selectedDataset);
+              const hasResults = status === "completed";
               const res = await submitExperiment({
                 hypothesisId: selectedHypothesis,
                 problemStatementId: selectedPS || undefined,
@@ -283,10 +307,20 @@ function ExperimentSubmitForm({
                   datasetMode === "platform"
                     ? ds?.name || ""
                     : customDatasetName,
-                methodology,
+                status,
+                methodology: methodology || undefined,
                 analysisPlan: analysisPlan || undefined,
                 osfLink: osfLink || undefined,
-                status,
+                results: hasResults
+                  ? {
+                      summary: resSummary || undefined,
+                      pValue: resPValue ? parseFloat(resPValue) : undefined,
+                      effectSize: resEffectSize ? parseFloat(resEffectSize) : undefined,
+                      sampleSize: resSampleSize ? parseInt(resSampleSize, 10) : undefined,
+                      confidenceIntervalLow: resCILow ? parseFloat(resCILow) : undefined,
+                      confidenceIntervalHigh: resCIHigh ? parseFloat(resCIHigh) : undefined,
+                    }
+                  : undefined,
               });
               setSubmittedId(res.data.id);
               setSubmitted(true);
@@ -324,9 +358,17 @@ function ExperimentSubmitForm({
 
           {/* Hypothesis */}
           <div>
-            <label className="mb-1.5 block text-sm font-semibold text-stone-700">
-              Hypothesis Being Tested
-            </label>
+            <div className="mb-1.5 flex items-center gap-2">
+              <label className="text-sm font-semibold text-stone-700">
+                Hypothesis Being Tested
+              </label>
+              <Link
+                href="/submit"
+                className="text-[11px] font-medium text-stone-400 hover:text-stone-600 transition-colors"
+              >
+                Hypothesis not on OpenExperiments yet? Add here &rarr;
+              </Link>
+            </div>
             <div className="relative">
               <select
                 value={selectedHypothesis}
@@ -433,36 +475,172 @@ function ExperimentSubmitForm({
             )}
           </div>
 
-          {/* Methodology */}
+          {/* Current Status */}
           <div>
             <label className="mb-1.5 block text-sm font-semibold text-stone-700">
-              Methodology
+              Current Status
             </label>
-            <textarea
-              value={methodology}
-              onChange={(e) => setMethodology(e.target.value)}
-              placeholder="Describe your experimental design, variables, analysis approach..."
-              rows={4}
-              className={inputClass}
-              required
-            />
+            <div className="flex flex-wrap gap-2">
+              {STATUS_OPTIONS.map((opt) => (
+                <label
+                  key={opt.value}
+                  className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium cursor-pointer transition-colors ${
+                    status === opt.value
+                      ? "border-stone-900 bg-stone-900 text-white"
+                      : "border-stone-200 bg-white text-stone-700 hover:border-stone-300"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="status"
+                    value={opt.value}
+                    checked={status === opt.value}
+                    onChange={(e) => setStatus(e.target.value)}
+                    className="sr-only"
+                  />
+                  {opt.label}
+                </label>
+              ))}
+            </div>
           </div>
 
-          {/* Analysis Plan (optional) */}
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-stone-700">
-              Analysis Plan <span className="font-normal text-stone-400">(optional)</span>
-            </label>
-            <textarea
-              value={analysisPlan}
-              onChange={(e) => setAnalysisPlan(e.target.value)}
-              placeholder="Pre-specify your analysis approach, statistical tests, corrections..."
-              rows={3}
-              className={inputClass}
-            />
+          {/* Conditional fields based on status */}
+          <div className="space-y-5 rounded-xl border border-stone-200 bg-white p-5">
+            <p className="text-xs font-medium uppercase tracking-wider text-stone-400">
+              {status === "planned" && "Planned Details"}
+              {status === "running" && "Running Details"}
+              {status === "completed" && "Completed Details"}
+            </p>
+
+            {/* Methodology - always shown */}
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-stone-700">
+                Methodology
+                {methodologyRequired
+                  ? <span className="ml-1 text-red-400">*</span>
+                  : <span className="ml-1 font-normal text-stone-400">(optional)</span>}
+              </label>
+              <textarea
+                value={methodology}
+                onChange={(e) => setMethodology(e.target.value)}
+                placeholder="Describe your experimental design, variables, analysis approach..."
+                rows={3}
+                className={inputClass}
+                required={methodologyRequired}
+              />
+            </div>
+
+            {/* Analysis Plan - running & completed */}
+            {showAnalysis && (
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-stone-700">
+                  Analysis Plan
+                  {analysisRequired
+                    ? <span className="ml-1 text-red-400">*</span>
+                    : <span className="ml-1 font-normal text-stone-400">(optional)</span>}
+                </label>
+                <textarea
+                  value={analysisPlan}
+                  onChange={(e) => setAnalysisPlan(e.target.value)}
+                  placeholder="Pre-specify your analysis approach, statistical tests, corrections..."
+                  rows={3}
+                  className={inputClass}
+                  required={analysisRequired}
+                />
+              </div>
+            )}
+
+            {/* Results - completed only */}
+            {showResults && (
+              <div className="space-y-4">
+                <div>
+                  <label className="mb-1.5 block text-sm font-semibold text-stone-700">
+                    Results Summary <span className="ml-1 text-red-400">*</span>
+                  </label>
+                  <textarea
+                    value={resSummary}
+                    onChange={(e) => setResSummary(e.target.value)}
+                    placeholder="Summarize your findings, key observations, and conclusions..."
+                    rows={3}
+                    className={inputClass}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-stone-700">
+                    Key Metrics <span className="font-normal text-stone-400">(optional)</span>
+                  </label>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <div>
+                    <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-stone-400">
+                      p-value
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={resPValue}
+                      onChange={(e) => setResPValue(e.target.value)}
+                      placeholder="0.002"
+                      className={metricInputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-stone-400">
+                      Effect Size
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={resEffectSize}
+                      onChange={(e) => setResEffectSize(e.target.value)}
+                      placeholder="0.33"
+                      className={metricInputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-stone-400">
+                      Sample Size
+                    </label>
+                    <input
+                      type="number"
+                      step="1"
+                      value={resSampleSize}
+                      onChange={(e) => setResSampleSize(e.target.value)}
+                      placeholder="2500"
+                      className={metricInputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-stone-400">
+                      95% CI
+                    </label>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        step="any"
+                        value={resCILow}
+                        onChange={(e) => setResCILow(e.target.value)}
+                        placeholder="0.18"
+                        className={metricInputClass}
+                      />
+                      <span className="text-stone-300">&ndash;</span>
+                      <input
+                        type="number"
+                        step="any"
+                        value={resCIHigh}
+                        onChange={(e) => setResCIHigh(e.target.value)}
+                        placeholder="0.48"
+                        className={metricInputClass}
+                      />
+                    </div>
+                  </div>
+                </div>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* OSF Link (optional) */}
+          {/* OSF Link - always optional */}
           <div>
             <label className="mb-1.5 block text-sm font-semibold text-stone-700">
               OSF Pre-registration Link <span className="font-normal text-stone-400">(optional)</span>
@@ -474,31 +652,6 @@ function ExperimentSubmitForm({
               placeholder="https://osf.io/..."
               className={inputClass}
             />
-          </div>
-
-          {/* Status */}
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-stone-700">
-              Current Status
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {STATUS_OPTIONS.map((opt) => (
-                <label
-                  key={opt.value}
-                  className="flex items-center gap-2 rounded-md border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:border-stone-300 cursor-pointer"
-                >
-                  <input
-                    type="radio"
-                    name="status"
-                    value={opt.value}
-                    checked={status === opt.value}
-                    onChange={(e) => setStatus(e.target.value)}
-                    className="text-stone-900 focus:ring-stone-900"
-                  />
-                  {opt.label}
-                </label>
-              ))}
-            </div>
           </div>
 
           {submitError && (

@@ -1,9 +1,10 @@
 import { HypothesisStatus, Phase } from "@/lib/types";
+import { FlaskConical, ShieldCheck } from "lucide-react";
 import clsx from "clsx";
 
 const statusConfig: Record<
   HypothesisStatus,
-  { label: string; bg: string; text: string; ring: string }
+  { label: string; bg: string; text: string; ring: string; icon?: React.ComponentType<{ className?: string }> }
 > = {
   proposed: {
     label: "Proposed",
@@ -18,36 +19,38 @@ const statusConfig: Record<
     ring: "ring-sky-200",
   },
   data_tested: {
-    label: "Data Tested",
+    label: "Tested",
     bg: "bg-teal-50",
     text: "text-teal-700",
     ring: "ring-teal-200",
+    icon: FlaskConical,
   },
   field_validated: {
     label: "Field Validated",
     bg: "bg-amber-50",
     text: "text-amber-700",
     ring: "ring-amber-200",
+    icon: ShieldCheck,
   },
 };
 
 interface EvidenceBadgeProps {
   status: HypothesisStatus;
   phase?: Phase;
-  score?: number;
   size?: "sm" | "md" | "lg";
 }
 
 export function EvidenceBadge({
   status,
   phase,
-  score,
   size = "md",
 }: EvidenceBadgeProps) {
   const isLive = phase === "live";
   const config = isLive
-    ? { label: "Evaluating", bg: "bg-stone-50", text: "text-stone-400", ring: "ring-stone-200" }
+    ? { label: "Evaluating", bg: "bg-stone-50", text: "text-stone-400", ring: "ring-stone-200", icon: undefined }
     : statusConfig[status];
+
+  const Icon = config.icon;
 
   return (
     <span
@@ -61,10 +64,12 @@ export function EvidenceBadge({
         size === "lg" && "px-2.5 py-1 text-sm"
       )}
     >
+      {Icon && <Icon className={clsx(
+        size === "sm" && "h-3 w-3",
+        size === "md" && "h-3.5 w-3.5",
+        size === "lg" && "h-4 w-4"
+      )} />}
       {config.label}
-      {!isLive && score !== undefined && (
-        <span className="ml-0.5 font-semibold">{score}</span>
-      )}
     </span>
   );
 }

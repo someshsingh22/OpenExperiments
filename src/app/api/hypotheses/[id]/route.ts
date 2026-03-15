@@ -48,7 +48,7 @@ export async function GET(
     }
   }
 
-  // Fetch comments
+  // Fetch comments with author info
   const comms = await db
     .select()
     .from(comments)
@@ -56,6 +56,9 @@ export async function GET(
 
   // Compute win rate
   const winRate = await getWinRate(db, id);
+
+  // Actual discussion comment count
+  const actualCommentCount = comms.length;
 
   // Anonymous visibility
   const isAnon = hypothesis.isAnonymous === 1;
@@ -80,7 +83,7 @@ export async function GET(
       evidenceScore: hypothesis.evidenceScore,
       pValue: hypothesis.pValue,
       effectSize: hypothesis.effectSize,
-      commentCount: hypothesis.commentCount,
+      commentCount: actualCommentCount,
       citationDois: hypothesis.citationDois,
       relatedHypothesisIds: hypothesis.relatedHypothesisIds,
     },
@@ -132,6 +135,15 @@ export async function PATCH(
 
   if (!addCitation) {
     return Response.json({ error: "addCitation is required" }, { status: 400 });
+  }
+
+  // Validate citation: must be an arXiv URL or a DOI
+  const { validateCitation } = await import("@/lib/validation");
+  if (!validateCitation(addCitation)) {
+    return Response.json(
+      { error: "Citation must be a valid arXiv URL (https://arxiv.org/abs/...) or DOI (10.xxxx/...)" },
+      { status: 400 }
+    );
   }
 
   const [hypothesis] = await db

@@ -69,6 +69,8 @@ export default function ArenaPage() {
         prev ? { ...prev, ...res.data } : prev
       );
       setHasVoted(true);
+      // Refresh leaderboard after voting
+      getArenaRankings().then((res) => setLeaderboard(res.data));
     } catch (err) {
       setVoteError(
         err instanceof Error ? err.message : "Failed to submit vote"

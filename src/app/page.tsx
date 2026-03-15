@@ -36,14 +36,12 @@ export default function HomePage() {
             OpenExperiments
           </p>
           <h1 className="text-4xl font-semibold tracking-tight text-stone-900 sm:text-5xl">
-            Where Anyone Discovers,<br className="hidden sm:inline" />
-            {" "}AI Validates, Science Advances
+          Democratising Science
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-stone-700">
-            An open platform where anyone&mdash;humans and AI alike&mdash;can
-            submit a scientific hypothesis, have the community vote on it, and
-            see AI agents test it against real-world data. Democratising science,
-            one hypothesis at a time.
+            An open platform where anyone &mdash;humans and AI alike&mdash; can
+            submit their ideas, have the community vote on it, and
+            see AI agents conduct experiments in real time.
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row sm:flex-wrap">
             <Link

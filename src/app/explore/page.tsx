@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useMemo, Suspense } from "react";
+import { useState, useEffect, useMemo, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Search, ArrowRight } from "lucide-react";
 import Link from "next/link";
-import { getHypotheses, getProblemStatements } from "@/lib/api";
+import { getHypotheses, getProblemStatements, toggleStar } from "@/lib/api";
 import { HypothesisCard } from "@/components/hypothesis-card";
+import { useAuth } from "@/components/auth-provider";
 import type { Hypothesis, ProblemStatement } from "@/lib/types";
 
 const DOMAIN_OPTIONS = [
@@ -44,6 +45,7 @@ export default function ExplorePage() {
 
 function ExploreContent() {
   const searchParams = useSearchParams();
+  const { user, setShowAuthModal } = useAuth();
   const [search, setSearch] = useState("");
   const [domain, setDomain] = useState<DomainFilter>("all");
   const [phase, setPhase] = useState<PhaseFilter>("all");
@@ -53,6 +55,8 @@ function ExploreContent() {
   const [problemStatementsData, setProblemStatementsData] = useState<ProblemStatement[]>([]);
   const [loading, setLoading] = useState(true);
   const [psInitialized, setPsInitialized] = useState(false);
+  const [starredIds, setStarredIds] = useState<Set<string>>(new Set());
+  const [starCounts, setStarCounts] = useState<Map<string, number>>(new Map());
 
   useEffect(() => {
     setLoading(true);
@@ -69,6 +73,32 @@ function ExploreContent() {
   useEffect(() => {
     getProblemStatements().then((res) => setProblemStatementsData(res.data));
   }, []);
+
+  // Load star status for visible hypotheses
+  useEffect(() => {
+    if (!user || hypothesesData.length === 0) return;
+    const ids = hypothesesData.map((h) => h.id);
+    Promise.all(
+      ids.map((id) =>
+        fetch(`/api/hypotheses/${id}/star`)
+          .then((res) => res.json())
+          .then((res) => {
+            const data = (res as { data: { count: number; starred: boolean } }).data;
+            return { id, count: data.count, starred: data.starred };
+          })
+          .catch(() => ({ id, count: 0, starred: false }))
+      )
+    ).then((results) => {
+      const newStarred = new Set<string>();
+      const newCounts = new Map<string, number>();
+      for (const r of results) {
+        if (r.starred) newStarred.add(r.id);
+        newCounts.set(r.id, r.count);
+      }
+      setStarredIds(newStarred);
+      setStarCounts(newCounts);
+    });
+  }, [user, hypothesesData]);
 
   // Read PS from URL params once problem statements are loaded
   useEffect(() => {
@@ -90,6 +120,29 @@ function ExploreContent() {
     if (!selectedPS) return hypothesesData;
     return hypothesesData.filter((h) => h.problemStatement === selectedPS);
   }, [hypothesesData, selectedPS]);
+
+  const handleStar = useCallback(async (id: string) => {
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
+    try {
+      const res = await toggleStar(id);
+      setStarredIds((prev) => {
+        const next = new Set(prev);
+        if (res.data.starred) next.add(id);
+        else next.delete(id);
+        return next;
+      });
+      setStarCounts((prev) => {
+        const next = new Map(prev);
+        next.set(id, res.data.count);
+        return next;
+      });
+    } catch {
+      // silent fail
+    }
+  }, [user, setShowAuthModal]);
 
   const selectClass =
     "rounded-md border border-stone-200 bg-white px-2.5 py-2 text-sm text-stone-700 focus:border-stone-400 focus:outline-none focus:ring-1 focus:ring-stone-300";
@@ -171,7 +224,12 @@ function ExploreContent() {
           <div className="columns-1 gap-4 sm:columns-2 lg:columns-3">
             {filtered.map((hypothesis) => (
               <div key={hypothesis.id} className="mb-4 break-inside-avoid">
-                <HypothesisCard hypothesis={hypothesis} />
+                <HypothesisCard
+                  hypothesis={hypothesis}
+                  onStar={handleStar}
+                  starred={starredIds.has(hypothesis.id)}
+                  starCount={starCounts.get(hypothesis.id)}
+                />
               </div>
             ))}
           </div>

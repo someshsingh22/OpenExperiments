@@ -75,6 +75,7 @@ export default function HypothesisDetailPage() {
   const [showShare, setShowShare] = useState(false);
   const [copying, setCopying] = useState(false);
   const [arxivLink, setArxivLink] = useState("");
+  const [citationError, setCitationError] = useState("");
   const shareRef = useRef<HTMLDivElement>(null);
 
   const [hypothesis, setHypothesis] = useState<Hypothesis | null>(null);
@@ -141,25 +142,24 @@ export default function HypothesisDetailPage() {
   const abWithUplift = hExperiments.find((e) => e.type === "ab_test" && e.results?.uplift);
 
   const tabClass = (t: string) =>
-    `pb-2.5 text-[13px] font-medium transition-colors ${activeTab === t
+    `pb-2.5 text-sm font-medium transition-colors ${activeTab === t
       ? "border-b-2 border-stone-800 text-stone-800"
       : "text-stone-400 hover:text-stone-600"
     }`;
 
   return (
     <div className="min-h-screen">
-      <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
+      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
         {/* Header */}
-        <header className="mb-6">
+        <header className="mb-8">
           <div className="mb-3">
             <EvidenceBadge
               status={hypothesis.status}
               phase={hypothesis.phase}
-              score={revealed ? hypothesis.evidenceScore : undefined}
-              size="md"
+              size="lg"
             />
           </div>
-          <h1 className="mb-3 text-xl font-semibold leading-tight text-stone-800">
+          <h1 className="mb-4 text-2xl font-semibold leading-snug text-stone-900 sm:text-3xl">
             {hypothesis.statement}
           </h1>
           <div className="flex flex-wrap items-center gap-1.5">
@@ -212,65 +212,65 @@ export default function HypothesisDetailPage() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 text-[13px] text-stone-400">
+          <div className="flex flex-wrap items-center gap-3 text-sm text-stone-500">
             {revealed ? (
               <span className="flex items-center gap-1">
                 {hypothesis.source === "ai_agent" ? (
                   <>
-                    <Cpu className="h-3.5 w-3.5 text-indigo-400" />
+                    <Cpu className="h-4 w-4 text-indigo-400" />
                     <span className="font-medium text-indigo-500">{hypothesis.agentName ?? "AI Agent"}</span>
                   </>
                 ) : (
                   <>
-                    <Brain className="h-3.5 w-3.5" />
+                    <Brain className="h-4 w-4" />
                     <span>Human</span>
                   </>
                 )}
               </span>
             ) : (
-              <span className="flex items-center gap-1 italic text-stone-300">
-                <Lock className="h-3 w-3" /> Source hidden during evaluation
+              <span className="flex items-center gap-1 italic text-stone-400">
+                <Lock className="h-3.5 w-3.5" /> Source hidden during evaluation
               </span>
             )}
             <span className="flex items-center gap-1">
-              <Calendar className="h-3.5 w-3.5" />
+              <Calendar className="h-4 w-4" />
               {fmtDate(hypothesis.submittedAt)}
             </span>
           </div>
           {hypothesis.problemStatement && (
-            <p className="mt-2 text-[13px] text-stone-400">
+            <p className="mt-2 text-sm text-stone-500">
               Problem: {hypothesis.problemStatement}
             </p>
           )}
           <div className="mt-6 flex flex-col gap-6">
             <div>
-              <p className="mb-2 text-[11px] font-medium text-stone-500">
+              <p className="mb-2 text-sm font-medium text-stone-600">
                 Are you a Social Scientist or Experimenter?
               </p>
               <Link
                 href="/experiments"
-                className="inline-flex items-center gap-2 rounded-md border border-stone-200 bg-stone-50 px-4 py-2 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-100 hover:text-stone-900"
+                className="inline-flex items-center gap-2 rounded-md border border-stone-200 bg-stone-50 px-5 py-2.5 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-100 hover:text-stone-900"
               >
                 Submit an Experiment
-                <ArrowRight className="h-3 w-3" />
+                <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
             <div className="w-full">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-stone-400">BibTeX Citation</span>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold uppercase tracking-wider text-stone-500">BibTeX Citation</span>
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(generateBibtex(hypothesis));
                     setCopying(true);
                     setTimeout(() => setCopying(false), 2000);
                   }}
-                  className="text-[10px] font-bold text-stone-400 hover:text-stone-600"
+                  className="text-xs font-bold text-stone-400 hover:text-stone-700"
                 >
                   {copying ? "COPIED" : "COPY"}
                 </button>
               </div>
-              <div className="rounded-md border border-stone-200 bg-stone-50 p-2.5 text-[10px]">
-                <pre className="max-h-32 overflow-y-auto whitespace-pre-wrap font-mono text-stone-600 leading-relaxed">
+              <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
+                <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap font-mono text-xs leading-relaxed text-stone-700">
                   {generateBibtex(hypothesis)}
                 </pre>
               </div>
@@ -279,16 +279,16 @@ export default function HypothesisDetailPage() {
         </header>
 
         {/* Rationale */}
-        <section className="mb-6 rounded-md border border-stone-200 bg-stone-50/50 p-4">
-          <h2 className="mb-1 text-[11px] font-medium uppercase tracking-wider text-stone-400">
+        <section className="mb-8 rounded-lg border border-stone-200 bg-stone-50/50 p-5">
+          <h2 className="mb-2 text-xs font-medium uppercase tracking-wider text-stone-500">
             Rationale
           </h2>
-          <p className="text-[13px] leading-relaxed text-stone-600">{hypothesis.rationale}</p>
+          <p className="text-base leading-relaxed text-stone-700">{hypothesis.rationale}</p>
         </section>
 
         {/* Live notice */}
         {!revealed && (
-          <div className="mb-6 rounded-md border border-amber-200 bg-amber-50/50 p-3 text-[13px] text-amber-700">
+          <div className="mb-8 rounded-lg border border-amber-200 bg-amber-50/50 p-4 text-sm text-amber-700">
             This hypothesis is currently live. Evidence, scores, and source identity will be revealed once evaluation completes.
           </div>
         )}
@@ -316,11 +316,11 @@ export default function HypothesisDetailPage() {
             {activeTab === "community" && (
               <div className="space-y-5">
                 {revealed && hypothesis.winRate != null && (
-                  <div className="rounded-md border border-stone-200 bg-white p-4">
-                    <h3 className="mb-1.5 text-[12px] font-medium text-stone-500">Arena Win Rate</h3>
-                    <div className="mb-1.5 flex items-baseline gap-1.5">
-                      <span className="font-mono text-2xl font-semibold text-stone-800">{hypothesis.winRate}%</span>
-                      <span className="text-[12px] text-stone-400">win rate</span>
+                  <div className="rounded-lg border border-stone-200 bg-white p-5">
+                    <h3 className="mb-2 text-sm font-medium text-stone-600">Arena Win Rate</h3>
+                    <div className="mb-2 flex items-baseline gap-2">
+                      <span className="font-mono text-3xl font-semibold text-stone-800">{hypothesis.winRate}%</span>
+                      <span className="text-sm text-stone-400">win rate</span>
                     </div>
                     <div className="h-1.5 overflow-hidden rounded-full bg-stone-100">
                       <div className="h-full rounded-full bg-stone-600 transition-all" style={{ width: `${hypothesis.winRate}%` }} />
@@ -329,7 +329,7 @@ export default function HypothesisDetailPage() {
                 )}
 
                 <div>
-                  <h3 className="mb-2.5 text-[12px] font-medium text-stone-500">Discussion</h3>
+                  <h3 className="mb-3 text-sm font-medium text-stone-600">Discussion</h3>
                   <div className="space-y-2">
                     {hComments.length > 0 ? (
                       hComments.filter((c) => !c.parentId).map((root) => (
@@ -344,7 +344,7 @@ export default function HypothesisDetailPage() {
                         />
                       ))
                     ) : (
-                      <p className="text-[13px] text-stone-400">No comments yet.</p>
+                      <p className="text-sm text-stone-400">No comments yet.</p>
                     )}
                   </div>
                   <div className="mt-4">
@@ -355,7 +355,7 @@ export default function HypothesisDetailPage() {
                           rows={2}
                           value={commentText}
                           onChange={(e) => setCommentText(e.target.value)}
-                          className="mb-2 w-full rounded-md border border-stone-200 px-3 py-2 text-[13px] text-stone-700 placeholder-stone-300 focus:border-stone-400 focus:outline-none focus:ring-1 focus:ring-stone-300"
+                          className="mb-2 w-full rounded-md border border-stone-200 px-3 py-2 text-sm text-stone-700 placeholder-stone-300 focus:border-stone-400 focus:outline-none focus:ring-1 focus:ring-stone-300"
                         />
                         <div className="flex items-center gap-2">
                           <button
@@ -392,7 +392,7 @@ export default function HypothesisDetailPage() {
                       </div>
                     ) : (
                       <div className="rounded-md border border-stone-200 bg-stone-50 p-3">
-                        <p className="text-[13px] text-stone-400 italic">
+                        <p className="text-sm text-stone-400 italic">
                           <button
                             onClick={() => setShowAuthModal(true)}
                             className="font-medium text-stone-600 underline underline-offset-2 hover:text-stone-800"
@@ -412,38 +412,44 @@ export default function HypothesisDetailPage() {
             {activeTab === "evidence" && revealed && (
               <div>
                 {(hypothesis.status === "data_tested" || hypothesis.status === "field_validated") && completedExp?.results ? (
-                  <div className="space-y-4 rounded-md border border-stone-200 bg-white p-4">
-                    <h3 className="text-[12px] font-medium text-stone-500">Results</h3>
+                  <div className="space-y-4 rounded-lg border border-stone-200 bg-white p-5">
+                    <h3 className="text-sm font-medium text-stone-600">Results</h3>
                     {hypothesis.evidenceScore != null && (
                       <div>
-                        <div className="mb-1 flex justify-between text-[12px]">
+                        <div className="mb-1.5 flex justify-between text-sm">
                           <span className="text-stone-500">Evidence Score</span>
                           <span className="font-medium text-stone-700">{hypothesis.evidenceScore}/100</span>
                         </div>
-                        <div className="h-1.5 overflow-hidden rounded-full bg-stone-100">
+                        <div className="h-2 overflow-hidden rounded-full bg-stone-100">
                           <div className="h-full rounded-full bg-teal-500" style={{ width: `${hypothesis.evidenceScore}%` }} />
                         </div>
                       </div>
                     )}
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      <div>
-                        <p className="text-[11px] text-stone-400">p-value</p>
-                        <p className="font-mono text-[13px] font-medium text-stone-700">{completedExp.results.pValue.toExponential(2)}</p>
-                      </div>
-                      <div>
-                        <p className="text-[11px] text-stone-400">Effect Size</p>
-                        <p className="font-mono text-[13px] font-medium text-stone-700">{completedExp.results.effectSize}</p>
-                      </div>
-                      <div>
-                        <p className="text-[11px] text-stone-400">95% CI</p>
-                        <p className="font-mono text-[13px] font-medium text-stone-700">
-                          [{completedExp.results.confidenceInterval[0].toFixed(2)}, {completedExp.results.confidenceInterval[1].toFixed(2)}]
-                        </p>
-                      </div>
+                    <div className="grid gap-4 sm:grid-cols-3">
+                      {completedExp.results.pValue != null && (
+                        <div>
+                          <p className="text-xs text-stone-400">p-value</p>
+                          <p className="font-mono text-sm font-medium text-stone-700">{completedExp.results.pValue.toExponential(2)}</p>
+                        </div>
+                      )}
+                      {completedExp.results.effectSize != null && (
+                        <div>
+                          <p className="text-xs text-stone-400">Effect Size</p>
+                          <p className="font-mono text-sm font-medium text-stone-700">{completedExp.results.effectSize}</p>
+                        </div>
+                      )}
+                      {completedExp.results.confidenceInterval && (
+                        <div>
+                          <p className="text-xs text-stone-400">95% CI</p>
+                          <p className="font-mono text-sm font-medium text-stone-700">
+                            [{completedExp.results.confidenceInterval[0].toFixed(2)}, {completedExp.results.confidenceInterval[1].toFixed(2)}]
+                          </p>
+                        </div>
+                      )}
                     </div>
                     <div>
-                      <p className="mb-0.5 text-[11px] text-stone-400">Methodology</p>
-                      <p className="text-[13px] text-stone-600">{completedExp.methodology}</p>
+                      <p className="mb-1 text-xs text-stone-400">Methodology</p>
+                      <p className="text-sm text-stone-600">{completedExp.methodology}</p>
                     </div>
                     <div className="mt-4 flex gap-3">
                       <Link
@@ -456,8 +462,8 @@ export default function HypothesisDetailPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="rounded-md border border-dashed border-stone-300 p-8 text-center">
-                    <p className="text-[13px] text-stone-400">Not yet tested against observational data.</p>
+                  <div className="rounded-lg border border-dashed border-stone-300 p-8 text-center">
+                    <p className="text-sm text-stone-400">Not yet tested against observational data.</p>
                   </div>
                 )}
               </div>
@@ -479,7 +485,7 @@ export default function HypothesisDetailPage() {
                 {hExperiments.length > 0 ? (
                   hExperiments.map((exp) => <ExperimentCard key={exp.id} experiment={exp} />)
                 ) : (
-                  <p className="text-[13px] text-stone-400">No experiments yet.</p>
+                  <p className="text-sm text-stone-400">No experiments yet.</p>
                 )}
               </div>
             )}
@@ -491,20 +497,20 @@ export default function HypothesisDetailPage() {
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-[0.1em] text-stone-500">Related & Bibliography</h2>
 
           <div className="mb-6">
-            <h3 className="mb-3 text-[13px] font-medium text-stone-800">Similar Ideas</h3>
+            <h3 className="mb-3 text-sm font-medium text-stone-800">Similar Ideas</h3>
             <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
               {related.length > 0 ? related.map((h) => (
                 <div key={h.id} className="min-w-[260px] max-w-[300px] shrink-0">
                   <HypothesisCard hypothesis={h} />
                 </div>
               )) : (
-                <p className="text-[13px] text-stone-400">No related hypotheses found.</p>
+                <p className="text-sm text-stone-400">No related hypotheses found.</p>
               )}
             </div>
           </div>
 
-          <div className="rounded-md border border-stone-200 bg-stone-50/50 p-5">
-            <h3 className="mb-4 text-[13px] font-medium text-stone-800 flex items-center gap-2">
+          <div className="rounded-lg border border-stone-200 bg-stone-50/50 p-5">
+            <h3 className="mb-4 text-sm font-medium text-stone-800 flex items-center gap-2">
               <Link2 className="h-4 w-4" />
               Bibliography
             </h3>
@@ -517,32 +523,38 @@ export default function HypothesisDetailPage() {
                     href={doiUrl(doi)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[13px] text-stone-600 hover:text-stone-900 hover:underline decoration-stone-300"
+                    className="text-sm text-stone-600 hover:text-stone-900 hover:underline decoration-stone-300"
                   >
                     {doi}
                   </a>
                 </div>
               ))}
               {hypothesis.citationDois.length === 0 && (
-                <p className="text-[13px] text-stone-400 italic">No citations added yet.</p>
+                <p className="text-sm text-stone-400 italic">No citations added yet.</p>
               )}
             </div>
 
             <div className="mt-4 border-t border-stone-200 pt-4">
-              <p className="mb-3 text-[12px] font-medium text-stone-600">
+              <p className="mb-1.5 text-sm font-medium text-stone-600">
                 If you see this idea in recent arXiv papers, add a link:
+              </p>
+              <p className="mb-3 text-xs text-stone-400">
+                Only arXiv URLs (https://arxiv.org/abs/...) or DOIs (10.xxxx/...) are accepted.
               </p>
               <div className="flex gap-2">
                 <input
                   type="text"
-                  placeholder="https://arxiv.org/abs/xxxx.xxxxx"
+                  placeholder="https://arxiv.org/abs/xxxx.xxxxx or 10.xxxx/..."
                   value={arxivLink}
-                  onChange={(e) => setArxivLink(e.target.value)}
-                  className="flex-1 rounded-md border border-stone-200 px-3 py-2 text-[13px] text-stone-700 placeholder-stone-300 focus:border-stone-400 focus:outline-none"
+                  onChange={(e) => { setArxivLink(e.target.value); setCitationError(""); }}
+                  className={`flex-1 rounded-md border px-3 py-2 text-sm text-stone-700 placeholder-stone-300 focus:outline-none ${
+                    citationError ? "border-red-300 focus:border-red-400 focus:ring-1 focus:ring-red-200" : "border-stone-200 focus:border-stone-400"
+                  }`}
                 />
                 <button
                   onClick={async () => {
                     if (!arxivLink) return;
+                    setCitationError("");
                     try {
                       const res = await addCitation(id, arxivLink);
                       setHypothesis((prev) =>
@@ -550,15 +562,18 @@ export default function HypothesisDetailPage() {
                       );
                       setArxivLink("");
                     } catch (err) {
-                      window.alert(err instanceof Error ? err.message : "Failed to add citation");
+                      setCitationError(err instanceof Error ? err.message : "Failed to add citation");
                     }
                   }}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-stone-800 bg-stone-800 px-4 py-2 text-xs font-medium text-white hover:bg-stone-700"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-stone-800 bg-stone-800 px-4 py-2 text-sm font-medium text-white hover:bg-stone-700"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   Add
                 </button>
               </div>
+              {citationError && (
+                <p className="mt-2 text-sm text-red-600">{citationError}</p>
+              )}
             </div>
           </div>
         </section>
@@ -609,14 +624,14 @@ function CommentThread({
 
   return (
     <div className={comment.parentId ? "ml-4 border-l border-stone-100 pl-3" : ""}>
-      <div className="rounded-md border border-stone-100 bg-white px-3 py-2">
+      <div className="rounded-md border border-stone-100 bg-white px-3.5 py-2.5">
         <div className="mb-1 flex items-center gap-1.5">
-          <span className="text-[11px] font-semibold text-stone-600">
+          <span className="text-xs font-semibold text-stone-700">
             {author?.name || "Anonymous"}
           </span>
-          <span className="text-[10px] text-stone-300">{fmtDate(comment.createdAt)}</span>
+          <span className="text-[11px] text-stone-400">{fmtDate(comment.createdAt)}</span>
         </div>
-        <p className="text-[13px] leading-snug text-stone-600">{comment.body}</p>
+        <p className="text-sm leading-relaxed text-stone-700">{comment.body}</p>
         <div className="mt-1 flex flex-wrap items-center gap-2">
           {comment.doi && (
             <a
@@ -695,18 +710,18 @@ function ExperimentCard({ experiment }: { experiment: Experiment }) {
   const t = EXP_TYPE_LABELS[experiment.type];
   const s = EXP_STATUS_LABELS[experiment.status];
   return (
-    <div className="rounded-md border border-stone-200 bg-white p-4">
-      <div className="mb-2 flex flex-wrap gap-1.5">
-        <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-medium ring-1 ring-inset ${t.cls}`}>{t.label}</span>
-        <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-medium ring-1 ring-inset ${s.cls}`}>{s.label}</span>
+    <div className="rounded-lg border border-stone-200 bg-white p-5">
+      <div className="mb-2.5 flex flex-wrap gap-1.5">
+        <span className={`rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${t.cls}`}>{t.label}</span>
+        <span className={`rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${s.cls}`}>{s.label}</span>
       </div>
-      <p className="mb-1 text-[13px] font-medium text-stone-700">{experiment.datasetName}</p>
-      <div className="mb-1 flex gap-2 text-[11px] text-stone-400">
+      <p className="mb-1.5 text-sm font-medium text-stone-700">{experiment.datasetName}</p>
+      <div className="mb-1.5 flex gap-3 text-xs text-stone-400">
         <span>Started: {fmtDate(experiment.startedAt)}</span>
         {experiment.completedAt && <span>Completed: {fmtDate(experiment.completedAt)}</span>}
       </div>
       {experiment.results && (
-        <p className="text-[13px] text-stone-500">{experiment.results.summary}</p>
+        <p className="text-sm text-stone-500">{experiment.results.summary}</p>
       )}
       <div className="mt-4">
         <a

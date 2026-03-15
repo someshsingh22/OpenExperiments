@@ -1,4 +1,4 @@
-import type { Hypothesis, Experiment, Comment, ProblemStatement, ArenaMatchup, Dataset } from "./types";
+import type { Hypothesis, Experiment, ExperimentVersion, Comment, ProblemStatement, ArenaMatchup, Dataset } from "./types";
 
 const BASE = "";
 
@@ -103,11 +103,13 @@ export async function getExperiments(hypothesisId?: string): Promise<{ data: Exp
   return fetchJSON(`/api/experiments${qs}`);
 }
 
-export async function getExperiment(id: string): Promise<{
+export async function getExperiment(id: string, version?: number): Promise<{
   data: Experiment;
   hypothesis: { id: string; statement: string; status: string; phase: string; domains: string[] } | null;
+  versions?: ExperimentVersion[];
 }> {
-  return fetchJSON(`/api/experiments/${id}`);
+  const qs = version ? `?version=${version}` : "";
+  return fetchJSON(`/api/experiments/${id}${qs}`);
 }
 
 // Problem Statements
@@ -143,13 +145,49 @@ export async function submitExperiment(data: {
   type: string;
   datasetId?: string;
   datasetName?: string;
-  methodology: string;
+  status?: string;
+  methodology?: string;
   analysisPlan?: string;
   osfLink?: string;
-  status?: string;
+  results?: {
+    pValue?: number;
+    effectSize?: number;
+    sampleSize?: number;
+    confidenceIntervalLow?: number;
+    confidenceIntervalHigh?: number;
+    summary?: string;
+  };
 }): Promise<{ data: { id: string } }> {
   const res = await fetch(`${BASE}/api/experiments`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || `API error: ${res.status}`);
+  }
+  return res.json();
+}
+
+// Update Experiment
+export async function updateExperiment(id: string, data: {
+  status?: string;
+  methodology?: string;
+  analysisPlan?: string;
+  osfLink?: string;
+  results?: {
+    pValue?: number;
+    effectSize?: number;
+    sampleSize?: number;
+    confidenceIntervalLow?: number;
+    confidenceIntervalHigh?: number;
+    summary?: string;
+  };
+  changeSummary?: string;
+}): Promise<{ data: { id: string; version: number } }> {
+  const res = await fetch(`${BASE}/api/experiments/${id}`, {
+    method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
@@ -200,6 +238,48 @@ export async function castVote(
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error((err as { error?: string }).error || `API error: ${res.status}`);
+  }
+  return res.json();
+}
+
+// Stars
+export async function toggleStar(hypothesisId: string): Promise<{ data: { count: number; starred: boolean } }> {
+  const res = await fetch(`${BASE}/api/hypotheses/${hypothesisId}/star`, {
+    method: "POST",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || `API error: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function getStarStatus(hypothesisId: string): Promise<{ data: { count: number; starred: boolean } }> {
+  return fetchJSON(`/api/hypotheses/${hypothesisId}/star`);
+}
+
+// Profile update
+export async function updateProfile(userId: string, data: {
+  name?: string;
+  position?: string;
+  scholarUrl?: string;
+  website?: string;
+  bio?: string;
+  orcid?: string;
+  twitterHandle?: string;
+}): Promise<{ ok: boolean }> {
+  const res = await fetch(`${BASE}/api/users/${userId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const parsed = err as { error?: string; errors?: { field: string; message: string }[] };
+    if (parsed.errors?.length) {
+      throw new Error(parsed.errors.map((e) => e.message).join(". "));
+    }
+    throw new Error(parsed.error || `API error: ${res.status}`);
   }
   return res.json();
 }

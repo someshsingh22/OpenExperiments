@@ -1,8 +1,8 @@
 export const runtime = "edge";
 
 import { getDB } from "@/db";
-import { hypotheses } from "@/db/schema";
-import { eq, and, or, like, desc, sql } from "drizzle-orm";
+import { hypotheses, comments, experiments } from "@/db/schema";
+import { eq, and, or, like, desc, sql, inArray } from "drizzle-orm";
 import { validateHypothesis } from "@/lib/validation";
 
 export async function GET(request: Request) {
@@ -64,7 +64,40 @@ export async function GET(request: Request) {
     .from(hypotheses)
     .where(where);
 
-  return Response.json({ data: rows.map((r) => deserializeHypothesis(r, viewer?.id)), total: count });
+  // Compute actual comment counts from comments table
+  const hypothesisIds = rows.map((r) => r.id);
+  let commentCounts = new Map<string, number>();
+  let experimentCounts = new Map<string, number>();
+  if (hypothesisIds.length > 0) {
+    const ccRows = await db
+      .select({
+        hypothesisId: comments.hypothesisId,
+        count: sql<number>`count(*)`,
+      })
+      .from(comments)
+      .where(inArray(comments.hypothesisId, hypothesisIds))
+      .groupBy(comments.hypothesisId);
+    for (const r of ccRows) {
+      commentCounts.set(r.hypothesisId, r.count);
+    }
+
+    const ecRows = await db
+      .select({
+        hypothesisId: experiments.hypothesisId,
+        count: sql<number>`count(*)`,
+      })
+      .from(experiments)
+      .where(inArray(experiments.hypothesisId, hypothesisIds))
+      .groupBy(experiments.hypothesisId);
+    for (const r of ecRows) {
+      experimentCounts.set(r.hypothesisId, r.count);
+    }
+  }
+
+  return Response.json({
+    data: rows.map((r) => deserializeHypothesis(r, viewer?.id, commentCounts, experimentCounts)),
+    total: count,
+  });
 }
 
 export async function POST(request: Request) {
@@ -109,7 +142,12 @@ export async function POST(request: Request) {
   return Response.json({ data: { id } }, { status: 201 });
 }
 
-function deserializeHypothesis(row: typeof hypotheses.$inferSelect, viewerId?: string) {
+function deserializeHypothesis(
+  row: typeof hypotheses.$inferSelect,
+  viewerId?: string,
+  commentCounts?: Map<string, number>,
+  experimentCounts?: Map<string, number>,
+) {
   const isAnon = row.isAnonymous === 1;
   const isOwner = viewerId != null && row.submittedBy === viewerId;
   return {
@@ -129,7 +167,8 @@ function deserializeHypothesis(row: typeof hypotheses.$inferSelect, viewerId?: s
     evidenceScore: row.evidenceScore,
     pValue: row.pValue,
     effectSize: row.effectSize,
-    commentCount: row.commentCount,
+    commentCount: commentCounts ? (commentCounts.get(row.id) ?? 0) : row.commentCount,
+    experimentCount: experimentCounts?.get(row.id) ?? 0,
     citationDois: row.citationDois,
     relatedHypothesisIds: row.relatedHypothesisIds,
   };

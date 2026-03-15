@@ -10,6 +10,7 @@ export const users = sqliteTable("users", {
   avatarUrl: text("avatar_url"),
   passwordHash: text("password_hash"),
   affiliation: text("affiliation"),
+  position: text("position"),
   scholarUrl: text("scholar_url"),
   website: text("website"),
   bio: text("bio"),
@@ -107,18 +108,40 @@ export const experiments = sqliteTable("experiments", {
   status: text("status").notNull(), // "running" | "completed" | "planned"
   datasetId: text("dataset_id").references(() => datasets.id),
   datasetName: text("dataset_name").notNull(),
-  methodology: text("methodology").notNull(),
+  methodology: text("methodology"),
   analysisPlan: text("analysis_plan"),
   startedAt: integer("started_at").notNull(),
   completedAt: integer("completed_at"),
   osfLink: text("osf_link"),
   submittedBy: text("submitted_by").references(() => users.id),
+  version: integer("version").notNull().default(1),
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
 }, (table) => [
   index("idx_experiments_hypothesis_id").on(table.hypothesisId),
   index("idx_experiments_status").on(table.status),
   index("idx_experiments_dataset_id").on(table.datasetId),
+]);
+
+export const experimentVersions = sqliteTable("experiment_versions", {
+  id: text("id").primaryKey(),
+  experimentId: text("experiment_id").notNull().references(() => experiments.id),
+  version: integer("version").notNull(),
+  status: text("status").notNull(),
+  methodology: text("methodology"),
+  analysisPlan: text("analysis_plan"),
+  osfLink: text("osf_link"),
+  pValue: real("p_value"),
+  effectSize: real("effect_size"),
+  sampleSize: integer("sample_size"),
+  confidenceIntervalLow: real("confidence_interval_low"),
+  confidenceIntervalHigh: real("confidence_interval_high"),
+  summary: text("summary"),
+  changeSummary: text("change_summary"),
+  createdAt: integer("created_at").notNull(),
+}, (table) => [
+  index("idx_exp_versions_experiment_id").on(table.experimentId),
+  uniqueIndex("idx_exp_versions_exp_version").on(table.experimentId, table.version),
 ]);
 
 export const experimentResults = sqliteTable("experiment_results", {
@@ -170,4 +193,14 @@ export const arenaVotes = sqliteTable("arena_votes", {
 }, (table) => [
   index("idx_arena_votes_matchup_id").on(table.matchupId),
   uniqueIndex("idx_arena_votes_ip_matchup").on(table.matchupId, table.voterIpHash),
+]);
+
+export const stars = sqliteTable("stars", {
+  userId: text("user_id").notNull().references(() => users.id),
+  hypothesisId: text("hypothesis_id").notNull().references(() => hypotheses.id),
+  createdAt: integer("created_at").notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.userId, table.hypothesisId] }),
+  index("idx_stars_user_id").on(table.userId),
+  index("idx_stars_hypothesis_id").on(table.hypothesisId),
 ]);

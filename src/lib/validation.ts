@@ -107,7 +107,7 @@ export function validateComment(body: Record<string, unknown>): ValidationResult
   const doi = body.doi ? trimmed(body.doi) : null;
   const parentId = body.parentId ? trimmed(body.parentId) : null;
 
-  if (!hypothesisId || !UUID_RE.test(hypothesisId)) {
+  if (!hypothesisId) {
     errors.push({ field: "hypothesisId", message: "Invalid hypothesis reference" });
   }
 
@@ -121,7 +121,7 @@ export function validateComment(body: Record<string, unknown>): ValidationResult
     errors.push({ field: "doi", message: "Please enter a valid DOI (e.g., 10.1234/example)" });
   }
 
-  if (parentId && !UUID_RE.test(parentId)) {
+  if (parentId && parentId.length === 0) {
     errors.push({ field: "parentId", message: "Invalid parent comment reference" });
   }
 
@@ -129,9 +129,12 @@ export function validateComment(body: Record<string, unknown>): ValidationResult
   return { ok: true, data: { hypothesisId, content, doi, parentId } };
 }
 
+const ARXIV_RE = /^https?:\/\/(www\.)?arxiv\.org\/(abs|pdf)\/\d{4}\.\d{4,5}(v\d+)?$/;
+const CITATION_RE = /^(10\.\d{4,9}\/[^\s]+|https?:\/\/(www\.)?arxiv\.org\/(abs|pdf)\/\d{4}\.\d{4,5}(v\d+)?)$/;
+
 export function validateProfile(body: Record<string, unknown>): ValidationResult<{
   name: string;
-  affiliation: string | null;
+  position: string | null;
   scholarUrl: string | null;
   website: string | null;
   bio: string | null;
@@ -140,7 +143,7 @@ export function validateProfile(body: Record<string, unknown>): ValidationResult
 }> {
   const errors: FieldError[] = [];
   const name = trimmed(body.name);
-  const affiliation = body.affiliation ? trimmed(body.affiliation) : null;
+  const position = body.position ? trimmed(body.position) : null;
   const scholarUrl = body.scholarUrl ? trimmed(body.scholarUrl) : null;
   const website = body.website ? trimmed(body.website) : null;
   const bio = body.bio ? trimmed(body.bio) : null;
@@ -153,8 +156,8 @@ export function validateProfile(body: Record<string, unknown>): ValidationResult
     if (e) errors.push(e);
   }
 
-  if (affiliation) {
-    const e = between(affiliation, 2, 200, "affiliation", "Affiliation");
+  if (position) {
+    const e = between(position, 2, 100, "position", "Position");
     if (e) errors.push(e);
   }
 
@@ -183,7 +186,11 @@ export function validateProfile(body: Record<string, unknown>): ValidationResult
   }
 
   if (errors.length > 0) return { ok: false, errors };
-  return { ok: true, data: { name, affiliation, scholarUrl, website, bio, orcid, twitterHandle } };
+  return { ok: true, data: { name, position, scholarUrl, website, bio, orcid, twitterHandle } };
+}
+
+export function validateCitation(citation: string): boolean {
+  return CITATION_RE.test(citation);
 }
 
 export function validateRegistration(body: Record<string, unknown>): ValidationResult<{

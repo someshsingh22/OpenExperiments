@@ -3,13 +3,13 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
-import { Shield, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 export default function CompleteProfilePage() {
   const { user, loading, refresh } = useAuth();
   const router = useRouter();
   const [name, setName] = useState("");
-  const [affiliation, setAffiliation] = useState("");
+  const [position, setPosition] = useState("");
   const [scholarUrl, setScholarUrl] = useState("");
   const [website, setWebsite] = useState("");
   const [bio, setBio] = useState("");
@@ -52,7 +52,7 @@ export default function CompleteProfilePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim(),
-          affiliation: affiliation.trim(),
+          position: position.trim(),
           scholarUrl: scholarUrl.trim(),
           website: website.trim(),
           bio: bio.trim(),
@@ -125,30 +125,25 @@ export default function CompleteProfilePage() {
             className={`${inputClass} bg-stone-50 text-stone-500`}
           />
           <p className="mt-1 text-xs text-stone-400">
-            From your sign-in. Used for experiment updates and notifications.
+            From your sign-in. Your affiliation is derived from your email domain.
           </p>
         </div>
 
-        {/* Affiliation */}
+        {/* Position */}
         <div>
           <label className="mb-1.5 block text-sm font-semibold text-stone-700">
-            Affiliation
+            Position
           </label>
           <input
             type="text"
-            value={affiliation}
-            onChange={(e) => setAffiliation(e.target.value)}
-            placeholder="e.g., MIT, Google DeepMind, Independent Researcher"
+            value={position}
+            onChange={(e) => setPosition(e.target.value)}
+            placeholder="e.g., Research Scientist, Engineer, PhD Student, Professor"
             className={inputClass}
           />
-          <div className="mt-2 flex gap-2 rounded-md border border-amber-200 bg-amber-50/60 p-2.5">
-            <Shield className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
-            <p className="text-xs leading-relaxed text-amber-800">
-              To prevent abuse and improve auditability, adding an affiliation will
-              <span className="font-semibold"> prioritize your hypotheses for automated analysis and field experiments</span>.
-              This is optional but strongly encouraged.
-            </p>
-          </div>
+          <p className="mt-1 text-xs text-stone-400">
+            Your role or title. This helps the community understand your background.
+          </p>
         </div>
 
         {/* Google Scholar */}
