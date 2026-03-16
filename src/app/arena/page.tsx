@@ -185,6 +185,23 @@ export default function ArenaPage() {
         setShowAuthModal(true);
         return;
       }
+
+      // Optimistic update
+      const wasStarred = starredIds.has(id);
+      const prevCount = starCounts.get(id) ?? 0;
+
+      setStarredIds((prev) => {
+        const next = new Set(prev);
+        if (wasStarred) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+      setStarCounts((prev) => {
+        const next = new Map(prev);
+        next.set(id, wasStarred ? prevCount - 1 : prevCount + 1);
+        return next;
+      });
+
       try {
         const res = await toggleStar(id);
         setStarredIds((prev) => {
@@ -199,10 +216,21 @@ export default function ArenaPage() {
           return next;
         });
       } catch {
-        // silent fail
+        // Revert on failure
+        setStarredIds((prev) => {
+          const next = new Set(prev);
+          if (wasStarred) next.add(id);
+          else next.delete(id);
+          return next;
+        });
+        setStarCounts((prev) => {
+          const next = new Map(prev);
+          next.set(id, prevCount);
+          return next;
+        });
       }
     },
-    [user, setShowAuthModal],
+    [user, setShowAuthModal, starredIds, starCounts],
   );
 
   const handleVote = async (vote: "a" | "b" | "tie" | "both_weak") => {
