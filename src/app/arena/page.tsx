@@ -248,7 +248,7 @@ export default function ArenaPage() {
       </div>
 
       {/* Matchup */}
-      <section className="mb-10">
+      <section className="mb-10 min-h-[420px]">
         {loading ? (
           <div className="flex justify-center py-16">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-stone-300 border-t-stone-600" />
