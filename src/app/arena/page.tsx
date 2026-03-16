@@ -38,7 +38,7 @@ function ArenaCard({
   return (
     <div className="flex flex-col rounded-lg border border-stone-200 bg-white transition-all duration-300 hover:border-stone-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
       <Link href={`/hypothesis/${hypothesis.id}`} className="block p-5">
-        <span className="mb-2 block text-[11px] font-medium tracking-wider text-stone-300 uppercase">
+        <span className="mb-2 block text-[11px] font-medium tracking-wider text-stone-500 uppercase">
           {label}
         </span>
         <div className="mb-2 flex flex-wrap gap-1.5">
@@ -55,7 +55,7 @@ function ArenaCard({
           className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
             starred
               ? "bg-amber-50 text-amber-600 hover:bg-amber-100"
-              : "text-stone-400 hover:bg-stone-50 hover:text-stone-600"
+              : "text-stone-500 hover:bg-stone-50 hover:text-stone-700"
           }`}
         >
           <Star className={`h-3 w-3 ${starred ? "fill-amber-400" : ""}`} />
@@ -64,7 +64,7 @@ function ArenaCard({
         <div className="relative" ref={shareRef}>
           <button
             onClick={() => setShowShare(!showShare)}
-            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-stone-400 transition-colors hover:bg-stone-50 hover:text-stone-600"
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-stone-500 transition-colors hover:bg-stone-50 hover:text-stone-700"
           >
             <Share2 className="h-3 w-3" />
             Share
@@ -241,7 +241,7 @@ export default function ArenaPage() {
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
       <div className="mb-8">
         <h1 className="text-lg font-semibold text-stone-800">Which idea has more potential?</h1>
-        <p className="mt-1 text-[13px] text-stone-400">
+        <p className="mt-1 text-[13px] text-stone-500">
           Read both hypotheses and their rationale, then vote. Source and scores are hidden to
           prevent bias.
         </p>
@@ -266,14 +266,14 @@ export default function ArenaPage() {
                     onStar={handleStar}
                   />
                 ) : (
-                  <div className="rounded-lg border border-stone-200 p-5 text-stone-400">
+                  <div className="rounded-lg border border-stone-200 p-5 text-stone-500">
                     Not found
                   </div>
                 )}
               </div>
 
               <div className="flex items-center justify-center">
-                <span className="font-mono text-xs text-stone-300">vs</span>
+                <span className="font-mono text-xs text-stone-500">vs</span>
               </div>
 
               <div className="flex flex-col">
@@ -286,7 +286,7 @@ export default function ArenaPage() {
                     onStar={handleStar}
                   />
                 ) : (
-                  <div className="rounded-lg border border-stone-200 p-5 text-stone-400">
+                  <div className="rounded-lg border border-stone-200 p-5 text-stone-500">
                     Not found
                   </div>
                 )}
@@ -315,7 +315,7 @@ export default function ArenaPage() {
                     {
                       key: "both_weak" as const,
                       label: "Both weak",
-                      style: "border-stone-300 text-stone-400 hover:bg-stone-100",
+                      style: "border-stone-300 text-stone-500 hover:bg-stone-100",
                     },
                   ].map((btn) => (
                     <button
@@ -346,7 +346,7 @@ export default function ArenaPage() {
                       {sourceLabel(matchup.hypothesisA)}
                     </span>
                   </div>
-                  <span className="text-[11px] text-stone-300">vs</span>
+                  <span className="text-[11px] text-stone-500">vs</span>
                   <div className="flex items-center gap-1.5">
                     <span
                       className={`font-medium ${sourceIsAI(matchup.hypothesisB) ? "text-indigo-600" : "text-stone-700"}`}
@@ -395,7 +395,7 @@ export default function ArenaPage() {
             )}
           </>
         ) : (
-          <p className="text-center text-sm text-stone-400">No matchups available.</p>
+          <p className="text-center text-sm text-stone-500">No matchups available.</p>
         )}
       </section>
 
@@ -403,19 +403,19 @@ export default function ArenaPage() {
       <section>
         <h2 className="mb-4 text-sm font-semibold text-stone-700">
           Arena Rankings
-          <span className="ml-2 text-[11px] font-normal text-stone-400">completed only</span>
+          <span className="ml-2 text-[11px] font-normal text-stone-500">completed only</span>
         </h2>
         <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
           <table className="w-full">
             <thead>
               <tr className="border-b border-stone-100">
-                <th className="px-3 py-2.5 text-left text-[11px] font-medium tracking-wider text-stone-400 uppercase">
+                <th className="px-3 py-2.5 text-left text-[11px] font-medium tracking-wider text-stone-500 uppercase">
                   #
                 </th>
-                <th className="px-3 py-2.5 text-left text-[11px] font-medium tracking-wider text-stone-400 uppercase">
+                <th className="px-3 py-2.5 text-left text-[11px] font-medium tracking-wider text-stone-500 uppercase">
                   Hypothesis
                 </th>
-                <th className="px-3 py-2.5 text-right text-[11px] font-medium tracking-wider text-stone-400 uppercase">
+                <th className="px-3 py-2.5 text-right text-[11px] font-medium tracking-wider text-stone-500 uppercase">
                   Win Rate
                 </th>
               </tr>
@@ -426,7 +426,7 @@ export default function ArenaPage() {
                   key={h.id}
                   className="group border-b border-stone-50 transition-colors last:border-b-0 hover:bg-stone-50"
                 >
-                  <td className="px-3 py-2.5 align-top font-mono text-[12px] text-stone-400">
+                  <td className="px-3 py-2.5 align-top font-mono text-[12px] text-stone-500">
                     {i + 1}
                   </td>
                   <td className="max-w-md px-3 py-2.5 align-top text-[13px] text-stone-700">

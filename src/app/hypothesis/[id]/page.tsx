@@ -138,7 +138,7 @@ export default function HypothesisDetailPage() {
     return (
       <div className="mx-auto max-w-2xl px-4 py-16 text-center">
         <h1 className="mb-1 text-lg font-semibold text-stone-800">Not found</h1>
-        <p className="text-sm text-stone-400">
+        <p className="text-sm text-stone-500">
           This hypothesis does not exist or has been removed.
         </p>
       </div>
@@ -153,7 +153,7 @@ export default function HypothesisDetailPage() {
     `pb-2.5 text-sm font-medium transition-colors ${
       activeTab === t
         ? "border-b-2 border-stone-800 text-stone-800"
-        : "text-stone-400 hover:text-stone-600"
+        : "text-stone-500 hover:text-stone-700"
     }`;
 
   return (
@@ -237,7 +237,7 @@ export default function HypothesisDetailPage() {
                 )}
               </span>
             ) : (
-              <span className="flex items-center gap-1 text-stone-400 italic">
+              <span className="flex items-center gap-1 text-stone-500 italic">
                 <Lock className="h-3.5 w-3.5" /> Source hidden during evaluation
               </span>
             )}
@@ -273,7 +273,7 @@ export default function HypothesisDetailPage() {
                     setCopying(true);
                     setTimeout(() => setCopying(false), 2000);
                   }}
-                  className="text-xs font-bold text-stone-400 hover:text-stone-700"
+                  className="text-xs font-bold text-stone-500 hover:text-stone-700"
                 >
                   {copying ? "COPIED" : "COPY"}
                 </button>
@@ -341,7 +341,7 @@ export default function HypothesisDetailPage() {
                       <span className="font-mono text-3xl font-semibold text-stone-800">
                         {hypothesis.winRate}%
                       </span>
-                      <span className="text-sm text-stone-400">win rate</span>
+                      <span className="text-sm text-stone-500">win rate</span>
                     </div>
                     <div className="h-1.5 overflow-hidden rounded-full bg-stone-100">
                       <div
@@ -370,7 +370,7 @@ export default function HypothesisDetailPage() {
                           />
                         ))
                     ) : (
-                      <p className="text-sm text-stone-400">No comments yet.</p>
+                      <p className="text-sm text-stone-500">No comments yet.</p>
                     )}
                   </div>
                   <div className="mt-4">
@@ -418,7 +418,7 @@ export default function HypothesisDetailPage() {
                       </div>
                     ) : (
                       <div className="rounded-md border border-stone-200 bg-stone-50 p-3">
-                        <p className="text-sm text-stone-400 italic">
+                        <p className="text-sm text-stone-500 italic">
                           <button
                             onClick={() => setShowAuthModal(true)}
                             className="font-medium text-stone-600 underline underline-offset-2 hover:text-stone-800"
@@ -460,7 +460,7 @@ export default function HypothesisDetailPage() {
                     <div className="grid gap-4 sm:grid-cols-3">
                       {completedExp.results.pValue != null && (
                         <div>
-                          <p className="text-xs text-stone-400">p-value</p>
+                          <p className="text-xs text-stone-500">p-value</p>
                           <p className="font-mono text-sm font-medium text-stone-700">
                             {completedExp.results.pValue.toExponential(2)}
                           </p>
@@ -468,7 +468,7 @@ export default function HypothesisDetailPage() {
                       )}
                       {completedExp.results.effectSize != null && (
                         <div>
-                          <p className="text-xs text-stone-400">Effect Size</p>
+                          <p className="text-xs text-stone-500">Effect Size</p>
                           <p className="font-mono text-sm font-medium text-stone-700">
                             {completedExp.results.effectSize}
                           </p>
@@ -476,7 +476,7 @@ export default function HypothesisDetailPage() {
                       )}
                       {completedExp.results.confidenceInterval && (
                         <div>
-                          <p className="text-xs text-stone-400">95% CI</p>
+                          <p className="text-xs text-stone-500">95% CI</p>
                           <p className="font-mono text-sm font-medium text-stone-700">
                             [{completedExp.results.confidenceInterval[0].toFixed(2)},{" "}
                             {completedExp.results.confidenceInterval[1].toFixed(2)}]
@@ -500,7 +500,7 @@ export default function HypothesisDetailPage() {
                   </div>
                 ) : (
                   <div className="rounded-lg border border-dashed border-stone-300 p-8 text-center">
-                    <p className="text-sm text-stone-400">
+                    <p className="text-sm text-stone-500">
                       Not yet tested against observational data.
                     </p>
                   </div>
@@ -551,7 +551,7 @@ export default function HypothesisDetailPage() {
                   </div>
                 ))
               ) : (
-                <p className="text-sm text-stone-400">No related hypotheses found.</p>
+                <p className="text-sm text-stone-500">No related hypotheses found.</p>
               )}
             </div>
           </div>
@@ -565,7 +565,7 @@ export default function HypothesisDetailPage() {
             <div className="mb-6 space-y-3">
               {hypothesis.citationDois.map((doi) => (
                 <div key={doi} className="flex items-start gap-2">
-                  <FileText className="mt-0.5 h-4 w-4 text-stone-400" />
+                  <FileText className="mt-0.5 h-4 w-4 text-stone-500" />
                   <a
                     href={doiUrl(doi)}
                     target="_blank"
@@ -577,7 +577,7 @@ export default function HypothesisDetailPage() {
                 </div>
               ))}
               {hypothesis.citationDois.length === 0 && (
-                <p className="text-sm text-stone-400 italic">No citations added yet.</p>
+                <p className="text-sm text-stone-500 italic">No citations added yet.</p>
               )}
             </div>
 
@@ -585,7 +585,7 @@ export default function HypothesisDetailPage() {
               <p className="mb-1.5 text-sm font-medium text-stone-600">
                 If you see this idea in recent arXiv papers, add a link:
               </p>
-              <p className="mb-3 text-xs text-stone-400">
+              <p className="mb-3 text-xs text-stone-500">
                 Only arXiv URLs (https://arxiv.org/abs/...) or DOIs (10.xxxx/...) are accepted.
               </p>
               <div className="flex gap-2">
@@ -687,7 +687,7 @@ function CommentThread({
           <span className="text-xs font-semibold text-stone-700">
             {author?.name || "Anonymous"}
           </span>
-          <span className="text-[11px] text-stone-400">{fmtDate(comment.createdAt)}</span>
+          <span className="text-[11px] text-stone-500">{fmtDate(comment.createdAt)}</span>
         </div>
         <p className="text-sm leading-relaxed text-stone-700">{comment.body}</p>
         <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -705,14 +705,14 @@ function CommentThread({
           {user ? (
             <button
               onClick={() => setReplying(!replying)}
-              className="text-[10px] font-medium text-stone-400 hover:text-stone-600"
+              className="text-[10px] font-medium text-stone-500 hover:text-stone-700"
             >
               Reply
             </button>
           ) : (
             <button
               onClick={() => setShowAuthModal(true)}
-              className="text-[10px] font-medium text-stone-400 hover:text-stone-600"
+              className="text-[10px] font-medium text-stone-500 hover:text-stone-700"
             >
               Reply
             </button>
@@ -741,7 +741,7 @@ function CommentThread({
                 setReplying(false);
                 setReplyText("");
               }}
-              className="rounded-md px-2.5 py-1 text-[11px] text-stone-400 hover:text-stone-600"
+              className="rounded-md px-2.5 py-1 text-[11px] text-stone-500 hover:text-stone-700"
             >
               Cancel
             </button>
@@ -781,7 +781,7 @@ function ExperimentCard({ experiment }: { experiment: Experiment }) {
         </span>
       </div>
       <p className="mb-1.5 text-sm font-medium text-stone-700">{experiment.datasetName}</p>
-      <div className="mb-1.5 flex gap-3 text-xs text-stone-400">
+      <div className="mb-1.5 flex gap-3 text-xs text-stone-500">
         <span>Started: {fmtDate(experiment.startedAt)}</span>
         {experiment.completedAt && <span>Completed: {fmtDate(experiment.completedAt)}</span>}
       </div>
