@@ -88,30 +88,33 @@ async function getHomeData(): Promise<{
   const shuffled = serializedHyp.sort(() => 0.5 - Math.random());
   const featured = shuffled.slice(0, 3);
 
-  // Fetch problem statements with datasets
+  // Fetch problem statements with datasets (single batched query)
   const psRows = await db.select().from(problemStatements);
-  const serializedPS: ProblemStatement[] = await Promise.all(
-    psRows.map(async (ps) => {
-      const dsLinks = await db
-        .select({
-          id: datasets.id,
-          name: datasets.name,
-          huggingfaceUrl: datasets.huggingfaceUrl,
-        })
-        .from(datasetProblemStatements)
-        .innerJoin(datasets, eq(datasetProblemStatements.datasetId, datasets.id))
-        .where(eq(datasetProblemStatements.problemStatementId, ps.id));
+  const allDsLinks = await db
+    .select({
+      problemStatementId: datasetProblemStatements.problemStatementId,
+      id: datasets.id,
+      name: datasets.name,
+      huggingfaceUrl: datasets.huggingfaceUrl,
+    })
+    .from(datasetProblemStatements)
+    .innerJoin(datasets, eq(datasetProblemStatements.datasetId, datasets.id));
 
-      return {
-        id: ps.id,
-        question: ps.question,
-        description: ps.description,
-        domain: ps.domain,
-        hypothesisCount: ps.hypothesisCount,
-        datasets: dsLinks,
-      };
-    }),
-  );
+  const dsMap = new Map<string, { id: string; name: string; huggingfaceUrl: string | null }[]>();
+  for (const row of allDsLinks) {
+    const list = dsMap.get(row.problemStatementId) ?? [];
+    list.push({ id: row.id, name: row.name, huggingfaceUrl: row.huggingfaceUrl });
+    dsMap.set(row.problemStatementId, list);
+  }
+
+  const serializedPS: ProblemStatement[] = psRows.map((ps) => ({
+    id: ps.id,
+    question: ps.question,
+    description: ps.description,
+    domain: ps.domain,
+    hypothesisCount: ps.hypothesisCount,
+    datasets: dsMap.get(ps.id) ?? [],
+  }));
 
   return { hypotheses: featured, problems: serializedPS };
 }
