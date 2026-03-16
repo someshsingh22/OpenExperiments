@@ -9,13 +9,7 @@ export function Footer() {
         <div className="xl:grid xl:grid-cols-3 xl:gap-8">
           <div className="space-y-8 xl:col-span-1">
             <Link href="/" className="flex items-center gap-2">
-              <Image
-                src="/logo.svg"
-                alt={SITE_CONFIG.name}
-                width={24}
-                height={24}
-                className="h-6 w-auto"
-              />
+              <Image src="/logo.svg" alt="" width={32} height={24} className="h-6 w-8" />
               <span className="text-lg font-semibold tracking-tight text-stone-900">
                 {SITE_CONFIG.name}
               </span>
@@ -27,7 +21,7 @@ export function Footer() {
           <div className="mt-12 grid grid-cols-2 gap-8 xl:col-span-2 xl:mt-0">
             <div className="md:grid md:grid-cols-2 md:gap-8">
               <div>
-                <h3 className="text-sm font-semibold text-stone-900">Navigation</h3>
+                <p className="text-sm font-semibold text-stone-900">Navigation</p>
                 <ul role="list" className="mt-4 space-y-3">
                   <li>
                     <Link
@@ -56,7 +50,7 @@ export function Footer() {
                 </ul>
               </div>
               <div className="mt-12 md:mt-0">
-                <h3 className="text-sm font-semibold text-stone-900">Contributing</h3>
+                <p className="text-sm font-semibold text-stone-900">Contributing</p>
                 <ul role="list" className="mt-4 space-y-3">
                   <li>
                     <Link
@@ -87,7 +81,7 @@ export function Footer() {
             </div>
             <div className="md:grid md:grid-cols-2 md:gap-8">
               <div>
-                <h3 className="text-sm font-semibold text-stone-900">Research</h3>
+                <p className="text-sm font-semibold text-stone-900">Research</p>
                 <ul role="list" className="mt-4 space-y-3">
                   <li>
                     <Link
@@ -120,7 +114,7 @@ export function Footer() {
                 </ul>
               </div>
               <div className="mt-12 md:mt-0">
-                <h3 className="text-sm font-semibold text-stone-900">Contact</h3>
+                <p className="text-sm font-semibold text-stone-900">Contact</p>
                 <ul role="list" className="mt-4 space-y-3">
                   <li>
                     <a
@@ -146,7 +140,7 @@ export function Footer() {
           </div>
         </div>
         <div className="mt-12 flex items-center justify-between border-t border-stone-200 pt-8">
-          <p className="text-xs text-stone-400">
+          <p className="text-xs text-stone-500">
             &copy; {new Date().getFullYear()} {SITE_CONFIG.name}. All rights reserved.
           </p>
         </div>

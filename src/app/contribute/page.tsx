@@ -1,6 +1,18 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ExternalLink, Database, Cpu, Code2, Users, FileText } from "lucide-react";
 import { SITE_CONFIG } from "@/lib/constants";
+
+export const metadata: Metadata = {
+  title: "Contribute",
+  description: `Join the ${SITE_CONFIG.name} community. Submit hypotheses, vote in the arena, suggest datasets, contribute code, or support compute.`,
+  openGraph: {
+    title: `Contribute to ${SITE_CONFIG.name}`,
+    description: `Help democratise science. Submit ideas, vote, suggest datasets, or contribute to development.`,
+    url: `${SITE_CONFIG.url}/contribute`,
+  },
+  alternates: { canonical: `${SITE_CONFIG.url}/contribute` },
+};
 
 export default function ContributePage() {
   return (

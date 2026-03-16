@@ -149,26 +149,67 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       hasVResults = true;
     }
 
-    return Response.json({
+    return Response.json(
+      {
+        data: {
+          id: exp.id,
+          hypothesisId: exp.hypothesisId,
+          problemStatementId: exp.problemStatementId,
+          type: exp.type,
+          status: ver.status,
+          datasetId: exp.datasetId,
+          datasetName: exp.datasetName,
+          methodology: ver.methodology,
+          analysisPlan: ver.analysisPlan,
+          submitter,
+          startedAt: new Date(exp.startedAt * 1000).toISOString().split("T")[0],
+          completedAt: exp.completedAt
+            ? new Date(exp.completedAt * 1000).toISOString().split("T")[0]
+            : undefined,
+          osfLink: ver.osfLink,
+          version: ver.version,
+          totalVersions: exp.version,
+          results: hasVResults ? vResults : undefined,
+        },
+        hypothesis: hyp || null,
+        versions: allVersions.map((v) => ({
+          version: v.version,
+          status: v.status,
+          methodology: v.methodology,
+          analysisPlan: v.analysisPlan,
+          osfLink: v.osfLink,
+          changeSummary: v.changeSummary,
+          createdAt: new Date(v.createdAt * 1000).toISOString(),
+        })),
+      },
+      {
+        headers: { "Cache-Control": "public, max-age=300, s-maxage=600" },
+      },
+    );
+  }
+
+  // Current version (default)
+  return Response.json(
+    {
       data: {
         id: exp.id,
         hypothesisId: exp.hypothesisId,
         problemStatementId: exp.problemStatementId,
         type: exp.type,
-        status: ver.status,
+        status: exp.status,
         datasetId: exp.datasetId,
         datasetName: exp.datasetName,
-        methodology: ver.methodology,
-        analysisPlan: ver.analysisPlan,
+        methodology: exp.methodology,
+        analysisPlan: exp.analysisPlan,
         submitter,
         startedAt: new Date(exp.startedAt * 1000).toISOString().split("T")[0],
         completedAt: exp.completedAt
           ? new Date(exp.completedAt * 1000).toISOString().split("T")[0]
           : undefined,
-        osfLink: ver.osfLink,
-        version: ver.version,
+        osfLink: exp.osfLink,
+        version: exp.version,
         totalVersions: exp.version,
-        results: hasVResults ? vResults : undefined,
+        results: result ? buildResultsResponse(result) : undefined,
       },
       hypothesis: hyp || null,
       versions: allVersions.map((v) => ({
@@ -180,42 +221,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         changeSummary: v.changeSummary,
         createdAt: new Date(v.createdAt * 1000).toISOString(),
       })),
-    });
-  }
-
-  // Current version (default)
-  return Response.json({
-    data: {
-      id: exp.id,
-      hypothesisId: exp.hypothesisId,
-      problemStatementId: exp.problemStatementId,
-      type: exp.type,
-      status: exp.status,
-      datasetId: exp.datasetId,
-      datasetName: exp.datasetName,
-      methodology: exp.methodology,
-      analysisPlan: exp.analysisPlan,
-      submitter,
-      startedAt: new Date(exp.startedAt * 1000).toISOString().split("T")[0],
-      completedAt: exp.completedAt
-        ? new Date(exp.completedAt * 1000).toISOString().split("T")[0]
-        : undefined,
-      osfLink: exp.osfLink,
-      version: exp.version,
-      totalVersions: exp.version,
-      results: result ? buildResultsResponse(result) : undefined,
     },
-    hypothesis: hyp || null,
-    versions: allVersions.map((v) => ({
-      version: v.version,
-      status: v.status,
-      methodology: v.methodology,
-      analysisPlan: v.analysisPlan,
-      osfLink: v.osfLink,
-      changeSummary: v.changeSummary,
-      createdAt: new Date(v.createdAt * 1000).toISOString(),
-    })),
-  });
+    {
+      headers: { "Cache-Control": "public, max-age=300, s-maxage=600" },
+    },
+  );
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {

@@ -1,0 +1,3 @@
+ALTER TABLE hypotheses ADD COLUMN win_rate INTEGER;
+ALTER TABLE hypotheses ADD COLUMN arena_wins INTEGER DEFAULT 0;
+ALTER TABLE hypotheses ADD COLUMN arena_total INTEGER DEFAULT 0;

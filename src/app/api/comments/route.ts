@@ -30,17 +30,24 @@ export async function GET(request: Request) {
     .leftJoin(users, eq(comments.userId, users.id))
     .where(eq(comments.hypothesisId, hypothesisId));
 
-  return Response.json({
-    data: rows.map((c) => ({
-      id: c.id,
-      hypothesisId: c.hypothesisId,
-      body: c.body,
-      doi: c.doi,
-      createdAt: new Date(c.createdAt * 1000).toISOString().split("T")[0],
-      parentId: c.parentId,
-      author: c.authorId ? { id: c.authorId, name: c.authorName, avatarUrl: c.authorAvatar } : null,
-    })),
-  });
+  return Response.json(
+    {
+      data: rows.map((c) => ({
+        id: c.id,
+        hypothesisId: c.hypothesisId,
+        body: c.body,
+        doi: c.doi,
+        createdAt: new Date(c.createdAt * 1000).toISOString().split("T")[0],
+        parentId: c.parentId,
+        author: c.authorId
+          ? { id: c.authorId, name: c.authorName, avatarUrl: c.authorAvatar }
+          : null,
+      })),
+    },
+    {
+      headers: { "Cache-Control": "public, max-age=30, s-maxage=120" },
+    },
+  );
 }
 
 export async function POST(request: Request) {

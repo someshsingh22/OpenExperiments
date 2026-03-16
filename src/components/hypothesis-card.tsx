@@ -6,7 +6,17 @@ function isRevealed(h: Hypothesis): boolean {
 }
 import { EvidenceBadge } from "./evidence-badge";
 import { DomainTag } from "./domain-tag";
-import { Brain, Cpu, MessageSquare, Star, Share2, Copy, Twitter, Linkedin } from "lucide-react";
+import {
+  Brain,
+  Cpu,
+  MessageSquare,
+  Star,
+  Share2,
+  Copy,
+  Twitter,
+  Linkedin,
+  FileText,
+} from "lucide-react";
 
 interface HypothesisCardProps {
   hypothesis: Hypothesis;
@@ -45,7 +55,7 @@ export function HypothesisCard({ hypothesis, onStar, starred, starCount }: Hypot
           {hypothesis.statement}
         </p>
 
-        <div className="flex items-center justify-between text-[11px] text-stone-400">
+        <div className="flex items-center justify-between text-[11px] text-stone-500">
           <div className="flex items-center gap-1">
             {revealed ? (
               hypothesis.source === "ai_agent" ? (
@@ -84,10 +94,11 @@ export function HypothesisCard({ hypothesis, onStar, starred, starCount }: Hypot
             e.stopPropagation();
             if (onStar) onStar(hypothesis.id);
           }}
+          aria-label={starred ? "Unstar hypothesis" : "Star hypothesis"}
           className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
             starred
               ? "bg-amber-50 text-amber-600 hover:bg-amber-100"
-              : "text-stone-400 hover:bg-stone-50 hover:text-stone-600"
+              : "text-stone-500 hover:bg-stone-50 hover:text-stone-700"
           }`}
         >
           <Star className={`h-3 w-3 ${starred ? "fill-amber-400" : ""}`} />
@@ -100,7 +111,8 @@ export function HypothesisCard({ hypothesis, onStar, starred, starCount }: Hypot
               e.stopPropagation();
               setShowShare(!showShare);
             }}
-            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-stone-400 transition-colors hover:bg-stone-50 hover:text-stone-600"
+            aria-label="Share hypothesis"
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-stone-500 transition-colors hover:bg-stone-50 hover:text-stone-700"
           >
             <Share2 className="h-3 w-3" />
             Share
@@ -121,6 +133,27 @@ export function HypothesisCard({ hypothesis, onStar, starred, starCount }: Hypot
               >
                 <Copy className="h-3 w-3" />
                 {copied ? "Copied!" : "Copy Link"}
+              </button>
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const author =
+                    hypothesis.source === "ai_agent"
+                      ? (hypothesis.agentName ?? "AI Agent")
+                      : "OpenExperiments User(s)";
+                  const year = new Date(hypothesis.submittedAt).getFullYear();
+                  const bibId = hypothesis.id.replace(/-/g, "_");
+                  const bibtex = `@misc{openexperiments_${bibId},\n  title = {${hypothesis.statement}},\n  author = {${author}},\n  year = {${year}},\n  howpublished = {\\url{${window.location.origin}/hypothesis/${hypothesis.id}}},\n  note = {Accessed: ${new Date().toISOString().split("T")[0]}}\n}`;
+                  navigator.clipboard.writeText(bibtex);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                  setShowShare(false);
+                }}
+                className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[11px] font-medium text-stone-600 transition-colors hover:bg-stone-50 hover:text-stone-900"
+              >
+                <FileText className="h-3 w-3" />
+                Copy BibTeX
               </button>
               <a
                 href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(`${typeof window !== "undefined" ? window.location.origin : ""}/hypothesis/${hypothesis.id}`)}&text=${encodeURIComponent(hypothesis.statement)}`}

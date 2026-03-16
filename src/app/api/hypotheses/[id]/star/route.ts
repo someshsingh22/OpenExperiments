@@ -1,11 +1,11 @@
 export const runtime = "edge";
 
 import { getDB } from "@/db";
-import { stars, hypotheses } from "@/db/schema";
+import { stars } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
+import { getSession, requireSession } from "@/lib/auth";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { getSession } = await import("@/lib/auth");
   const user = await getSession(request);
   const { id } = await params;
   const db = getDB();
@@ -25,28 +25,21 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     starred = !!existing;
   }
 
-  return Response.json({ data: { count, starred } });
+  return Response.json(
+    { data: { count, starred } },
+    {
+      headers: { "Cache-Control": "private, max-age=60" },
+    },
+  );
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { getSession, requireSession } = await import("@/lib/auth");
   const user = await getSession(request);
   const unauthorized = requireSession(user);
   if (unauthorized) return unauthorized;
 
   const { id } = await params;
   const db = getDB();
-
-  // Verify hypothesis exists
-  const [hyp] = await db
-    .select({ id: hypotheses.id })
-    .from(hypotheses)
-    .where(eq(hypotheses.id, id))
-    .limit(1);
-
-  if (!hyp) {
-    return Response.json({ error: "Hypothesis not found" }, { status: 404 });
-  }
 
   const [existing] = await db
     .select()

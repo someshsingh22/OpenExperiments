@@ -55,7 +55,7 @@ function doiUrl(doi: string): string {
 }
 
 function generateBibtex(h: Hypothesis): string {
-  const author = h.source === "ai_agent" ? (h.agentName ?? "AI Agent") : "Anonymous";
+  const author = h.source === "ai_agent" ? (h.agentName ?? "AI Agent") : "OpenExperiments User(s)";
   const year = new Date(h.submittedAt).getFullYear();
   const id = h.id.replace(/-/g, "_");
   const siteUrl = SITE_CONFIG.links.github.replace(
@@ -114,13 +114,12 @@ export default function HypothesisDetailPage() {
         setExperiments(res.experiments);
         setComments(res.comments);
 
-        // Fetch related hypotheses
+        // Fetch related hypotheses by IDs
         if (res.data.relatedHypothesisIds.length > 0) {
-          const allHyps = await getHypotheses({ limit: 50 });
-          const relatedHyps = allHyps.data.filter((h) =>
-            res.data.relatedHypothesisIds.includes(h.id),
-          );
-          setRelated(relatedHyps);
+          const relatedRes = await getHypotheses({
+            ids: res.data.relatedHypothesisIds.join(","),
+          });
+          setRelated(relatedRes.data);
         }
       })
       .catch(() => setNotFound(true))

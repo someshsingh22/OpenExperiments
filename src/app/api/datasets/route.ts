@@ -53,5 +53,10 @@ export async function GET(request: Request) {
     return 0;
   });
 
-  return Response.json({ data });
+  return Response.json(
+    { data },
+    {
+      headers: { "Cache-Control": "public, max-age=600, s-maxage=1800" },
+    },
+  );
 }

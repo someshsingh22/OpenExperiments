@@ -32,26 +32,31 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   // Experiments using this dataset
   const exps = await db.select().from(experiments).where(eq(experiments.datasetId, id));
 
-  return Response.json({
-    data: {
-      id: dataset.id,
-      name: dataset.name,
-      huggingfaceUrl: dataset.huggingfaceUrl,
-      taskDescription: dataset.taskDescription,
-      dataColumnNames: dataset.dataColumnNames,
-      targetColumnName: dataset.targetColumnName,
-      description: dataset.description,
-      domain: dataset.domain,
-      createdAt: new Date(dataset.createdAt * 1000).toISOString().split("T")[0],
+  return Response.json(
+    {
+      data: {
+        id: dataset.id,
+        name: dataset.name,
+        huggingfaceUrl: dataset.huggingfaceUrl,
+        taskDescription: dataset.taskDescription,
+        dataColumnNames: dataset.dataColumnNames,
+        targetColumnName: dataset.targetColumnName,
+        description: dataset.description,
+        domain: dataset.domain,
+        createdAt: new Date(dataset.createdAt * 1000).toISOString().split("T")[0],
+      },
+      problemStatements: psLinks,
+      experiments: exps.map((e) => ({
+        id: e.id,
+        hypothesisId: e.hypothesisId,
+        type: e.type,
+        status: e.status,
+        methodology: e.methodology,
+        startedAt: new Date(e.startedAt * 1000).toISOString().split("T")[0],
+      })),
     },
-    problemStatements: psLinks,
-    experiments: exps.map((e) => ({
-      id: e.id,
-      hypothesisId: e.hypothesisId,
-      type: e.type,
-      status: e.status,
-      methodology: e.methodology,
-      startedAt: new Date(e.startedAt * 1000).toISOString().split("T")[0],
-    })),
-  });
+    {
+      headers: { "Cache-Control": "public, max-age=600, s-maxage=1800" },
+    },
+  );
 }

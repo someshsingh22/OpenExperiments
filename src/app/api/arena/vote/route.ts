@@ -3,6 +3,7 @@ export const runtime = "edge";
 import { getDB } from "@/db";
 import { arenaVotes, arenaMatchups } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
+import { updateWinRatesForMatchup } from "@/lib/arena-stats";
 
 export async function POST(request: Request) {
   const { getSession } = await import("@/lib/auth");
@@ -95,6 +96,9 @@ export async function POST(request: Request) {
       WHERE id = ${matchupId}
     `);
   }
+
+  // Update denormalized win rates for both hypotheses
+  await updateWinRatesForMatchup(db, matchupId);
 
   // Return updated matchup
   const [updated] = await db

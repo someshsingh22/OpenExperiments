@@ -52,7 +52,7 @@ export function EvidenceBadge({ status, phase, size = "md" }: EvidenceBadgeProps
     ? {
         label: "Evaluating",
         bg: "bg-stone-50",
-        text: "text-stone-400",
+        text: "text-stone-500",
         ring: "ring-stone-200",
         icon: undefined,
       }

@@ -7,12 +7,15 @@ import { eq, sql } from "drizzle-orm";
 export async function GET() {
   const db = getDB();
 
-  // Pick a random matchup
-  const [matchup] = await db
-    .select()
-    .from(arenaMatchups)
-    .orderBy(sql`RANDOM()`)
-    .limit(1);
+  // Pick a random matchup using count + offset (avoids full table scan)
+  const [{ total }] = await db.select({ total: sql<number>`count(*)` }).from(arenaMatchups);
+
+  if (total === 0) {
+    return Response.json({ error: "No matchups available" }, { status: 404 });
+  }
+
+  const offset = Math.floor(Math.random() * total);
+  const [matchup] = await db.select().from(arenaMatchups).limit(1).offset(offset);
 
   if (!matchup) {
     return Response.json({ error: "No matchups available" }, { status: 404 });
@@ -31,33 +34,38 @@ export async function GET() {
     .where(eq(hypotheses.id, matchup.hypothesisBId))
     .limit(1);
 
-  return Response.json({
-    data: {
-      id: matchup.id,
-      totalVotes: matchup.totalVotes,
-      votesA: matchup.votesA,
-      votesB: matchup.votesB,
-      votesTie: matchup.votesTie,
-      hypothesisA: hypA
-        ? {
-            id: hypA.id,
-            statement: hypA.statement,
-            domain: hypA.domains,
-            arenaElo: hypA.arenaElo,
-            source: hypA.source,
-            agentName: hypA.agentName,
-          }
-        : null,
-      hypothesisB: hypB
-        ? {
-            id: hypB.id,
-            statement: hypB.statement,
-            domain: hypB.domains,
-            arenaElo: hypB.arenaElo,
-            source: hypB.source,
-            agentName: hypB.agentName,
-          }
-        : null,
+  return Response.json(
+    {
+      data: {
+        id: matchup.id,
+        totalVotes: matchup.totalVotes,
+        votesA: matchup.votesA,
+        votesB: matchup.votesB,
+        votesTie: matchup.votesTie,
+        hypothesisA: hypA
+          ? {
+              id: hypA.id,
+              statement: hypA.statement,
+              domain: hypA.domains,
+              arenaElo: hypA.arenaElo,
+              source: hypA.source,
+              agentName: hypA.agentName,
+            }
+          : null,
+        hypothesisB: hypB
+          ? {
+              id: hypB.id,
+              statement: hypB.statement,
+              domain: hypB.domains,
+              arenaElo: hypB.arenaElo,
+              source: hypB.source,
+              agentName: hypB.agentName,
+            }
+          : null,
+      },
     },
-  });
+    {
+      headers: { "Cache-Control": "no-store" },
+    },
+  );
 }

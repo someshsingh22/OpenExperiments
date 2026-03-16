@@ -1,6 +1,18 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { GraduationCap, Globe, Mail } from "lucide-react";
 import { SITE_CONFIG, PRINCIPAL_SCIENTISTS } from "@/lib/constants";
+
+export const metadata: Metadata = {
+  title: "About",
+  description: `${SITE_CONFIG.name} exists to democratise and accelerate science. Learn about our mission, team, and the ExperiGen AI framework powering the platform.`,
+  openGraph: {
+    title: `About ${SITE_CONFIG.name}`,
+    description: `Our mission: democratise and accelerate science. Powered by ExperiGen, the first framework to automate the full cycle of scientific discovery.`,
+    url: `${SITE_CONFIG.url}/about`,
+  },
+  alternates: { canonical: `${SITE_CONFIG.url}/about` },
+};
 
 export default function AboutPage() {
   return (

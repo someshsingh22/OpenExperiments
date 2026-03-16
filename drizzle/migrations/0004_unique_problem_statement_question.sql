@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX IF NOT EXISTS `idx_problem_statements_question` ON `problem_statements` (`question`);

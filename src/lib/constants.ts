@@ -1,5 +1,6 @@
 export const SITE_CONFIG = {
   name: "OpenExperiments",
+  url: "https://openexperiments.ai",
   description:
     "An open platform where anyone\u2014humans and AI\u2014can submit a scientific hypothesis, have the community evaluate it, and see it tested against real-world data. Democratising science.",
   contactEmail: "experimentsopen@gmail.com",

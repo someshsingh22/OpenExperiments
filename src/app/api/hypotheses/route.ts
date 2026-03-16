@@ -1,8 +1,8 @@
 export const runtime = "edge";
 
 import { getDB } from "@/db";
-import { hypotheses, comments, experiments } from "@/db/schema";
-import { eq, and, or, like, desc, sql, inArray } from "drizzle-orm";
+import { hypotheses, comments, experiments, problemStatements } from "@/db/schema";
+import { eq, and, or, like, desc, sql, inArray, type SQL } from "drizzle-orm";
 import { validateHypothesis } from "@/lib/validation";
 
 export async function GET(request: Request) {
@@ -10,6 +10,30 @@ export async function GET(request: Request) {
   const viewer = await getSession(request);
   const db = getDB();
   const url = new URL(request.url);
+
+  // Fast path: fetch by specific IDs (for related hypotheses)
+  const idsParam = url.searchParams.get("ids");
+  if (idsParam) {
+    const ids = idsParam.split(",").filter(Boolean);
+    if (ids.length === 0) {
+      return Response.json(
+        { data: [], total: 0 },
+        {
+          headers: { "Cache-Control": "public, max-age=60, s-maxage=300" },
+        },
+      );
+    }
+    const rows = await db.select().from(hypotheses).where(inArray(hypotheses.id, ids));
+    return Response.json(
+      {
+        data: rows.map((r) => deserializeHypothesis(r, viewer?.id)),
+        total: rows.length,
+      },
+      {
+        headers: { "Cache-Control": "public, max-age=60, s-maxage=300" },
+      },
+    );
+  }
 
   const domain = url.searchParams.get("domain");
   const phase = url.searchParams.get("phase");
@@ -19,7 +43,7 @@ export async function GET(request: Request) {
   const limit = Math.min(parseInt(url.searchParams.get("limit") || "50"), 100);
   const offset = parseInt(url.searchParams.get("offset") || "0");
 
-  const conditions = [];
+  const conditions: SQL[] = [];
   if (phase) conditions.push(eq(hypotheses.phase, phase));
   if (status) conditions.push(eq(hypotheses.status, status));
   if (search) {
@@ -94,10 +118,15 @@ export async function GET(request: Request) {
     }
   }
 
-  return Response.json({
-    data: rows.map((r) => deserializeHypothesis(r, viewer?.id, commentCounts, experimentCounts)),
-    total: count,
-  });
+  return Response.json(
+    {
+      data: rows.map((r) => deserializeHypothesis(r, viewer?.id, commentCounts, experimentCounts)),
+      total: count,
+    },
+    {
+      headers: { "Cache-Control": "public, max-age=60, s-maxage=300" },
+    },
+  );
 }
 
 export async function POST(request: Request) {
@@ -127,6 +156,52 @@ export async function POST(request: Request) {
 
   const id = crypto.randomUUID();
   const now = Math.floor(Date.now() / 1000);
+
+  // Ensure problem statement exists in the catalog
+  const existingPS = await db
+    .select({ id: problemStatements.id })
+    .from(problemStatements)
+    .where(eq(problemStatements.question, problemStatement))
+    .limit(1);
+
+  let psId = existingPS[0]?.id;
+
+  if (!psId) {
+    psId = crypto.randomUUID();
+    try {
+      await db.insert(problemStatements).values({
+        id: psId,
+        question: problemStatement,
+        description: "",
+        domain: domains[0],
+        hypothesisCount: 0,
+        createdAt: now,
+        updatedAt: now,
+      });
+    } catch (err) {
+      // Race condition: another request created it first
+      if (err instanceof Error && err.message.includes("UNIQUE")) {
+        const retry = await db
+          .select({ id: problemStatements.id })
+          .from(problemStatements)
+          .where(eq(problemStatements.question, problemStatement))
+          .limit(1);
+        psId = retry[0]?.id;
+      } else {
+        throw err;
+      }
+    }
+  }
+
+  if (psId) {
+    await db
+      .update(problemStatements)
+      .set({
+        hypothesisCount: sql`${problemStatements.hypothesisCount} + 1`,
+        updatedAt: now,
+      })
+      .where(eq(problemStatements.id, psId));
+  }
 
   await db.insert(hypotheses).values({
     id,

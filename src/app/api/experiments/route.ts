@@ -92,7 +92,12 @@ export async function GET(request: Request) {
     }),
   );
 
-  return Response.json({ data });
+  return Response.json(
+    { data },
+    {
+      headers: { "Cache-Control": "public, max-age=300, s-maxage=600" },
+    },
+  );
 }
 
 export async function POST(request: Request) {

@@ -20,6 +20,7 @@ export const experiments: Experiment[] = [
     startedAt: "2025-09-20",
     completedAt: "2025-09-22",
     osfLink: "https://osf.io/",
+    version: 1,
   },
   {
     id: "exp-2",
@@ -41,6 +42,7 @@ export const experiments: Experiment[] = [
     startedAt: "2025-10-01",
     completedAt: "2025-10-22",
     osfLink: "https://osf.io/",
+    version: 1,
   },
   {
     id: "exp-3",
@@ -61,6 +63,7 @@ export const experiments: Experiment[] = [
     startedAt: "2025-10-05",
     completedAt: "2025-10-06",
     osfLink: "https://osf.io/",
+    version: 1,
   },
   {
     id: "exp-4",
@@ -81,6 +84,7 @@ export const experiments: Experiment[] = [
     startedAt: "2025-11-10",
     completedAt: "2025-11-11",
     osfLink: "https://osf.io/",
+    version: 1,
   },
   {
     id: "exp-5",
@@ -101,6 +105,7 @@ export const experiments: Experiment[] = [
     startedAt: "2025-10-22",
     completedAt: "2025-10-23",
     osfLink: "https://osf.io/",
+    version: 1,
   },
   {
     id: "exp-6",
@@ -121,6 +126,7 @@ export const experiments: Experiment[] = [
     startedAt: "2025-10-30",
     completedAt: "2025-11-01",
     osfLink: "https://osf.io/",
+    version: 1,
   },
   {
     id: "exp-7",
@@ -141,6 +147,7 @@ export const experiments: Experiment[] = [
     startedAt: "2025-12-02",
     completedAt: "2025-12-03",
     osfLink: "https://osf.io/",
+    version: 1,
   },
   {
     id: "exp-8",
@@ -161,5 +168,6 @@ export const experiments: Experiment[] = [
     startedAt: "2025-11-24",
     completedAt: "2025-11-25",
     osfLink: "https://osf.io/",
+    version: 1,
   },
 ];

@@ -1,0 +1,198 @@
+1. Strong input validations
+4. Home page: bottleneck is conducting experiments, we provide that + 5. One hypothesis at a time;
+
+================================================================================
+LIGHTHOUSE AUDIT REPORT — Consolidated (2026-03-17, dev server, Lighthouse 13)
+================================================================================
+
+SCORES SUMMARY
+──────────────────────────────────────────────────────
+ Page          | Perf | A11y | SEO | Notes
+──────────────────────────────────────────────────────
+ Homepage      |  61  | 100  | 100 | LCP & Speed Index worst
+ Explore       |  78  | 100  | 100 | TBT & TTI high
+ Hypothesis    |  63  |  96  | 100 | LCP worst, contrast issues
+ Arena         |  48  |  96  | 100 | CLS + LCP + contrast issues
+──────────────────────────────────────────────────────
+
+NOTE: "Best Practices" category not consistently scored (Lighthouse version
+difference); omitted from table. SEO is 100 across all pages — no SEO issues.
+
+================================================================================
+PERFORMANCE ISSUES (Priority Order)
+================================================================================
+
+P0 — SLOW SERVER RESPONSE TIME (all pages)
+───────────────────────────────────────────
+Root cause: Edge runtime + Turbopack dev server overhead. Pages with server-side
+DB queries pay high TTFB. Homepage saw 6,660 ms document latency; Hypothesis
+3,750 ms; Arena 5,160 ms; Explore 820 ms.
+
+RCA:
+- Homepage (`src/app/page.tsx`): getHomeData() runs 5+ sequential DB queries
+  including a Promise.all that does N+1 queries (one per problem statement to
+  fetch its datasets). Lines 93-113 — N+1 waterfall.
+- Hypothesis (`src/app/hypothesis/[id]/layout.tsx`): getHypothesisData() called
+  TWICE — once for generateMetadata (line 26) and once for HypothesisLayout
+  (line 89). No deduplication/caching between them.
+- Arena (`src/app/arena/page.tsx`): Entire page is "use client" — no SSR.
+  Initial HTML is empty shell. All data loaded client-side via useEffect (3
+  API calls: getMatchup, getArenaRankings, getStarsBatch).
+
+Actions:
+  [ ] Fix N+1 in Homepage: batch dataset lookup with a single JOIN instead of
+      Promise.all + per-PS query (src/app/page.tsx:93-113)
+  [ ] Deduplicate getHypothesisData() in hypothesis layout — use React cache()
+      or unstable_cache so generateMetadata + layout share one DB call
+      (src/app/hypothesis/[id]/layout.tsx)
+  [ ] Consider converting Arena to server component for initial rankings load
+      (or at least SSR the leaderboard table)
+
+P1 — LARGE CONTENTFUL PAINT (LCP) — ALL PAGES
+──────────────────────────────────────────────
+Measured: Homepage 7.1s, Explore 3.4s, Hypothesis 7.4s, Arena 6.9s
+
+RCA:
+- LCP element on most pages is text (h1 or hypothesis statement). LCP is
+  blocked by: (1) slow document response (see P0), (2) render-blocking JS,
+  (3) client-only pages that render nothing until JS hydrates + fetches data.
+- Hypothesis page is entirely "use client" — shows a spinner until the API
+  call completes. Zero server-rendered content. LCP = time until JS fetches
+  data and renders.
+- Arena page — same problem. 100% client rendered.
+
+Actions:
+  [ ] Convert hypothesis detail page to server component (SSR the main
+      hypothesis data, keep interactive parts as client islands)
+      (src/app/hypothesis/[id]/page.tsx — entire file is "use client")
+  [ ] At minimum, SSR the hypothesis statement + rationale + metadata to
+      eliminate the loading spinner as LCP
+
+P2 — UNUSED / UNMINIFIED JAVASCRIPT (all pages)
+────────────────────────────────────────────────
+Measured: ~493 KiB unused JS (homepage), ~275 KiB (other pages), ~174 KiB
+unminified JS.
+
+RCA:
+- Dev server (Turbopack) doesn't minify or tree-shake — this will largely
+  resolve in production build.
+- However: lucide-react icons are imported individually across many components
+  but there's no guarantee the bundler tree-shakes all unused exports.
+- Large client bundles: react-dom, next-devtools (dev only), client runtime.
+
+Actions:
+  [ ] Verify production build (`next build`) JS bundle sizes — most of this
+      is dev-only overhead from Turbopack
+  [ ] Consider dynamic imports for heavy client-only sections (arena page,
+      hypothesis detail tabs) to reduce initial bundle
+  [ ] Audit lucide-react — ensure only individual icon imports (already done)
+
+P3 — TOTAL BLOCKING TIME (TBT) & TIME TO INTERACTIVE (TTI)
+───────────────────────────────────────────────────────────
+Measured: TBT 210-510ms, TTI 6.9-7.3s across pages.
+
+RCA:
+- Heavy JS execution during hydration. Explore page had 1.3s of JS execution.
+- "use client" pages (Arena, Hypothesis detail) must download, parse, and
+  execute all JS before becoming interactive.
+- Multiple useEffect hooks fire on mount, triggering additional API fetches
+  (stars batch, matchup, rankings) that block meaningful interaction.
+
+Actions:
+  [ ] Reduce client JS by SSR-ing data (see P1)
+  [ ] Lazy-load non-critical client components (share menus, star batch
+      fetching) — defer star loading to after initial paint
+
+P4 — CUMULATIVE LAYOUT SHIFT (CLS) — Arena page
+─────────────────────────────────────────────────
+Measured: Arena CLS = 0.321 (POOR, threshold is 0.1)
+
+RCA:
+- Arena page renders empty shell, then matchup cards pop in after API response.
+  The entire matchup section shifts the layout.
+- No skeleton/placeholder dimensions reserved for the matchup grid.
+
+Actions:
+  [ ] Add min-height or skeleton placeholders for the Arena matchup section
+      so content doesn't shift when data loads (src/app/arena/page.tsx:251-400)
+  [ ] Set explicit dimensions on the vote button area
+
+P5 — LEGACY JAVASCRIPT (all pages)
+───────────────────────────────────
+Measured: ~8 KiB savings possible.
+
+RCA:
+- Some legacy JS patterns detected (likely from dependencies, not app code).
+- Minor in production. Will be addressed by build toolchain.
+
+Actions:
+  [ ] Verify in production build. Low priority.
+
+================================================================================
+ACCESSIBILITY ISSUES
+================================================================================
+
+A1 — COLOR CONTRAST RATIO (Arena + Hypothesis pages)
+─────────────────────────────────────────────────────
+Score: Arena 96, Hypothesis 96 (both fail contrast)
+
+Failing elements (common pattern): `text-stone-300` and `text-stone-400` on
+white backgrounds. These colors have insufficient contrast ratio (< 4.5:1 for
+normal text, < 3:1 for large text).
+
+Specific violators:
+
+Arena page (src/app/arena/page.tsx):
+  - Line 42: "Hypothesis A/B" label — `text-stone-300` (extremely low contrast)
+  - Line 67-68: Star/Share buttons — `text-stone-400`
+  - Line 276: "vs" text — `text-stone-300`
+  - Line 406: "completed only" — `text-stone-400`
+  - Line 412-419: Table headers — `text-stone-400`
+  - Line 247: Subtitle — `text-stone-400`
+
+Hypothesis page (src/app/hypothesis/[id]/page.tsx):
+  - Line 241: "Source hidden" text — `text-stone-400`
+  - Line 277: BibTeX "COPY" button — `text-stone-400`
+  - Comment timestamps — `text-stone-400`
+  - Reply buttons — `text-stone-400`
+  - "No citations" italic — `text-stone-400`
+
+Actions:
+  [ ] Replace `text-stone-300` with `text-stone-500` (or darker) for all
+      text elements on white backgrounds
+  [ ] Replace `text-stone-400` with `text-stone-500` for small/body text
+      to meet WCAG AA 4.5:1 ratio
+  [ ] Specifically fix: Arena card labels, Arena "vs", table headers,
+      hypothesis "Source hidden", comment timestamps, reply buttons
+
+================================================================================
+SEO — NO ISSUES
+================================================================================
+All pages score 100. Metadata, structured data (JSON-LD), canonical URLs,
+sitemap, robots.txt, OG tags, and Twitter cards are all properly configured.
+
+================================================================================
+QUICK WINS (can fix today)
+================================================================================
+1. [ ] Accessibility contrast: bulk replace text-stone-300 -> text-stone-500
+       and text-stone-400 -> text-stone-500 for affected elements
+       (Arena + Hypothesis pages)
+2. [ ] Arena CLS: add min-h-[400px] to matchup section container
+3. [ ] Homepage N+1: replace Promise.all per-PS dataset lookup with single
+       batched JOIN query
+4. [ ] Deduplicate hypothesis layout DB call with React cache()
+
+================================================================================
+MEDIUM EFFORT (next sprint)
+================================================================================
+5. [ ] Convert hypothesis detail page from full "use client" to server
+       component with client islands (biggest LCP win)
+6. [ ] SSR Arena leaderboard table (currently 100% client-rendered)
+7. [ ] Add skeleton placeholders for all client-loaded sections
+
+================================================================================
+VERIFY IN PRODUCTION
+================================================================================
+8. [ ] Run Lighthouse on production build (many JS size issues are dev-only)
+9. [ ] Confirm unused JS and minification resolve after `next build`
+10.[ ] Check TTFB with Cloudflare D1 (dev SQLite is slower)

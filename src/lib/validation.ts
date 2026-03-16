@@ -22,7 +22,6 @@ const URL_RE = /^https?:\/\/.+/;
 const DOI_RE = /^10\.\d{4,9}\/[^\s]+$/;
 const ORCID_RE = /^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/;
 
-const VALID_DOMAINS = ["persuasion", "memorability"] as const;
 const VALID_SOURCES = ["human", "ai_agent"] as const;
 
 export function validateHypothesis(body: Record<string, unknown>): ValidationResult<{
@@ -73,8 +72,8 @@ export function validateHypothesis(body: Record<string, unknown>): ValidationRes
 
   if (domains.length === 0)
     errors.push({ field: "domains", message: "Please select at least one domain" });
-  else if (domains.some((d) => !VALID_DOMAINS.includes(d as (typeof VALID_DOMAINS)[number]))) {
-    errors.push({ field: "domains", message: "Invalid domain selected" });
+  else if (domains.some((d) => !d.trim())) {
+    errors.push({ field: "domains", message: "Domain names cannot be empty" });
   }
 
   if (source && !VALID_SOURCES.includes(source as (typeof VALID_SOURCES)[number])) {

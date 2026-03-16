@@ -39,17 +39,11 @@ export function Navbar() {
     <nav className="sticky top-0 z-50 border-b border-stone-200 bg-white/90 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-2">
-          <Image
-            src="/logo.svg"
-            alt="OpenExperiments"
-            width={24}
-            height={24}
-            className="h-6 w-auto"
-          />
+          <Image src="/logo.svg" alt="" width={32} height={24} className="h-6 w-8" />
           <span className="text-base font-semibold tracking-tight text-stone-900">
             OpenExperiments
           </span>
-          <span className="hidden text-[10px] font-medium tracking-[0.15em] text-stone-400 uppercase sm:block">
+          <span className="hidden text-[10px] font-medium tracking-[0.15em] text-stone-500 uppercase sm:block">
             Democratising Science
           </span>
         </Link>
@@ -125,7 +119,7 @@ export function Navbar() {
                     <div className="absolute top-full right-0 z-50 mt-2 w-52 rounded-lg border border-stone-200 bg-white p-1.5 shadow-xl">
                       <div className="mb-1 border-b border-stone-100 px-3 py-2">
                         <p className="truncate text-sm font-medium text-stone-800">{user.name}</p>
-                        <p className="truncate text-xs text-stone-400">{user.email}</p>
+                        <p className="truncate text-xs text-stone-500">{user.email}</p>
                       </div>
                       <Link
                         href={`/profile/${user.id}`}
@@ -162,6 +156,8 @@ export function Navbar() {
 
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
+          aria-label={mobileOpen ? "Close menu" : "Open menu"}
+          aria-expanded={mobileOpen}
           className="rounded-md p-1.5 text-stone-500 hover:bg-stone-100 md:hidden"
         >
           {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -184,7 +180,7 @@ export function Navbar() {
             </Link>
           ))}
           <div className="mt-4 border-t border-stone-100 pt-4">
-            <p className="mb-2 px-3 text-xs font-semibold tracking-wider text-stone-400 uppercase">
+            <p className="mb-2 px-3 text-xs font-semibold tracking-wider text-stone-500 uppercase">
               Submit
             </p>
             <Link

@@ -24,6 +24,7 @@ export async function getHypotheses(params?: {
   search?: string;
   limit?: number;
   offset?: number;
+  ids?: string;
 }): Promise<{ data: Hypothesis[]; total: number }> {
   const query = new URLSearchParams();
   if (params) {
@@ -160,6 +161,7 @@ export async function getDataset(id: string): Promise<{
     type: string;
     status: string;
     methodology: string;
+    startedAt: string;
   }>;
 }> {
   return fetchJSON(`/api/datasets/${id}`);
@@ -290,6 +292,13 @@ export async function getStarStatus(
   hypothesisId: string,
 ): Promise<{ data: { count: number; starred: boolean } }> {
   return fetchJSON(`/api/hypotheses/${hypothesisId}/star`);
+}
+
+export async function getStarsBatch(
+  ids: string[],
+): Promise<{ data: Record<string, { count: number; starred: boolean }> }> {
+  if (ids.length === 0) return { data: {} };
+  return fetchJSON(`/api/hypotheses/stars?ids=${ids.join(",")}`);
 }
 
 // Profile update

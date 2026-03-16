@@ -24,6 +24,59 @@ MCP (Model Context Protocol) server for [OpenExperiments](https://openexperiment
 | `formulate-hypothesis` | Loads all context to help turn a rough idea into a testable hypothesis |
 | `co-ideate`            | Brainstorm new research directions from existing work                  |
 
+## Philosophy: ExperiGen Feature Extractability
+
+The MCP server guides users based on the **ExperiGen** approach ([arxiv.org/abs/2602.07983](https://arxiv.org/abs/2602.07983)):
+
+**Core Principle**: Hypotheses must test features COMPUTABLE from available dataset columns.
+
+**✅ Extractable Features:**
+
+- **Code-based**: Brightness from pixels, length from text, counts, ratios
+- **NLP/LLM-based**: Sentiment, readability, named entities, topics from text
+- **VLM-based**: Face count, object types, scene category from images
+- **Statistical**: Correlations, aggregations from numerical data
+
+**❌ Not Extractable:**
+
+- Viewer's mood (not stored in data)
+- Author's true intent (not measurable)
+- Temporal features when timestamps missing
+- User demographics when data is anonymized
+
+**Example**: "Warm colors make images more memorable" is testable because color can be extracted from RGB pixel values. "Viewer's mood affects memory" is NOT testable because mood isn't in the dataset.
+
+## Domain Flexibility
+
+The MCP server accepts hypotheses in **any domain**, not just persuasion/memorability:
+
+- **Standard domains**: `persuasion`, `memorability` (fully supported)
+- **New domains**: `attention`, `learning`, `decision-making`, etc. (exploratory)
+- Users can propose problem statements in any domain
+- Problem statements can exist without datasets initially
+- Datasets can be suggested via GitHub PR later
+
+When generating submission URLs for non-standard domains, the MCP shows a warning explaining the current platform restrictions and how to propose new domains.
+
+## Quick Start (Local Development)
+
+```bash
+# 1. Install and build
+cd mcp-server
+npm install
+npm run build
+
+# 2. Configure (choose one)
+bash configure-claude-code.sh      # For Claude Code CLI
+bash configure-claude-desktop.sh   # For Claude Desktop app
+
+# 3. Start your local dev server (in main project)
+cd ..
+npm run dev
+```
+
+See [LOCAL_SETUP.md](./LOCAL_SETUP.md) for detailed local development instructions.
+
 ## Setup
 
 ### 1. Install
@@ -81,10 +134,28 @@ Or add to `.claude/settings.json`:
 | `OPENEXPERIMENTS_API_URL`  | `https://openexperiments.pages.dev` | API base URL                 |
 | `OPENEXPERIMENTS_SITE_URL` | Same as API URL                     | Site URL for generated links |
 
-For local development, point to your local server:
+Configuration priority (highest to lowest):
 
-```bash
-OPENEXPERIMENTS_API_URL=http://localhost:3000 npm run dev
+1. Environment variables in Claude config (`env` field)
+2. `.env` file in `mcp-server/` directory
+3. Built-in defaults (production URLs)
+
+For local development, the `.env` file is pre-configured to use `localhost:3000`. Just start your dev server and it works.
+
+To override for production, edit `mcp-server/.env` or add `env` to your Claude config:
+
+```json
+{
+  "mcpServers": {
+    "openexperiments": {
+      "command": "node",
+      "args": ["/path/to/dist/index.js"],
+      "env": {
+        "OPENEXPERIMENTS_API_URL": "https://openexperiments.pages.dev"
+      }
+    }
+  }
+}
 ```
 
 ## Development

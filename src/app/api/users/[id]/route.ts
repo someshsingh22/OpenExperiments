@@ -80,48 +80,53 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   // Derive affiliation from email domain
   const emailAffiliation = user.email ? extractAffiliation(user.email) : null;
 
-  return Response.json({
-    data: {
-      user: {
-        id: user.id,
-        name: user.name,
-        email: isOwner ? user.email : null,
-        avatarUrl: user.avatarUrl,
-        affiliation: emailAffiliation,
-        position: user.position,
-        scholarUrl: user.scholarUrl,
-        website: user.website,
-        bio: user.bio,
-        orcid: user.orcid,
-        twitterHandle: user.twitterHandle,
-        joinedAt: new Date(user.createdAt * 1000).toISOString().split("T")[0],
+  return Response.json(
+    {
+      data: {
+        user: {
+          id: user.id,
+          name: user.name,
+          email: isOwner ? user.email : null,
+          avatarUrl: user.avatarUrl,
+          affiliation: emailAffiliation,
+          position: user.position,
+          scholarUrl: user.scholarUrl,
+          website: user.website,
+          bio: user.bio,
+          orcid: user.orcid,
+          twitterHandle: user.twitterHandle,
+          joinedAt: new Date(user.createdAt * 1000).toISOString().split("T")[0],
+        },
+        hypotheses: visibleHypotheses.map((h) => ({
+          id: h.id,
+          statement: h.statement,
+          status: h.status,
+          phase: h.phase,
+          domain: h.domains,
+          isAnonymous: h.isAnonymous === 1,
+          submittedAt: new Date(h.submittedAt * 1000).toISOString().split("T")[0],
+        })),
+        starredHypotheses: starredHypotheses.map((h) => ({
+          id: h.id,
+          statement: h.statement,
+          status: h.status,
+          phase: h.phase,
+          domain: h.domains,
+          submittedAt: new Date(h.submittedAt * 1000).toISOString().split("T")[0],
+        })),
+        stats: {
+          hypothesisCount: allHypotheses.length,
+          experimentCount,
+          commentCount,
+          voteCount,
+        },
+        isOwner,
       },
-      hypotheses: visibleHypotheses.map((h) => ({
-        id: h.id,
-        statement: h.statement,
-        status: h.status,
-        phase: h.phase,
-        domain: h.domains,
-        isAnonymous: h.isAnonymous === 1,
-        submittedAt: new Date(h.submittedAt * 1000).toISOString().split("T")[0],
-      })),
-      starredHypotheses: starredHypotheses.map((h) => ({
-        id: h.id,
-        statement: h.statement,
-        status: h.status,
-        phase: h.phase,
-        domain: h.domains,
-        submittedAt: new Date(h.submittedAt * 1000).toISOString().split("T")[0],
-      })),
-      stats: {
-        hypothesisCount: allHypotheses.length,
-        experimentCount,
-        commentCount,
-        voteCount,
-      },
-      isOwner,
     },
-  });
+    {
+      headers: { "Cache-Control": "public, max-age=120, s-maxage=300" },
+    },
+  );
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {

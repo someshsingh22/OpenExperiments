@@ -66,6 +66,9 @@ export const hypotheses = sqliteTable(
     pValue: real("p_value"),
     effectSize: real("effect_size"),
     isAnonymous: integer("is_anonymous").notNull().default(0),
+    winRate: integer("win_rate"),
+    arenaWins: integer("arena_wins").default(0),
+    arenaTotal: integer("arena_total").default(0),
     commentCount: integer("comment_count").notNull().default(0),
     citationDois: text("citation_dois", { mode: "json" }).notNull().$type<string[]>(),
     relatedHypothesisIds: text("related_hypothesis_ids", { mode: "json" })
@@ -93,7 +96,10 @@ export const problemStatements = sqliteTable(
     createdAt: integer("created_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
   },
-  (table) => [index("idx_problem_statements_domain").on(table.domain)],
+  (table) => [
+    index("idx_problem_statements_domain").on(table.domain),
+    uniqueIndex("idx_problem_statements_question").on(table.question),
+  ],
 );
 
 export const datasets = sqliteTable(

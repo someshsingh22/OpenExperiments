@@ -1,8 +1,12 @@
 #!/usr/bin/env node
 
+import { config } from "dotenv";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+
+// Load .env file if present
+config();
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -78,11 +82,14 @@ server.tool(
 
 server.tool(
   "list_datasets",
-  "List all Hugging Face datasets with column schemas, target columns, and " +
-    "task descriptions. Essential for understanding what data exists to test " +
-    "hypotheses. Filter by domain: 'persuasion' or 'memorability'.",
+  "List all Hugging Face datasets with column schemas and extractable features. " +
+    "For each dataset, see what features can be DERIVED: brightness from image pixels, " +
+    "sentiment from text, object counts from images via VLMs, etc. Filter by domain if needed.",
   {
-    domain: z.enum(["persuasion", "memorability"]).optional().describe("Filter by domain"),
+    domain: z
+      .string()
+      .optional()
+      .describe("Filter by domain (any string, e.g., 'attention', 'learning')"),
   },
   async ({ domain }) => {
     const qs = domain ? `?domain=${domain}` : "";
@@ -99,7 +106,22 @@ server.tool(
       text += `- Columns: ${cols}\n`;
       text += `- Target: ${d.targetColumnName}\n`;
       if (d.description) text += `- Description: ${d.description}\n`;
-      text += `- Problem statements: ${d.problemStatementCount ?? 0} | Experiments: ${d.experimentCount ?? 0}\n\n`;
+      text += `- Problem statements: ${d.problemStatementCount ?? 0} | Experiments: ${d.experimentCount ?? 0}\n`;
+
+      // Add extractability information
+      text += `- **Extractable Features**: `;
+      const extractabilityMap: Record<string, string> = {
+        "ds-1":
+          "Text sentiment, length, readability, named entities (NLP); User karma, post history (if not anonymized); Temporal patterns (from timestamp)",
+        "ds-2":
+          "Image brightness, contrast, color distribution, dominant colors (pixel analysis); Face count, object types, scene category (VLM); Composition features (rule of thirds, focal points)",
+        "ds-3": "Tweet sentiment, hashtags, mentions, length; Engagement metrics (retweets, likes)",
+        "ds-4": "Same as LaMem + attention map gaze patterns, fixation duration",
+      };
+      text +=
+        extractabilityMap[d.id] ||
+        "Code-based from structured data; LLM/NLP-based from text; VLM-based from images";
+      text += `\n\n`;
     }
     return { content: [{ type: "text" as const, text }] };
   },
@@ -107,8 +129,9 @@ server.tool(
 
 server.tool(
   "get_dataset",
-  "Get full details of a specific dataset: schema, linked problem " +
-    "statements, and experiments that used it.",
+  "Get full details of a specific dataset: schema, linked problem statements, " +
+    "and experiments. CRITICAL: Focus on what features can be EXTRACTED from the " +
+    "available columns (e.g., brightness from pixels, sentiment from text, face count via VLMs).",
   {
     datasetId: z.string().describe("Dataset ID (e.g., 'ds-1')"),
   },
@@ -130,6 +153,22 @@ server.tool(
     text += `- Target: ${d.targetColumnName}\n`;
     if (d.description) text += `- Description: ${d.description}\n`;
 
+    // Add extractability information
+    text += `\n**Extractable Features**:\n`;
+    const extractabilityMap: Record<string, string> = {
+      "ds-1":
+        "• Text: sentiment, length, readability, named entities (via NLP)\n• User: karma, post history (if not anonymized)\n• Temporal: time since post, posting patterns (from timestamp)\n• ❌ Cannot extract: author intent, viewer mood",
+      "ds-2":
+        "• Image: brightness, contrast, color distribution, dominant colors\n• Objects: face count, object types, scene category (via VLM)\n• Composition: focal points, rule of thirds alignment\n• ❌ Cannot extract: emotional impact on viewer, cultural significance",
+      "ds-3":
+        "• Tweet: sentiment, hashtags, mentions, length\n• Engagement: retweet counts, like counts\n• ❌ Cannot extract: sarcasm (unreliable), user demographics (if anonymized)",
+      "ds-4":
+        "• Image: same as LaMem\n• Attention: gaze patterns, fixation duration\n• ❌ Cannot extract: viewer prior knowledge, personal associations",
+    };
+    text +=
+      extractabilityMap[datasetId] ||
+      "• Code-based: statistical aggregations from structured data\n• LLM-based: semantic features from text fields\n• VLM-based: visual features from image fields\n";
+
     text += `\n## Problem Statements (${res.problemStatements.length})\n\n`;
     for (const ps of res.problemStatements) {
       text += `- ${ps.question} (${ps.id}, ${ps.domain}, ${ps.hypothesisCount} hypotheses)\n`;
@@ -149,11 +188,11 @@ server.tool(
 server.tool(
   "search_hypotheses",
   "Search hypotheses by keyword across statements, rationales, and problem " +
-    "statements. Use to find related work, check for duplicates, or get " +
-    "inspiration. Supports filtering by domain, phase, and status.",
+    "statements. Use to find related work across ALL domains, check for duplicates, " +
+    "or get inspiration. Supports filtering by domain, phase, and status.",
   {
     query: z.string().describe("Search keywords"),
-    domain: z.enum(["persuasion", "memorability"]).optional().describe("Filter by domain"),
+    domain: z.string().optional().describe("Filter by domain (any string)"),
     phase: z.enum(["live", "completed"]).optional().describe("Filter by phase"),
     status: z
       .enum(["proposed", "arena_ranked", "data_tested", "field_validated"])
@@ -376,9 +415,22 @@ server.tool(
     text += `- Live (accepting votes): ${byPhase.live}\n`;
     text += `- Completed (results available): ${byPhase.completed}\n`;
 
-    text += `\n## Domains\n`;
-    text += `- **Persuasion**: What makes arguments persuasive in online discourse\n`;
-    text += `- **Memorability**: What makes images memorable\n`;
+    text += `\n## Philosophy: ExperiGen Feature Extractability\n\n`;
+    text += `**Core Principle**: Hypotheses must test features COMPUTABLE from available data.\n\n`;
+    text += `**✅ EXTRACTABLE (Testable)**:\n`;
+    text += `- Brightness, contrast, color → extracted from image pixel values\n`;
+    text += `- Sentiment, readability, length → extracted from text via NLP\n`;
+    text += `- Face count, object types → extracted from images via VLMs\n`;
+    text += `- Duration, frequency → calculated from timestamps\n`;
+    text += `- Correlation patterns → statistical analysis of numerical data\n\n`;
+    text += `**❌ NOT EXTRACTABLE (Need new data)**:\n`;
+    text += `- Viewer's mood, emotions → not stored in any field\n`;
+    text += `- Author's true intent → not measurable from text alone\n`;
+    text += `- Cultural significance → requires external knowledge\n`;
+    text += `- Temporal trends → requires timestamps (if missing)\n`;
+    text += `- User demographics → requires user data (if anonymized)\n\n`;
+    text += `**Domains**: Start with persuasion or memorability, or PROPOSE NEW domains!\n`;
+    text += `(attention, learning, decision-making, memory, perception, etc.)\n`;
 
     text += `\n## Hypothesis Lifecycle\n`;
     text += `proposed -> arena_ranked -> data_tested -> field_validated\n`;
@@ -412,7 +464,9 @@ server.tool(
       .string()
       .optional()
       .describe("Custom problem statement if not using an existing one"),
-    domains: z.array(z.enum(["persuasion", "memorability"])).describe("Research domains"),
+    domains: z
+      .array(z.string())
+      .describe("Research domains (any strings, e.g., ['attention'], ['memory', 'learning'])"),
     source: z
       .enum(["human", "ai_agent"])
       .optional()
@@ -446,6 +500,26 @@ server.tool(
       text += `paste the rationale manually.\n`;
     }
 
+    // Add warning if using non-standard domains
+    const standardDomains = ["persuasion", "memorability"];
+    const nonStandardDomains = domains.filter((d) => !standardDomains.includes(d.toLowerCase()));
+
+    if (nonStandardDomains.length > 0) {
+      text += `\n---\n\n`;
+      text += `⚠️  **Domain Submission Note**\n\n`;
+      text += `Your hypothesis uses: **${nonStandardDomains.join(", ")}**\n\n`;
+      text += `The platform currently accepts hypotheses in these domains through `;
+      text += `the web UI, but the domain field will be restricted to standard options. `;
+      text += `Your hypothesis will be associated with an existing domain that's closest.\n\n`;
+      text += `To propose "${nonStandardDomains[0]}" as a new official domain:\n`;
+      text += `1. Open an issue at ${SITE_URL}/issues (GitHub link in footer)\n`;
+      text += `2. Describe the domain and why it's valuable\n`;
+      text += `3. Optionally: suggest datasets for this domain\n`;
+      text += `4. Community + maintainers will review\n\n`;
+      text += `Your hypothesis can still be submitted! The problem statement you `;
+      text += `propose will be recorded with your custom text.\n`;
+    }
+
     return { content: [{ type: "text" as const, text }] };
   },
 );
@@ -465,7 +539,7 @@ server.prompt(
     const [psRes, dsRes, hypRes] = await Promise.all([
       api<{ data: any[] }>("/api/problem-statements?includeDatasets=true"),
       api<{ data: any[] }>("/api/datasets"),
-      api<{ data: any[] }>("/api/hypotheses?phase=completed&sort=top_rated&limit=5"),
+      api<{ data: any[] }>("/api/hypotheses?sort=top_rated&limit=30"),
     ]);
 
     let ctx = "";
@@ -474,12 +548,26 @@ server.prompt(
     ctx += `community-ranked in blind arenas, and tested against real-world `;
     ctx += `data by AI agents.\n\n`;
 
-    ctx += `## What Makes a Good Hypothesis\n\n`;
-    ctx += `1. Specific, falsifiable claim about human behavior (persuasion or memorability)\n`;
-    ctx += `2. Can be tested with available datasets (see below)\n`;
-    ctx += `3. Clear expected direction of effect\n`;
-    ctx += `4. Rationale grounded in psychology, cognitive science, or empirical observation\n`;
-    ctx += `5. Distinct from existing hypotheses\n\n`;
+    ctx += `## What Makes a Good Hypothesis (ExperiGen Philosophy)\n\n`;
+    ctx += `**1. Feature Extractability** — Tests a feature COMPUTABLE from data:\n`;
+    ctx += `   ✅ "Warm colors increase image memorability"\n`;
+    ctx += `      → Color extractable from RGB pixel values (code-based)\n`;
+    ctx += `   ✅ "Longer arguments are more persuasive"\n`;
+    ctx += `      → Length extractable from text character count (code-based)\n`;
+    ctx += `   ✅ "Images with faces are more memorable"\n`;
+    ctx += `      → Face presence extractable via VLM (computer vision)\n`;
+    ctx += `   ✅ "Positive sentiment increases persuasiveness"\n`;
+    ctx += `      → Sentiment extractable from text via NLP/LLM\n`;
+    ctx += `   ❌ "Viewer's mood affects memory"\n`;
+    ctx += `      → Mood NOT in dataset (would need surveys)\n`;
+    ctx += `   ❌ "Arguments posted at night are less persuasive"\n`;
+    ctx += `      → Temporal feature needs timestamp field (check if exists!)\n\n`;
+    ctx += `**2. Specificity & Falsifiability** — Clear claim with expected direction\n\n`;
+    ctx += `**3. Grounded Rationale** — Based on theory, prior work, or observation\n\n`;
+    ctx += `**4. Novelty** — Distinct from existing hypotheses\n\n`;
+    ctx += `**5. Any Domain** — Persuasion, memorability, OR propose new domains:\n`;
+    ctx += `   attention, learning, memory, decision-making, perception, etc.\n`;
+    ctx += `   Problem statements can be proposed even without datasets initially.\n\n`;
 
     ctx += `## Active Problem Statements\n\n`;
     for (const ps of psRes.data) {
@@ -494,7 +582,14 @@ server.prompt(
       ctx += `\n`;
     }
 
-    ctx += `## Available Datasets\n\n`;
+    ctx += `## Available Datasets (What Can Be Extracted?)\n\n`;
+    ctx += `For each dataset, consider what features can be DERIVED using:\n`;
+    ctx += `- **Code**: brightness from pixels, length from text, counts, ratios\n`;
+    ctx += `- **NLP/LLM**: sentiment, readability, named entities, topics from text\n`;
+    ctx += `- **VLM**: object detection, face count, scene category from images\n`;
+    ctx += `- **Statistical**: correlations, aggregations from numerical data\n\n`;
+    ctx += `**Key Question**: "Can I compute this feature from the available columns?"\n\n`;
+
     for (const d of dsRes.data) {
       ctx += `### ${d.name} (${d.id})\n`;
       ctx += `Domain: ${d.domain || "unspecified"}\n`;
@@ -505,28 +600,66 @@ server.prompt(
       ctx += `Columns: ${cols}\n`;
       ctx += `Target: ${d.targetColumnName}\n`;
       if (d.description) ctx += `${d.description}\n`;
+
+      // Add extractability info
+      const extractabilityMap: Record<string, string> = {
+        "ds-1": "Text sentiment, length, readability; User karma; Temporal patterns",
+        "ds-2": "Brightness, color distribution; Face count, objects (VLM); Composition",
+        "ds-3": "Tweet sentiment, hashtags, length; Engagement metrics",
+        "ds-4": "Same as LaMem + attention gaze patterns",
+      };
+      ctx += `**→ Extractable**: ${extractabilityMap[d.id] || "Check columns for possibilities"}\n`;
       ctx += `\n`;
     }
 
-    ctx += `## Example Hypotheses (top-rated, completed)\n\n`;
-    for (const h of hypRes.data) {
-      ctx += `**${h.statement}**\n`;
-      ctx += `Rationale: ${h.rationale}\n`;
-      const domains = Array.isArray(h.domain) ? h.domain.join(", ") : h.domain;
-      ctx += `Domain: ${domains} | Problem: ${h.problemStatement}\n`;
-      ctx += `Status: ${h.status}`;
-      if (h.arenaElo) ctx += ` | ELO: ${h.arenaElo}`;
-      if (h.pValue != null) ctx += ` | p=${h.pValue}, d=${h.effectSize}`;
-      ctx += `\n\n`;
+    // Sample diverse hypotheses across domains (max 2 per domain, ELO > 1400)
+    const domainCounts = new Map<string, number>();
+    const sampled = hypRes.data
+      .filter((h: any) => h.phase === "completed" && (h.arenaElo || 0) > 1400)
+      .filter((h: any) => {
+        const d = Array.isArray(h.domain) ? h.domain[0] : h.domain;
+        const count = domainCounts.get(d) || 0;
+        if (count < 2) {
+          domainCounts.set(d, count + 1);
+          return true;
+        }
+        return false;
+      })
+      .slice(0, 8);
+
+    ctx += `## Example Hypotheses (top-rated, diverse domains)\n\n`;
+    if (sampled.length === 0) {
+      ctx += `(No completed hypotheses available yet — be the first!)\n\n`;
+    } else {
+      for (const h of sampled) {
+        ctx += `**${h.statement}**\n`;
+        ctx += `Rationale: ${h.rationale}\n`;
+        const domains = Array.isArray(h.domain) ? h.domain.join(", ") : h.domain;
+        ctx += `Domain: ${domains} | Problem: ${h.problemStatement}\n`;
+        ctx += `Status: ${h.status}`;
+        if (h.arenaElo) ctx += ` | ELO: ${h.arenaElo}`;
+        if (h.pValue != null) ctx += ` | p=${h.pValue}, d=${h.effectSize}`;
+        ctx += `\n\n`;
+      }
     }
 
     ctx += `## Your Workflow\n\n`;
-    ctx += `1. Understand the user's interest area\n`;
-    ctx += `2. Match to an existing problem statement or propose a new one\n`;
-    ctx += `3. Check for overlap with search_hypotheses tool\n`;
-    ctx += `4. Explain which dataset(s) could test it and how\n`;
-    ctx += `5. If NO dataset exists, clearly state this — suggest the user request one via GitHub\n`;
-    ctx += `6. Once ready, use generate_submission_url to create a pre-filled link\n`;
+    ctx += `1. **Understand the domain** — ANY domain, not just persuasion/memorability\n`;
+    ctx += `2. **Identify extractable features** from available datasets:\n`;
+    ctx += `   - What columns exist? (text, image_path, timestamp, etc.)\n`;
+    ctx += `   - What can be EXTRACTED? (sentiment, brightness, duration, etc.)\n`;
+    ctx += `   - What CANNOT be extracted? (mood, intent, external info)\n`;
+    ctx += `3. **Check for duplicates** with search_hypotheses tool across ALL domains\n`;
+    ctx += `4. **Match or propose problem statement**:\n`;
+    ctx += `   - Existing: pick from list\n`;
+    ctx += `   - New: propose it! (will have no dataset initially, can be added later)\n`;
+    ctx += `5. **Explain extraction method** — EXACTLY how the feature would be extracted:\n`;
+    ctx += `   "We'd extract brightness using code to read pixel RGB values"\n`;
+    ctx += `   "We'd extract sentiment using an LLM prompt on the text field"\n`;
+    ctx += `   "We'd count faces using a VLM on the image_path field"\n`;
+    ctx += `6. **If NO dataset exists**: State clearly, suggest user finds one on Hugging Face\n`;
+    ctx += `   and proposes it via GitHub PR (see /contribute page)\n`;
+    ctx += `7. **Generate submission URL** with generate_submission_url tool\n`;
 
     if (idea) {
       ctx += `\n## User's Idea\n\n`;
@@ -534,8 +667,10 @@ server.prompt(
       ctx += `Help them develop this into a testable hypothesis for the platform.\n`;
     } else {
       ctx += `\n## Getting Started\n\n`;
-      ctx += `Ask the user what area they're interested in or what they think `;
-      ctx += `might be true about persuasion or memorability.\n`;
+      ctx += `Ask the user what domain interests them (persuasion, memory, attention, `;
+      ctx += `learning, decision-making, etc.) and what they think might be true. `;
+      ctx += `ALL scientific domains welcome! If they have a vague idea, help them `;
+      ctx += `identify which features can be EXTRACTED from available data.\n`;
     }
 
     return {
@@ -554,10 +689,7 @@ server.prompt(
   "Brainstorm new hypothesis ideas. Loads existing hypotheses, results, " +
     "and gaps to inspire new research directions.",
   {
-    domain: z
-      .enum(["persuasion", "memorability"])
-      .optional()
-      .describe("Focus on a specific domain"),
+    domain: z.string().optional().describe("Focus on a specific domain (any string)"),
   },
   async ({ domain }) => {
     const params = new URLSearchParams({ sort: "top_rated", limit: "20" });
@@ -568,8 +700,12 @@ server.prompt(
       api<{ data: any[] }>("/api/problem-statements?includeDatasets=true"),
     ]);
 
-    let ctx = `You are co-ideating new research hypotheses with a user on `;
-    ctx += `OpenExperiments.\n\n`;
+    let ctx = `You are co-ideating new research hypotheses with a user on OpenExperiments. `;
+    ctx += `Explore ANY domain—not just persuasion/memorability. Focus on features `;
+    ctx += `that can be EXTRACTED from available datasets:\n`;
+    ctx += `- Code-based: brightness, length, counts\n`;
+    ctx += `- LLM-based: sentiment, topics, named entities\n`;
+    ctx += `- VLM-based: faces, objects, scenes\n\n`;
 
     ctx += `## Existing Hypotheses\n\n`;
     for (const h of hypRes.data) {
@@ -591,16 +727,19 @@ server.prompt(
     }
 
     ctx += `\n## How to Brainstorm\n\n`;
-    ctx += `1. Identify gaps — what hasn't been tested yet?\n`;
-    ctx += `2. Find contradictions — which results conflict?\n`;
-    ctx += `3. Suggest extensions — combine two existing ideas?\n`;
-    ctx += `4. Explore adjacent areas — what related phenomena could matter?\n`;
-    ctx += `5. When the user likes an idea, formulate it and use generate_submission_url\n`;
+    ctx += `1. **Identify gaps** — What features haven't been tested?\n`;
+    ctx += `   Consider: texture, motion, temporal patterns, cross-modal effects\n`;
+    ctx += `2. **Find contradictions** — Which results conflict? Why?\n`;
+    ctx += `3. **Suggest extensions** — Combine existing ideas or test new domains\n`;
+    ctx += `4. **Check extractability** — Can the feature be computed from existing data?\n`;
+    ctx += `5. **Propose new domains** — Beyond persuasion/memorability:\n`;
+    ctx += `   attention, learning, memory consolidation, decision-making, perception\n`;
+    ctx += `6. When the user likes an idea, use generate_submission_url\n\n`;
 
-    if (domain) ctx += `\nFocus area: **${domain}**\n`;
+    if (domain) ctx += `Focus area: **${domain}** (but feel free to explore adjacent domains)\n`;
 
-    ctx += `\nStart by summarizing what's been explored and suggest 2-3 `;
-    ctx += `unexplored directions.\n`;
+    ctx += `\nStart by summarizing what's been explored, identify extractability `;
+    ctx += `constraints, and suggest 2-3 testable directions.\n`;
 
     return {
       messages: [
@@ -630,12 +769,34 @@ An open platform where anyone — humans and AI — can submit a scientific
 hypothesis, have the community vote on it, and see AI agents test it
 against real-world data. Democratising science, one hypothesis at a time.
 
+## ExperiGen Philosophy: Feature Extractability
+
+**Core principle**: Hypotheses test features COMPUTABLE from existing data.
+
+**✅ EXTRACTABLE (You can test this)**:
+- Brightness, color, contrast → from image pixel RGB values
+- Sentiment, tone, complexity → from text using NLP/LLMs
+- Face count, object types, scene category → from images using VLMs
+- Duration, frequency, patterns → from timestamps/structured data
+- Post history, engagement → from user metadata (if not anonymized)
+
+**❌ NOT EXTRACTABLE (Need new data collection)**:
+- Viewer's mood or emotions → not stored in any field
+- Author's true underlying intent → can't measure from text alone
+- Cultural significance → requires external cultural knowledge
+- Temporal patterns → need timestamp field (check if available!)
+- User demographics → need user data (check if anonymized!)
+
+**Think**: "Can I compute this using the available columns + AI/code?"
+
 ## Domains
 
-- **Persuasion**: What makes arguments persuasive in online discourse
-  (datasets: Reddit ChangeMyView, Twitter Persuasion Pairs)
-- **Memorability**: What makes images memorable
-  (datasets: LaMem, Visual Attention & Memorability)
+- **Persuasion**: What makes arguments persuasive (Reddit CMV, Twitter)
+- **Memorability**: What makes images memorable (LaMem, Visual Attention)
+- **[Propose New]**: Attention, learning, memory, decision-making, perception...
+
+Any scientific domain is welcome! Problem statements can be proposed even
+without initial datasets—find or suggest datasets later via GitHub PR.
 
 ## Hypothesis Lifecycle
 

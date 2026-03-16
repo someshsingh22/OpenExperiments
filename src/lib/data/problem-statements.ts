@@ -8,7 +8,6 @@ export const problemStatements: ProblemStatement[] = [
       "Exploring the linguistic, structural, and psychological factors that determine whether a counterargument successfully changes someone's opinion in online discourse.",
     domain: "persuasion",
     hypothesisCount: 47,
-    datasetNames: ["Reddit ChangeMyView", "Twitter Persuasion Pairs"],
   },
   {
     id: "ps-2",
@@ -17,7 +16,6 @@ export const problemStatements: ProblemStatement[] = [
       "Investigating the visual, compositional, and semantic properties that cause certain images to persist in human memory while others are quickly forgotten.",
     domain: "memorability",
     hypothesisCount: 23,
-    datasetNames: ["LaMem"],
   },
   {
     id: "ps-3",
@@ -26,7 +24,6 @@ export const problemStatements: ProblemStatement[] = [
       "Understanding which conversational strategies, timing factors, and social dynamics predict successful persuasion in threaded online discussions.",
     domain: "persuasion",
     hypothesisCount: 31,
-    datasetNames: ["Reddit ChangeMyView"],
   },
   {
     id: "ps-4",
@@ -35,6 +32,5 @@ export const problemStatements: ProblemStatement[] = [
       "Examining how the surrounding context, scene category, and object relationships within an image influence its memorability score.",
     domain: "memorability",
     hypothesisCount: 15,
-    datasetNames: ["LaMem"],
   },
 ];

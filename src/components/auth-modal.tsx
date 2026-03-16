@@ -80,7 +80,8 @@ export function AuthModal() {
       <div className="relative mx-4 w-full max-w-sm rounded-xl border border-stone-200 bg-white p-6 shadow-2xl">
         <button
           onClick={close}
-          className="absolute top-3 right-3 rounded-md p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-600"
+          aria-label="Close dialog"
+          className="absolute top-3 right-3 rounded-md p-1 text-stone-500 hover:bg-stone-100 hover:text-stone-700"
         >
           <X className="h-4 w-4" />
         </button>
@@ -128,7 +129,7 @@ export function AuthModal() {
 
         <div className="my-5 flex items-center gap-3">
           <div className="h-px flex-1 bg-stone-200" />
-          <span className="text-xs text-stone-400">or use email</span>
+          <span className="text-xs text-stone-500">or use email</span>
           <div className="h-px flex-1 bg-stone-200" />
         </div>
 

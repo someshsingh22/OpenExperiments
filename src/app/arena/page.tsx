@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { Star, Share2, Copy, Twitter, Linkedin, Brain, Cpu } from "lucide-react";
-import { getArenaRankings, getMatchup, castVote, toggleStar } from "@/lib/api";
+import { getArenaRankings, getMatchup, castVote, toggleStar, getStarsBatch } from "@/lib/api";
 import { useAuth } from "@/components/auth-provider";
 import { DomainTag } from "@/components/domain-tag";
 import type { Domain } from "@/lib/types";
@@ -159,32 +159,24 @@ export default function ArenaPage() {
     getArenaRankings().then((res) => setLeaderboard(res.data));
   }, []);
 
-  // Load star status for matchup hypotheses
+  // Load star status for matchup hypotheses (batch)
   useEffect(() => {
     if (!user || !matchup) return;
     const ids = [matchup.hypothesisA?.id, matchup.hypothesisB?.id].filter(Boolean) as string[];
     if (ids.length === 0) return;
-    Promise.all(
-      ids.map((id) =>
-        fetch(`/api/hypotheses/${id}/star`)
-          .then((res) => res.json())
-          .then((res) => {
-            const data = (res as { data: { count: number; starred: boolean } }).data;
-            return { id, count: data.count, starred: data.starred };
-          })
-          .catch(() => ({ id, count: 0, starred: false })),
-      ),
-    ).then((results) => {
-      const newStarred = new Set<string>(starredIds);
-      const newCounts = new Map<string, number>(starCounts);
-      for (const r of results) {
-        if (r.starred) newStarred.add(r.id);
-        else newStarred.delete(r.id);
-        newCounts.set(r.id, r.count);
-      }
-      setStarredIds(newStarred);
-      setStarCounts(newCounts);
-    });
+    getStarsBatch(ids)
+      .then((res) => {
+        const newStarred = new Set<string>(starredIds);
+        const newCounts = new Map<string, number>(starCounts);
+        for (const [id, status] of Object.entries(res.data)) {
+          if (status.starred) newStarred.add(id);
+          else newStarred.delete(id);
+          newCounts.set(id, status.count);
+        }
+        setStarredIds(newStarred);
+        setStarCounts(newCounts);
+      })
+      .catch(() => {});
   }, [user, matchup]);
 
   const handleStar = useCallback(

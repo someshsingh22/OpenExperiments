@@ -2,7 +2,7 @@ export const runtime = "edge";
 
 import { getDB } from "@/db";
 import { hypotheses, experiments, experimentResults, comments } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { getWinRate } from "@/lib/arena-stats";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -23,22 +23,20 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const expIds = exps.map((e) => e.id);
   const results: Record<string, typeof experimentResults.$inferSelect> = {};
   if (expIds.length > 0) {
-    // Fetch all results for all experiments
-    for (const exp of exps) {
-      const [result] = await db
-        .select()
-        .from(experimentResults)
-        .where(eq(experimentResults.experimentId, exp.id))
-        .limit(1);
-      if (result) results[exp.id] = result;
+    const allResults = await db
+      .select()
+      .from(experimentResults)
+      .where(inArray(experimentResults.experimentId, expIds));
+    for (const r of allResults) {
+      results[r.experimentId] = r;
     }
   }
 
   // Fetch comments with author info
   const comms = await db.select().from(comments).where(eq(comments.hypothesisId, id));
 
-  // Compute win rate
-  const winRate = await getWinRate(db, id);
+  // Win rate: use denormalized column, fall back to computing from matchups
+  const winRate = hypothesis.winRate ?? (await getWinRate(db, id));
 
   // Actual discussion comment count
   const actualCommentCount = comms.length;
@@ -47,64 +45,69 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const isAnon = hypothesis.isAnonymous === 1;
   const isOwner = viewer?.id != null && hypothesis.submittedBy === viewer.id;
 
-  return Response.json({
-    data: {
-      id: hypothesis.id,
-      statement: hypothesis.statement,
-      rationale: hypothesis.rationale,
-      source: hypothesis.source,
-      agentName: hypothesis.agentName,
-      domain: hypothesis.domains,
-      problemStatement: hypothesis.problemStatement,
-      status: hypothesis.status,
-      phase: hypothesis.phase,
-      submittedAt: new Date(hypothesis.submittedAt * 1000).toISOString().split("T")[0],
-      submittedBy: isAnon && !isOwner ? null : hypothesis.submittedBy,
-      isAnonymous: isAnon,
-      arenaElo: hypothesis.arenaElo,
-      winRate,
-      evidenceScore: hypothesis.evidenceScore,
-      pValue: hypothesis.pValue,
-      effectSize: hypothesis.effectSize,
-      commentCount: actualCommentCount,
-      citationDois: hypothesis.citationDois,
-      relatedHypothesisIds: hypothesis.relatedHypothesisIds,
+  return Response.json(
+    {
+      data: {
+        id: hypothesis.id,
+        statement: hypothesis.statement,
+        rationale: hypothesis.rationale,
+        source: hypothesis.source,
+        agentName: hypothesis.agentName,
+        domain: hypothesis.domains,
+        problemStatement: hypothesis.problemStatement,
+        status: hypothesis.status,
+        phase: hypothesis.phase,
+        submittedAt: new Date(hypothesis.submittedAt * 1000).toISOString().split("T")[0],
+        submittedBy: isAnon && !isOwner ? null : hypothesis.submittedBy,
+        isAnonymous: isAnon,
+        arenaElo: hypothesis.arenaElo,
+        winRate,
+        evidenceScore: hypothesis.evidenceScore,
+        pValue: hypothesis.pValue,
+        effectSize: hypothesis.effectSize,
+        commentCount: actualCommentCount,
+        citationDois: hypothesis.citationDois,
+        relatedHypothesisIds: hypothesis.relatedHypothesisIds,
+      },
+      experiments: exps.map((e) => ({
+        id: e.id,
+        hypothesisId: e.hypothesisId,
+        type: e.type,
+        status: e.status,
+        datasetName: e.datasetName,
+        methodology: e.methodology,
+        startedAt: new Date(e.startedAt * 1000).toISOString().split("T")[0],
+        completedAt: e.completedAt
+          ? new Date(e.completedAt * 1000).toISOString().split("T")[0]
+          : undefined,
+        osfLink: e.osfLink,
+        results: results[e.id]
+          ? {
+              pValue: results[e.id].pValue,
+              effectSize: results[e.id].effectSize,
+              confidenceInterval: [
+                results[e.id].confidenceIntervalLow,
+                results[e.id].confidenceIntervalHigh,
+              ],
+              sampleSize: results[e.id].sampleSize,
+              summary: results[e.id].summary,
+              uplift: results[e.id].uplift,
+            }
+          : undefined,
+      })),
+      comments: comms.map((c) => ({
+        id: c.id,
+        hypothesisId: c.hypothesisId,
+        body: c.body,
+        doi: c.doi,
+        createdAt: new Date(c.createdAt * 1000).toISOString().split("T")[0],
+        parentId: c.parentId,
+      })),
     },
-    experiments: exps.map((e) => ({
-      id: e.id,
-      hypothesisId: e.hypothesisId,
-      type: e.type,
-      status: e.status,
-      datasetName: e.datasetName,
-      methodology: e.methodology,
-      startedAt: new Date(e.startedAt * 1000).toISOString().split("T")[0],
-      completedAt: e.completedAt
-        ? new Date(e.completedAt * 1000).toISOString().split("T")[0]
-        : undefined,
-      osfLink: e.osfLink,
-      results: results[e.id]
-        ? {
-            pValue: results[e.id].pValue,
-            effectSize: results[e.id].effectSize,
-            confidenceInterval: [
-              results[e.id].confidenceIntervalLow,
-              results[e.id].confidenceIntervalHigh,
-            ],
-            sampleSize: results[e.id].sampleSize,
-            summary: results[e.id].summary,
-            uplift: results[e.id].uplift,
-          }
-        : undefined,
-    })),
-    comments: comms.map((c) => ({
-      id: c.id,
-      hypothesisId: c.hypothesisId,
-      body: c.body,
-      doi: c.doi,
-      createdAt: new Date(c.createdAt * 1000).toISOString().split("T")[0],
-      parentId: c.parentId,
-    })),
-  });
+    {
+      headers: { "Cache-Control": "public, max-age=120, s-maxage=600" },
+    },
+  );
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {

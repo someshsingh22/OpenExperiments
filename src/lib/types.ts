@@ -1,7 +1,7 @@
 export type HypothesisStatus = "proposed" | "arena_ranked" | "data_tested" | "field_validated";
 export type Phase = "live" | "completed";
 export type Source = "human" | "ai_agent";
-export type Domain = "persuasion" | "memorability";
+export type Domain = string;
 
 export interface Hypothesis {
   id: string;

@@ -7,10 +7,10 @@ import { getProblemStatements, submitHypothesis } from "@/lib/api";
 import { EvidenceBadge } from "@/components/evidence-badge";
 import { DomainTag } from "@/components/domain-tag";
 import { useAuth } from "@/components/auth-provider";
-import { ChevronDown, Check, EyeOff, User } from "lucide-react";
+import { Check, EyeOff, User, Search, X, Plus } from "lucide-react";
 import type { Domain, ProblemStatement } from "@/lib/types";
 
-const DOMAINS: Domain[] = ["persuasion", "memorability"];
+const WELL_KNOWN_DOMAINS: string[] = ["persuasion", "memorability"];
 
 export default function SubmitPage() {
   return (
@@ -30,12 +30,19 @@ function SubmitContent() {
   const { user, loading: authLoading, setShowAuthModal } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [selectedPS, setSelectedPS] = useState<string | null>(null);
-  const [customQ, setCustomQ] = useState("");
-  const [showCustom, setShowCustom] = useState(false);
+
+  // Problem statement state
+  const [psQuery, setPsQuery] = useState("");
+  const [selectedExistingPS, setSelectedExistingPS] = useState<ProblemStatement | null>(null);
+  const [isProposingNew, setIsProposingNew] = useState(false);
+  const [newPsDomain, setNewPsDomain] = useState<string | null>(null);
+  const [showCustomDomainInput, setShowCustomDomainInput] = useState(false);
+  const [customDomainInput, setCustomDomainInput] = useState("");
+  const [psDropdownOpen, setPsDropdownOpen] = useState(false);
+  const psRef = useRef<HTMLDivElement>(null);
+
   const [statement, setStatement] = useState("");
   const [rationale, setRationale] = useState("");
-  const [selectedDomains, setSelectedDomains] = useState<Domain[]>([]);
   const [doi, setDoi] = useState("");
   const [suggestedTest, setSuggestedTest] = useState("");
   const [showOptional, setShowOptional] = useState(false);
@@ -52,6 +59,23 @@ function SubmitContent() {
   const [redirectCountdown, setRedirectCountdown] = useState(3);
   const redirectTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Derived values
+  const activeDomains: Domain[] = selectedExistingPS
+    ? [selectedExistingPS.domain]
+    : isProposingNew && newPsDomain
+      ? [newPsDomain]
+      : [];
+
+  const problemStatementText = selectedExistingPS
+    ? selectedExistingPS.question
+    : isProposingNew
+      ? psQuery
+      : "";
+
+  const filteredPS = psQuery.trim()
+    ? problemStatements.filter((ps) => ps.question.toLowerCase().includes(psQuery.toLowerCase()))
+    : problemStatements;
+
   useEffect(() => {
     getProblemStatements().then((res) => setProblemStatements(res.data));
   }, []);
@@ -60,6 +84,17 @@ function SubmitContent() {
     return () => {
       if (redirectTimerRef.current) clearInterval(redirectTimerRef.current);
     };
+  }, []);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (psRef.current && !psRef.current.contains(e.target as Node)) {
+        setPsDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, []);
 
   // Pre-fill from URL params (e.g., MCP-generated submission links)
@@ -73,31 +108,39 @@ function SubmitContent() {
 
     if (urlStatement) setStatement(urlStatement);
     if (urlRationale) setRationale(urlRationale);
-    if (urlPS) setSelectedPS(urlPS);
-    if (urlCustomPS) {
-      setShowCustom(true);
-      setCustomQ(urlCustomPS);
-    }
-    if (urlDomains) {
-      const parsed = urlDomains
-        .split(",")
-        .filter((d): d is Domain => DOMAINS.includes(d as Domain));
-      if (parsed.length > 0) setSelectedDomains(parsed);
-    }
     if (urlSource === "ai_agent") setGeneratorType("AI");
-  }, [searchParams]);
 
-  const toggleDomain = (d: Domain) => {
-    setSelectedDomains((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));
+    // Pre-fill PS from URL — needs problemStatements to be loaded
+    if (urlPS && problemStatements.length > 0) {
+      const match = problemStatements.find((ps) => ps.id === urlPS);
+      if (match) {
+        setSelectedExistingPS(match);
+        setPsQuery(match.question);
+      }
+    } else if (urlCustomPS) {
+      setPsQuery(urlCustomPS);
+      setIsProposingNew(true);
+      if (urlDomains) {
+        const parsed = urlDomains.split(",").filter((d) => d.trim());
+        if (parsed.length > 0) setNewPsDomain(parsed[0]);
+      }
+    }
+  }, [searchParams, problemStatements]);
+
+  const clearPsSelection = () => {
+    setSelectedExistingPS(null);
+    setIsProposingNew(false);
+    setNewPsDomain(null);
+    setShowCustomDomainInput(false);
+    setCustomDomainInput("");
+    setPsQuery("");
+    setFieldErrors((p) => ({ ...p, problemStatement: "", domains: "" }));
   };
 
   const resetForm = () => {
-    setSelectedPS(null);
-    setCustomQ("");
-    setShowCustom(false);
+    clearPsSelection();
     setStatement("");
     setRationale("");
-    setSelectedDomains([]);
     setDoi("");
     setSuggestedTest("");
     setShowOptional(false);
@@ -192,6 +235,8 @@ function SubmitContent() {
   const inputClass =
     "w-full rounded-md border border-stone-200 px-3 py-2.5 text-base text-stone-800 placeholder-stone-400 transition-colors focus:border-stone-300 focus:outline-none focus:ring-1 focus:ring-stone-300";
 
+  const psHasSelection = selectedExistingPS !== null || isProposingNew;
+
   return (
     <div className="mx-auto max-w-xl px-4 py-10 sm:px-6 sm:py-14">
       <header className="mb-10 text-center">
@@ -210,7 +255,6 @@ function SubmitContent() {
           setSubmitError("");
           setFieldErrors({});
 
-          // Client-side basic validation
           const errors: Record<string, string> = {};
           if (!statement.trim()) errors.statement = "Please provide your hypothesis";
           else if (statement.trim().length < 10)
@@ -218,12 +262,13 @@ function SubmitContent() {
           if (!rationale.trim()) errors.rationale = "Please provide your rationale";
           else if (rationale.trim().length < 10)
             errors.rationale = "Rationale must be at least 10 characters";
-          const psQuestion = showCustom
-            ? customQ
-            : problemStatements.find((ps) => ps.id === selectedPS)?.question || "";
-          if (!psQuestion.trim())
-            errors.problemStatement = "Please select or enter a problem statement";
-          if (selectedDomains.length === 0) errors.domains = "Please select at least one domain";
+          if (!problemStatementText.trim())
+            errors.problemStatement = "Please select or propose a problem statement";
+          if (activeDomains.length === 0) {
+            errors.domains = isProposingNew
+              ? "Please select a domain for your new problem statement"
+              : "Please select a problem statement first";
+          }
 
           if (Object.keys(errors).length > 0) {
             setFieldErrors(errors);
@@ -237,8 +282,8 @@ function SubmitContent() {
             const res = await submitHypothesis({
               statement,
               rationale,
-              problemStatement: psQuestion,
-              domains: selectedDomains,
+              problemStatement: problemStatementText,
+              domains: activeDomains,
               source,
               citationDois: doi ? [doi] : [],
               isAnonymous,
@@ -308,56 +353,247 @@ function SubmitContent() {
           )}
         </div>
 
-        {/* Problem statement */}
+        {/* Problem statement — combobox */}
         <div>
-          <label htmlFor="ps" className="mb-1.5 block text-sm font-semibold text-stone-700">
+          <label className="mb-1 block text-sm font-semibold text-stone-700">
             Problem statement
           </label>
+          <p className="mb-2 text-xs text-stone-500">
+            Pick an existing problem statement or propose a new one
+          </p>
           {fieldErrors.problemStatement && (
             <p className="mb-1.5 text-xs text-red-500">{fieldErrors.problemStatement}</p>
           )}
-          {!showCustom ? (
-            <>
-              <div className="relative">
-                <select
-                  id="ps"
-                  value={selectedPS ?? ""}
-                  onChange={(e) => setSelectedPS(e.target.value || null)}
-                  className={`${inputClass} appearance-none pr-9`}
+          {fieldErrors.domains && (
+            <p className="mb-1.5 text-xs text-red-500">{fieldErrors.domains}</p>
+          )}
+
+          {psHasSelection ? (
+            /* Selected state — show chosen PS as a card */
+            <div className="rounded-md border border-stone-200 bg-stone-50/50 p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1 flex items-center gap-1.5">
+                    {activeDomains[0] && <DomainTag domain={activeDomains[0]} />}
+                    {isProposingNew && (
+                      <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-600">
+                        New
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-stone-700">
+                    {selectedExistingPS ? selectedExistingPS.question : psQuery}
+                  </p>
+                  {selectedExistingPS && (
+                    <p className="mt-0.5 text-[11px] text-stone-400">
+                      {selectedExistingPS.hypothesisCount} hypothesis
+                      {selectedExistingPS.hypothesisCount !== 1 ? "es" : ""}
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={clearPsSelection}
+                  className="shrink-0 rounded p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-600"
+                  title="Change problem statement"
                 >
-                  <option value="">Select a question...</option>
-                  {problemStatements.map((ps) => (
-                    <option key={ps.id} value={ps.id}>
-                      {ps.question}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-stone-300" />
+                  <X className="h-4 w-4" />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowCustom(true)}
-                className="mt-1.5 text-xs font-semibold text-stone-500 hover:text-stone-700"
-              >
-                Or propose a new question
-              </button>
-            </>
+
+              {/* Domain picker — only for new problem statements */}
+              {isProposingNew && (
+                <div className="mt-3 border-t border-stone-200 pt-3">
+                  <label className="mb-1.5 block text-xs font-medium text-stone-500">
+                    Domain for this problem statement
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {WELL_KNOWN_DOMAINS.map((d) => {
+                      const sel = newPsDomain === d;
+                      return (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => {
+                            setNewPsDomain(d);
+                            setShowCustomDomainInput(false);
+                            setCustomDomainInput("");
+                            setFieldErrors((p) => ({ ...p, domains: "" }));
+                          }}
+                          className={`inline-flex items-center rounded-md px-3 py-1.5 text-sm font-semibold capitalize transition-colors ${
+                            sel
+                              ? "bg-stone-900 text-white"
+                              : "border border-stone-200 text-stone-600 hover:border-stone-300 hover:text-stone-800"
+                          }`}
+                        >
+                          {sel && <Check className="mr-1.5 h-3.5 w-3.5" />}
+                          {d}
+                        </button>
+                      );
+                    })}
+                    {!showCustomDomainInput ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowCustomDomainInput(true);
+                          setNewPsDomain(null);
+                        }}
+                        className={`inline-flex items-center gap-1 rounded-md border border-dashed px-3 py-1.5 text-sm font-medium transition-colors ${
+                          newPsDomain && !WELL_KNOWN_DOMAINS.includes(newPsDomain)
+                            ? "border-stone-900 bg-stone-900 text-white"
+                            : "border-stone-300 text-stone-500 hover:border-stone-400 hover:text-stone-700"
+                        }`}
+                      >
+                        {newPsDomain && !WELL_KNOWN_DOMAINS.includes(newPsDomain) ? (
+                          <>
+                            <Check className="h-3.5 w-3.5" />
+                            {newPsDomain}
+                          </>
+                        ) : (
+                          <>
+                            <Plus className="h-3.5 w-3.5" />
+                            New Domain
+                          </>
+                        )}
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="text"
+                          value={customDomainInput}
+                          onChange={(e) => setCustomDomainInput(e.target.value.toLowerCase())}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              const val = customDomainInput.trim();
+                              if (val) {
+                                setNewPsDomain(val);
+                                setShowCustomDomainInput(false);
+                                setFieldErrors((p) => ({ ...p, domains: "" }));
+                              }
+                            }
+                          }}
+                          placeholder="e.g. decision-making"
+                          autoFocus
+                          className="w-40 rounded-md border border-stone-300 px-2.5 py-1.5 text-sm text-stone-800 placeholder-stone-400 focus:border-stone-400 focus:ring-1 focus:ring-stone-300 focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const val = customDomainInput.trim();
+                            if (val) {
+                              setNewPsDomain(val);
+                              setShowCustomDomainInput(false);
+                              setFieldErrors((p) => ({ ...p, domains: "" }));
+                            }
+                          }}
+                          disabled={!customDomainInput.trim()}
+                          className="rounded-md bg-stone-900 px-2.5 py-1.5 text-sm font-medium text-white transition-colors hover:bg-stone-800 disabled:opacity-40"
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowCustomDomainInput(false);
+                            setCustomDomainInput("");
+                          }}
+                          className="rounded-md p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-600"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           ) : (
-            <div className="space-y-1.5">
-              <input
-                type="text"
-                value={customQ}
-                onChange={(e) => setCustomQ(e.target.value)}
-                placeholder="Your question..."
-                className={inputClass}
-              />
-              <button
-                type="button"
-                onClick={() => setShowCustom(false)}
-                className="text-xs font-semibold text-stone-500 hover:text-stone-700"
-              >
-                Choose from existing
-              </button>
+            /* Search state — combobox input with dropdown */
+            <div ref={psRef} className="relative">
+              <div className="relative">
+                <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-stone-400" />
+                <input
+                  type="text"
+                  value={psQuery}
+                  onChange={(e) => {
+                    setPsQuery(e.target.value);
+                    setPsDropdownOpen(true);
+                    setFieldErrors((p) => ({ ...p, problemStatement: "", domains: "" }));
+                  }}
+                  onFocus={() => setPsDropdownOpen(true)}
+                  placeholder="Search or type a new problem statement..."
+                  className={`${inputClass} pl-9`}
+                />
+              </div>
+
+              {psDropdownOpen && (
+                <div className="absolute z-10 mt-1 max-h-72 w-full overflow-y-auto rounded-md border border-stone-200 bg-white shadow-lg">
+                  {filteredPS.length > 0 && (
+                    <>
+                      <div className="px-3 py-1.5 text-[10px] font-medium tracking-wider text-stone-400 uppercase">
+                        Existing problem statements
+                      </div>
+                      {filteredPS.map((ps) => (
+                        <button
+                          key={ps.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedExistingPS(ps);
+                            setPsQuery(ps.question);
+                            setPsDropdownOpen(false);
+                            setFieldErrors((p) => ({ ...p, problemStatement: "", domains: "" }));
+                          }}
+                          className="w-full border-b border-stone-100 px-3 py-2 text-left transition-colors last:border-0 hover:bg-stone-50"
+                        >
+                          <div className="mb-0.5 flex items-center gap-1.5">
+                            <DomainTag domain={ps.domain} />
+                            <span className="text-[10px] text-stone-400">
+                              {ps.hypothesisCount} hypothesis{ps.hypothesisCount !== 1 ? "es" : ""}
+                            </span>
+                          </div>
+                          <p className="text-sm text-stone-700">{ps.question}</p>
+                        </button>
+                      ))}
+                    </>
+                  )}
+
+                  {psQuery.trim() && (
+                    <>
+                      {filteredPS.length > 0 && <div className="border-t border-stone-200" />}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsProposingNew(true);
+                          setPsDropdownOpen(false);
+                          setFieldErrors((p) => ({ ...p, problemStatement: "" }));
+                        }}
+                        className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-teal-50"
+                      >
+                        <Plus className="h-4 w-4 shrink-0 text-teal-600" />
+                        <div className="min-w-0">
+                          <span className="text-sm font-medium text-teal-700">
+                            Propose as new problem statement
+                          </span>
+                          <p className="truncate text-xs text-stone-500">&ldquo;{psQuery}&rdquo;</p>
+                        </div>
+                      </button>
+                    </>
+                  )}
+
+                  {filteredPS.length === 0 && !psQuery.trim() && (
+                    <div className="px-3 py-4 text-center text-sm text-stone-400">
+                      Start typing to search or propose a new one
+                    </div>
+                  )}
+
+                  {filteredPS.length === 0 && psQuery.trim() && (
+                    <div className="border-b border-stone-100 px-3 py-3 text-center text-xs text-stone-400">
+                      No existing problem statements match
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -406,34 +642,6 @@ function SubmitContent() {
             maxLength={5000}
           />
           <p className="mt-1 text-right text-[11px] text-stone-400">{rationale.length}/5000</p>
-        </div>
-
-        {/* Domain tags */}
-        <div>
-          <label className="mb-1.5 block text-sm font-semibold text-stone-700">Domain</label>
-          {fieldErrors.domains && (
-            <p className="mb-1.5 text-xs text-red-500">{fieldErrors.domains}</p>
-          )}
-          <div className="flex gap-2">
-            {DOMAINS.map((d) => {
-              const sel = selectedDomains.includes(d);
-              return (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => toggleDomain(d)}
-                  className={`inline-flex items-center rounded-md px-3 py-1.5 text-sm font-semibold capitalize transition-colors ${
-                    sel
-                      ? "bg-stone-900 text-white"
-                      : "border border-stone-200 text-stone-600 hover:border-stone-300 hover:text-stone-800"
-                  }`}
-                >
-                  {sel && <Check className="mr-1.5 h-3.5 w-3.5" />}
-                  {d}
-                </button>
-              );
-            })}
-          </div>
         </div>
 
         {/* Optional */}
@@ -485,11 +693,13 @@ function SubmitContent() {
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-1.5">
               <EvidenceBadge status="proposed" phase="live" size="sm" />
-              {selectedDomains.map((d) => (
+              {activeDomains.map((d) => (
                 <DomainTag key={d} domain={d} />
               ))}
-              {selectedDomains.length === 0 && (
-                <span className="text-[11px] text-stone-300 italic">Select domains above</span>
+              {activeDomains.length === 0 && (
+                <span className="text-[11px] text-stone-300 italic">
+                  Domain set by problem statement
+                </span>
               )}
             </div>
             <p className="text-[13px] leading-relaxed text-stone-700">

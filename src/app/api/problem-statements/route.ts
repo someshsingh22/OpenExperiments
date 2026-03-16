@@ -34,16 +34,26 @@ export async function GET(request: Request) {
         };
       }),
     );
-    return Response.json({ data });
+    return Response.json(
+      { data },
+      {
+        headers: { "Cache-Control": "public, max-age=3600, s-maxage=3600" },
+      },
+    );
   }
 
-  return Response.json({
-    data: rows.map((ps) => ({
-      id: ps.id,
-      question: ps.question,
-      description: ps.description,
-      domain: ps.domain,
-      hypothesisCount: ps.hypothesisCount,
-    })),
-  });
+  return Response.json(
+    {
+      data: rows.map((ps) => ({
+        id: ps.id,
+        question: ps.question,
+        description: ps.description,
+        domain: ps.domain,
+        hypothesisCount: ps.hypothesisCount,
+      })),
+    },
+    {
+      headers: { "Cache-Control": "public, max-age=3600, s-maxage=3600" },
+    },
+  );
 }

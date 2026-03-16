@@ -1,5 +1,5 @@
 import { arenaMatchups, hypotheses } from "@/db/schema";
-import { inArray } from "drizzle-orm";
+import { eq, or, inArray } from "drizzle-orm";
 import type { getDB } from "@/db";
 
 type DB = ReturnType<typeof getDB>;
@@ -153,4 +153,69 @@ export async function getSourceWinRates(db: DB): Promise<
   }
 
   return results.sort((a, b) => b.winRate - a.winRate);
+}
+
+/**
+ * After a vote, recompute and persist win rates for both hypotheses in a matchup.
+ * Reads only matchups involving those two hypotheses (not the whole table).
+ */
+export async function updateWinRatesForMatchup(db: DB, matchupId: string) {
+  const [matchup] = await db
+    .select()
+    .from(arenaMatchups)
+    .where(eq(arenaMatchups.id, matchupId))
+    .limit(1);
+  if (!matchup) return;
+
+  const hypIds = [matchup.hypothesisAId, matchup.hypothesisBId];
+
+  // Fetch all matchups involving either hypothesis
+  const relevant = await db
+    .select()
+    .from(arenaMatchups)
+    .where(
+      or(
+        inArray(arenaMatchups.hypothesisAId, hypIds),
+        inArray(arenaMatchups.hypothesisBId, hypIds),
+      ),
+    );
+
+  // Compute stats for each hypothesis
+  for (const hypId of hypIds) {
+    let wins = 0;
+    let ties = 0;
+    let total = 0;
+
+    for (const m of relevant) {
+      const meaningful = m.votesA + m.votesB + m.votesTie;
+      if (meaningful === 0) continue;
+
+      if (m.hypothesisAId === hypId) {
+        wins += m.votesA;
+        ties += m.votesTie;
+        total += meaningful;
+      } else if (m.hypothesisBId === hypId) {
+        wins += m.votesB;
+        ties += m.votesTie;
+        total += meaningful;
+      }
+    }
+
+    const rate = total > 0 ? Math.round(((wins + 0.5 * ties) / total) * 100) : null;
+
+    await db
+      .update(hypotheses)
+      .set({ winRate: rate, arenaWins: wins, arenaTotal: total })
+      .where(eq(hypotheses.id, hypId));
+  }
+}
+
+/**
+ * One-time backfill: compute win rates from all matchups and write to hypotheses table.
+ */
+export async function backfillWinRates(db: DB) {
+  const rates = await getAllWinRates(db);
+  for (const [id, rate] of rates) {
+    await db.update(hypotheses).set({ winRate: rate }).where(eq(hypotheses.id, id));
+  }
 }
