@@ -1,5 +1,6 @@
 export const runtime = "edge";
 
+import { cache } from "react";
 import type { Metadata } from "next";
 import { SITE_CONFIG } from "@/lib/constants";
 import { getDB } from "@/db";
@@ -11,7 +12,7 @@ interface Props {
   children: React.ReactNode;
 }
 
-async function getHypothesisData(id: string) {
+const getHypothesisData = cache(async (id: string) => {
   try {
     const db = getDB();
     const [h] = await db.select().from(hypotheses).where(eq(hypotheses.id, id)).limit(1);
@@ -19,7 +20,7 @@ async function getHypothesisData(id: string) {
   } catch {
     return null;
   }
-}
+});
 
 export async function generateMetadata({
   params,
