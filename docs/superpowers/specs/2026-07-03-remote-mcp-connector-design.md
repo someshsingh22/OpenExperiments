@@ -40,9 +40,13 @@ openexperiments-mcp  (Cloudflare Worker)
 
 ### 1. MCP Worker (`openexperiments-mcp`)
 
-New Worker package (lives alongside the current `mcp-server/`; e.g.
-`mcp-server/` gains a Worker entrypoint or a sibling `mcp-worker/` dir —
-implementation plan decides). Built on:
+**Packaging (locked): a new sibling `mcp-worker/` package** with its own
+`package.json`, `wrangler.toml`, and `tsconfig.json` — keeping the Workers runtime,
+Workers-only deps, and wrangler build fully isolated from the Node stdio package.
+The tool/prompt/resource definitions are **extracted into a small shared,
+runtime-neutral module** (no `process`, no Node built-ins — just `fetch`) that
+both `mcp-server/` (stdio) and `mcp-worker/` (HTTP) import, so there is no
+duplication and fixes land in both. Built on:
 
 - **`@cloudflare/workers-oauth-provider`** — the OAuth 2.1 authorization server.
   Serves `.well-known/oauth-authorization-server` and
@@ -52,12 +56,14 @@ implementation plan decides). Built on:
 - **`agents` SDK `McpAgent`** (a Durable Object) — mounts the MCP endpoint at
   `/sse` and `/mcp`, wrapping the MCP SDK `McpServer`. Handles the SSE /
   Streamable-HTTP handshake, protocol versioning, and session hibernation.
-- The **same 10 tools / 2 prompts / 1 resource** ported from
-  `mcp-server/src/index.ts`:
-  - `process.env` → Worker `env`.
+- The **same 10 tools / 2 prompts / 1 resource**, registered from the shared
+  module (extracted from `mcp-server/src/index.ts`):
+  - The shared module takes the API base URL + an optional per-request `appToken`
+    as parameters (no `process.env`, no Node built-ins).
   - The `api()` helper forwards the caller's `appToken` as
     `Authorization: Bearer <token>` when present.
-  - Tool/prompt/resource logic is otherwise copied verbatim.
+  - stdio (`mcp-server/`) passes `process.env` + no token; the Worker passes
+    `env` + the authenticated grant token.
 
 The authenticated user's `{ userId, appToken }` is stored in the OAuth grant
 `props` by `workers-oauth-provider` and read inside tool handlers.
