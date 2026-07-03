@@ -4,450 +4,247 @@ A platform for hypothesis generation, crowdsourced ranking, and empirical testin
 
 ## Features
 
-- **Hypothesis Submission & Discovery** - Browse and submit research hypotheses
-- **Arena Ranking System** - Elo-based pairwise comparison for hypothesis evaluation
-- **Experiment Tracking** - Link hypotheses to experiments with results and statistical analysis
-- **Problem Statements** - Organize hypotheses around key research questions
-- **Google OAuth Authentication** - Secure user authentication with session management
-- **Researcher Profiles** - Track contributions with Google Scholar integration
+- **Hypothesis Submission & Discovery** — Browse, submit, and star research hypotheses
+- **Arena Ranking** — Elo-based pairwise voting to surface the best hypotheses
+- **Experiment Tracking** — Link hypotheses to experiments with statistical results
+- **Problem Statements** — Organize hypotheses around key research questions
+- **Datasets** — Browse datasets available for experimentation
+- **Google OAuth** — Authentication with session management
+- **Researcher Profiles** — Track contributions per user
 
 ## Tech Stack
 
-- **Framework**: Next.js 16.1.6 (App Router)
-- **Runtime**: Cloudflare Pages (Edge Runtime)
-- **Database**: Cloudflare D1 (SQLite) with Drizzle ORM
-- **Authentication**: Arctic (Google OAuth)
-- **Styling**: Tailwind CSS v4
-- **Language**: TypeScript
+| Layer      | Tech                                      |
+| ---------- | ----------------------------------------- |
+| Framework  | Next.js 15.5.2 (App Router, Edge Runtime) |
+| Deployment | Cloudflare Pages                          |
+| Database   | Cloudflare D1 (SQLite) via Drizzle ORM    |
+| Auth       | Arctic (Google OAuth)                     |
+| Styling    | Tailwind CSS v4                           |
+| Language   | TypeScript                                |
 
-## Prerequisites
+## Project Structure
 
-- **Node.js** 20 or later
-- **npm** or yarn
-- **Cloudflare Account** (for deployment)
-- **Google OAuth Credentials** (for authentication)
+```
+├── src/
+│   ├── app/
+│   │   ├── api/                  # Edge API routes
+│   │   ├── arena/                # Pairwise voting UI
+│   │   ├── data/[id]/            # Dataset detail
+│   │   ├── experiments/[id]/     # Experiment detail
+│   │   ├── explore/              # Hypothesis browser
+│   │   ├── hypothesis/[id]/      # Hypothesis detail
+│   │   ├── profile/[id]/         # User profile
+│   │   └── submit/               # Submit a hypothesis
+│   ├── components/               # Shared React components
+│   ├── db/
+│   │   ├── index.ts              # D1 client (getCloudflareContext)
+│   │   └── schema.ts             # Drizzle schema
+│   └── lib/
+│       ├── api.ts                # Client-side fetch helpers
+│       ├── auth.ts               # Session resolution
+│       └── types.ts              # Shared TypeScript interfaces
+├── drizzle/migrations/           # SQL migration files
+├── mcp-server/                   # MCP server (separate package)
+├── scripts/seed.sql              # Seed data
+├── wrangler.toml                 # Cloudflare config
+└── next.config.ts                # Next.js config
+```
 
-## Local Development Setup
+## Local Development
 
-### 1. Install Dependencies
+### 1. Install dependencies
 
 ```bash
 npm install
 ```
 
-### 2. Configure Environment Variables
-
-Create a `.dev.vars` file in the project root with the following variables:
+### 2. Set up environment variables
 
 ```bash
+cp .env.example .env
+```
+
+Fill in `.env`:
+
+```env
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
 APP_URL=http://localhost:3000
-GOOGLE_CLIENT_ID=your-google-client-id
-GOOGLE_CLIENT_SECRET=your-google-client-secret
-SESSION_SECRET=your-secure-random-string-min-32-chars
+CLOUDFLARE_ACCOUNT_ID=...
+CLOUDFLARE_API_TOKEN=...
+CLOUDFLARE_D1_DATABASE_ID=...
 ```
 
-**Generate a secure SESSION_SECRET:**
+Get Google OAuth credentials at [console.cloud.google.com](https://console.cloud.google.com) — add `http://localhost:3000/api/auth/google/callback` as an authorized redirect URI.
+
+### 3. Set up local D1 database
 
 ```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+npm run wrangler -- d1 migrations apply openexperiments-db --local
+npm run wrangler -- d1 execute openexperiments-db --local --file=scripts/seed.sql
 ```
 
-**Get Google OAuth Credentials:**
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select existing
-3. Enable Google+ API
-4. Create OAuth 2.0 credentials
-5. Add authorized redirect URI: `http://localhost:3000/api/auth/google/callback`
-6. Copy Client ID and Client Secret to `.dev.vars`
-
-### 3. Set Up Local D1 Database
-
-Apply the database schema:
-
-```bash
-wrangler d1 execute openexperiments-db --local --file=./drizzle/migrations/0000_certain_butterfly.sql
-```
-
-Seed with initial data:
-
-```bash
-wrangler d1 execute openexperiments-db --local --file=./scripts/seed.sql
-```
-
-### 4. Run Development Server
+### 4. Start the dev server
 
 ```bash
 npm run dev
 ```
 
-Visit [http://localhost:3000](http://localhost:3000)
+Visit [http://localhost:3000](http://localhost:3000).
 
-## Database Management
+## Database
 
-### Refresh/Reseed Local Database
+### Schema
 
-To reload seed data (this will duplicate data if run multiple times):
+| Table                        | Purpose                    |
+| ---------------------------- | -------------------------- |
+| `users`                      | Registered users           |
+| `sessions`                   | Auth sessions              |
+| `hypotheses`                 | Core hypothesis records    |
+| `problem_statements`         | Research questions         |
+| `datasets`                   | Available datasets         |
+| `dataset_problem_statements` | Many-to-many join          |
+| `experiments`                | Linked experiments         |
+| `experiment_versions`        | Versioned experiment plans |
+| `experiment_results`         | Statistical results        |
+| `comments`                   | Hypothesis comments        |
+| `arena_matchups`             | Pairwise matchup records   |
+| `arena_votes`                | Per-user votes             |
+| `stars`                      | User stars on hypotheses   |
 
-```bash
-wrangler d1 execute openexperiments-db --local --file=./scripts/seed.sql
-```
+### Migrations
 
-To completely reset the database:
-
-```bash
-# Drop all tables and reapply schema
-wrangler d1 execute openexperiments-db --local --file=./drizzle/migrations/0000_certain_butterfly.sql
-
-# Reseed
-wrangler d1 execute openexperiments-db --local --file=./scripts/seed.sql
-```
-
-### View Database Contents
-
-**Local database:**
-
-```bash
-wrangler d1 execute openexperiments-db --local --command="SELECT * FROM hypotheses LIMIT 10"
-wrangler d1 execute openexperiments-db --local --command="SELECT * FROM users"
-wrangler d1 execute openexperiments-db --local --command="SELECT name FROM sqlite_master WHERE type='table'"
-```
-
-**Production database:**
-
-```bash
-wrangler d1 execute openexperiments-db --remote --command="SELECT COUNT(*) FROM hypotheses"
-```
-
-### Generate New Migrations
-
-After modifying `src/db/schema.ts`:
+Generate a migration after editing `src/db/schema.ts`:
 
 ```bash
 npx drizzle-kit generate
 ```
 
-This creates a new migration file in `drizzle/migrations/`.
-
-### Apply Migrations
-
-**Local:**
+Apply locally:
 
 ```bash
-wrangler d1 execute openexperiments-db --local --file=./drizzle/migrations/<new-migration-file>.sql
+npm run wrangler -- d1 migrations apply openexperiments-db --local
 ```
 
-**Production:**
+Apply to production:
 
 ```bash
-wrangler d1 execute openexperiments-db --remote --file=./drizzle/migrations/<new-migration-file>.sql
+npm run wrangler -- d1 migrations apply openexperiments-db --remote
 ```
 
-## Cloudflare Pages Deployment
-
-### Step 1: Create Production D1 Database
+### Query the database
 
 ```bash
-wrangler d1 create openexperiments-db
+# Local
+npm run wrangler -- d1 execute openexperiments-db --local --command="SELECT COUNT(*) FROM hypotheses"
+
+# Remote
+npm run wrangler -- d1 execute openexperiments-db --remote --command="SELECT COUNT(*) FROM hypotheses"
 ```
 
-**Expected output:**
+## Deployment
 
-```
-✅ Successfully created DB 'openexperiments-db'
+### Automatic (recommended)
 
-[[d1_databases]]
-binding = "DB"
-database_name = "openexperiments-db"
-database_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-```
+The repo is connected to Cloudflare Pages. Every push to `main` triggers a production deploy automatically.
 
-Copy the `database_id` from the output.
+Build settings:
 
-### Step 2: Update wrangler.toml
+- **Build command**: `npx @cloudflare/next-on-pages`
+- **Build output directory**: `.vercel/output/static`
 
-Open `wrangler.toml` and replace the database ID:
-
-```toml
-name = "openexperiments"
-compatibility_date = "2025-12-01"
-compatibility_flags = ["nodejs_compat"]
-
-[[d1_databases]]
-binding = "DB"
-database_name = "openexperiments-db"
-database_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # Your production database ID
-```
-
-### Step 3: Run Production Migrations
-
-Apply the database schema:
+### Manual
 
 ```bash
-wrangler d1 execute openexperiments-db --remote --file=./drizzle/migrations/0000_certain_butterfly.sql
+npm run deploy
 ```
 
-Verify tables were created:
+This runs `npx @cloudflare/next-on-pages` then deploys via wrangler.
+
+### First-time setup
+
+See the steps below if setting up a new Cloudflare environment from scratch.
+
+**1. Create D1 database**
 
 ```bash
-wrangler d1 execute openexperiments-db --remote --command="SELECT name FROM sqlite_master WHERE type='table'"
+npm run wrangler -- d1 create openexperiments-db
+# Copy the database_id into wrangler.toml
 ```
 
-**Expected tables:**
-
-- users
-- sessions
-- hypotheses
-- experiments
-- experiment_results
-- comments
-- arena_matchups
-- arena_votes
-- problem_statements
-
-### Step 4: (Optional) Seed Production Data
+**2. Run migrations and seed**
 
 ```bash
-wrangler d1 execute openexperiments-db --remote --file=./scripts/seed.sql
+npm run wrangler -- d1 migrations apply openexperiments-db --remote
+npm run wrangler -- d1 execute openexperiments-db --remote --file=scripts/seed.sql
 ```
 
-**Note:** Review `scripts/seed.sql` before running to ensure data is appropriate for production.
-
-### Step 5: Configure Production Environment Variables
-
-**Option A - Via Wrangler CLI:**
+**3. Create Pages project and set secrets**
 
 ```bash
-npx wrangler pages secret put APP_URL
-# Enter: https://openexperiments.pages.dev (or your custom domain)
-
-npx wrangler pages secret put GOOGLE_CLIENT_ID
-# Enter: your-production-google-client-id
-
-npx wrangler pages secret put GOOGLE_CLIENT_SECRET
-# Enter: your-production-google-client-secret
-
-npx wrangler pages secret put SESSION_SECRET
-# Enter: (generate a new one with the crypto command above)
+npm run wrangler -- pages project create openexperiments --production-branch main
+npm run wrangler -- pages secret put GOOGLE_CLIENT_ID --project-name openexperiments
+npm run wrangler -- pages secret put GOOGLE_CLIENT_SECRET --project-name openexperiments
+npm run wrangler -- pages secret put APP_URL --project-name openexperiments
 ```
 
-**Option B - Via Cloudflare Dashboard:**
+**4. Bind D1 to Pages**
 
-1. Go to Cloudflare Dashboard → Pages → Your Project
-2. Navigate to **Settings** → **Environment Variables**
-3. Add variables for the **Production** environment:
-   - `APP_URL` = `https://openexperiments.pages.dev`
-   - `GOOGLE_CLIENT_ID` = your production client ID
-   - `GOOGLE_CLIENT_SECRET` = your production client secret
-   - `SESSION_SECRET` = secure random string (min 32 chars)
+In the Cloudflare dashboard: Pages → openexperiments → Settings → Functions → D1 database bindings → add `DB` → `openexperiments-db`.
 
-### Step 6: Update Google OAuth Configuration
-
-In [Google Cloud Console](https://console.cloud.google.com/):
-
-1. Navigate to **APIs & Services** → **Credentials**
-2. Select your OAuth 2.0 Client ID
-3. Add **Authorized redirect URI**:
-   ```
-   https://openexperiments.pages.dev/api/auth/google/callback
-   ```
-4. Add **Authorized JavaScript origin**:
-   ```
-   https://openexperiments.pages.dev
-   ```
-5. Save changes
-
-### Step 7: Deploy to Cloudflare Pages
-
-**Option A - CLI Deployment:**
+**5. Deploy**
 
 ```bash
-# Authenticate with Cloudflare
-npx wrangler login
-
-# Build the Next.js application
-npm run build
-
-# Build for Cloudflare Pages
-npx @cloudflare/next-on-pages
-
-# Deploy
-npx wrangler pages deploy .vercel/output/static --project-name=openexperiments
+npm run deploy
 ```
 
-**Option B - Git Integration (Recommended for CI/CD):**
-
-1. Push your code to GitHub, GitLab, or Bitbucket
-2. In Cloudflare Dashboard:
-   - Go to **Pages** → **Create a project**
-   - Select **Connect to Git**
-   - Choose your repository and authorize Cloudflare
-3. Configure build settings:
-   - **Production branch**: `main`
-   - **Build command**: `npm run build && npx @cloudflare/next-on-pages`
-   - **Build output directory**: `.vercel/output/static`
-   - **Root directory**: (leave blank, or `/website` if in a monorepo)
-4. Add environment variables in the setup wizard (Step 5 above)
-5. Click **Save and Deploy**
-
-This will automatically deploy on every push to `main` and create preview deployments for pull requests.
-
-### Step 8: Verify Deployment
-
-Test these critical endpoints:
-
-1. **Homepage**: `https://openexperiments.pages.dev/`
-2. **API Routes**:
-   - `/api/hypotheses`
-   - `/api/problem-statements`
-   - `/api/arena/matchup`
-3. **Authentication**:
-   - Click "Sign in with Google"
-   - Complete OAuth flow
-   - Verify session persistence
-4. **Database Operations**:
-   - Browse hypotheses at `/explore`
-   - Vote in `/arena`
-   - Submit a hypothesis at `/submit`
-
-## Custom Domain Setup (Optional)
-
-### Add Custom Domain via CLI
+### Rollback
 
 ```bash
-npx wrangler pages domain add yourdomain.com openexperiments
+npm run wrangler -- pages deployment list --project-name openexperiments
+npm run wrangler -- pages deployment rollback <DEPLOYMENT_ID> --project-name openexperiments
 ```
 
-### Add Custom Domain via Dashboard
+## MCP Server
 
-1. Go to Cloudflare Dashboard → Pages → Your Project
-2. Navigate to **Custom domains**
-3. Click **Set up a custom domain**
-4. Enter your domain and follow the instructions
-5. Add a CNAME record in your DNS:
-   ```
-   yourdomain.com → openexperiments.pages.dev
-   ```
-
-### Update Configuration
-
-After adding a custom domain:
-
-1. **Update `APP_URL` environment variable** to `https://yourdomain.com`
-2. **Update Google OAuth redirect URIs** to include:
-   ```
-   https://yourdomain.com/api/auth/google/callback
-   ```
-
-## Refresh/Reseed Production Database
-
-**Warning:** This will add duplicate data if run multiple times. Consider clearing relevant tables first.
+The `mcp-server/` directory is a standalone Model Context Protocol server exposing the platform's API as tools for AI assistants.
 
 ```bash
-# Reseed production database
-wrangler d1 execute openexperiments-db --remote --file=./scripts/seed.sql
+cd mcp-server && npm install && npm run build
 ```
 
-To clear specific tables before reseeding:
+Configure with `OPENEXPERIMENTS_API_URL` pointing to the running app.
 
-```bash
-# Clear hypotheses
-wrangler d1 execute openexperiments-db --remote --command="DELETE FROM hypotheses WHERE submitted_by = 'system'"
+## Environment Variables
 
-# Clear users
-wrangler d1 execute openexperiments-db --remote --command="DELETE FROM users WHERE id = 'system'"
-
-# Then reseed
-wrangler d1 execute openexperiments-db --remote --file=./scripts/seed.sql
-```
+| Variable                    | Required  | Description                                        |
+| --------------------------- | --------- | -------------------------------------------------- |
+| `GOOGLE_CLIENT_ID`          | Yes       | Google OAuth client ID                             |
+| `GOOGLE_CLIENT_SECRET`      | Yes       | Google OAuth client secret                         |
+| `APP_URL`                   | Yes       | Base URL (no trailing slash)                       |
+| `CLOUDFLARE_ACCOUNT_ID`     | CI only   | Cloudflare account ID                              |
+| `CLOUDFLARE_API_TOKEN`      | CI only   | API token with Pages + D1 write permissions        |
+| `CLOUDFLARE_D1_DATABASE_ID` | Reference | D1 database UUID                                   |
+| `DB`                        | Runtime   | D1 binding (set in Cloudflare dashboard, not .env) |
 
 ## Troubleshooting
 
-### "Database binding not found"
+**"Database binding not found"** — Check the D1 binding (`DB`) is configured in Cloudflare Pages → Settings → Functions and that `wrangler.toml` has the correct `database_id`.
 
-- Verify the D1 binding in `wrangler.toml` matches the code (`DB`)
-- Ensure the database exists: `wrangler d1 list`
-- Check that the database ID is correct in `wrangler.toml`
+**OAuth redirect mismatch** — Verify `APP_URL` matches your deployment URL exactly and the redirect URI in Google Cloud Console matches `${APP_URL}/api/auth/google/callback`.
 
-### OAuth Redirect Mismatch Error
+**Build fails with edge runtime error** — All non-static pages must export `export const runtime = "edge"`. Check the failing route.
 
-- Verify `APP_URL` environment variable matches your deployment URL
-- Check Google Cloud Console redirect URIs match exactly (no trailing slashes)
-- Ensure both authorized redirect URI and JavaScript origin are configured
-
-### Build Fails
-
-- Ensure Node.js version is 20 or later: `node --version`
-- Check all dependencies are installed: `npm install`
-- Verify all API routes have `export const runtime = "edge"`
-- Clear build cache: `rm -rf .next .vercel`
-
-### Session Not Persisting
-
-- Verify `SESSION_SECRET` is set in production
-- Check that the secret is at least 32 characters long
-- Ensure cookies are working (HTTPS required in production)
-
-### View Deployment Logs
-
-```bash
-# List deployments
-npx wrangler pages deployment list --project-name=openexperiments
-
-# Tail logs in real-time
-npx wrangler pages deployment tail --project-name=openexperiments
-```
-
-## Project Structure
-
-```
-/website
-├── src/
-│   ├── app/              # Next.js App Router pages
-│   │   ├── api/          # API routes (all edge runtime)
-│   │   ├── arena/        # Arena ranking UI
-│   │   ├── explore/      # Browse hypotheses
-│   │   └── submit/       # Submit new hypotheses
-│   ├── components/       # React components
-│   ├── db/
-│   │   ├── index.ts      # D1 database client
-│   │   └── schema.ts     # Drizzle ORM schema
-│   └── lib/              # Utilities and helpers
-├── drizzle/
-│   └── migrations/       # Database migrations
-├── scripts/
-│   └── seed.sql          # Seed data
-├── wrangler.toml         # Cloudflare configuration
-└── next.config.ts        # Next.js configuration
-```
-
-## Rollback Deployment
-
-If you need to rollback to a previous deployment:
-
-```bash
-# List all deployments
-npx wrangler pages deployment list --project-name=openexperiments
-
-# Rollback to specific deployment
-npx wrangler pages deployment rollback <DEPLOYMENT_ID> --project-name=openexperiments
-```
-
-Or via Dashboard:
-
-1. Go to Cloudflare Dashboard → Pages → Your Project
-2. Click "View build" on a previous successful deployment
-3. Click "Rollback to this deployment"
+**`npx wrangler` not found** — Use `npm run wrangler -- <command>` instead (local wrangler binary path issue).
 
 ## Contributing
 
-Contributions are welcome! Please ensure:
-
-- All API routes use `export const runtime = "edge"`
-- Database queries use Drizzle ORM
-- TypeScript types are properly defined
-- New migrations are generated with `drizzle-kit generate`
+- All API routes must export `export const runtime = "edge"`
+- Database queries must use Drizzle ORM — no raw SQL in application code
+- New schema changes require a migration: `npx drizzle-kit generate`
+- TypeScript strict mode is on — no `any`, no suppressed errors
 
 ## License
 
-[Add your license here]
+MIT
