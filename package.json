@@ -9,7 +9,9 @@
     "lint": "eslint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "prepare": "husky"
+    "prepare": "husky",
+    "wrangler": "node node_modules/wrangler/wrangler-dist/cli.js",
+    "deploy": "npx @cloudflare/next-on-pages && node node_modules/wrangler/wrangler-dist/cli.js pages deploy .vercel/output/static --project-name openexperiments --branch main"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,mjs}": [
@@ -27,7 +29,7 @@
     "drizzle-orm": "^0.45.1",
     "geist": "^1.7.0",
     "lucide-react": "^0.575.0",
-    "next": "16.1.6",
+    "next": "^15.5.2",
     "oslo": "^1.2.1",
     "react": "19.2.3",
     "react-dom": "19.2.3"
@@ -46,7 +48,7 @@
     "@types/react-dom": "^19",
     "drizzle-kit": "^0.31.9",
     "eslint": "^9",
-    "eslint-config-next": "16.1.6",
+    "eslint-config-next": "^15.5.2",
     "eslint-config-prettier": "^10.1.8",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",

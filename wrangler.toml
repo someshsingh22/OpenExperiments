@@ -1,9 +1,10 @@
 name = "openexperiments"
+pages_build_output_dir = ".vercel/output/static"
 compatibility_date = "2025-12-01"
 compatibility_flags = ["nodejs_compat"]
 
 [[d1_databases]]
 binding = "DB"
 database_name = "openexperiments-db"
-database_id = "local-dev-placeholder"
+database_id = "0d7822ad-4fd7-4b8c-a019-7ff3ad033a6b"
 migrations_dir = "drizzle/migrations"

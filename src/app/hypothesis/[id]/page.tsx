@@ -66,12 +66,13 @@ async function getHypothesisDetail(id: string) {
     type: e.type as Experiment["type"],
     status: e.status as Experiment["status"],
     datasetName: e.datasetName,
-    methodology: e.methodology,
+    methodology: e.methodology ?? undefined,
     startedAt: new Date(e.startedAt * 1000).toISOString().split("T")[0],
     completedAt: e.completedAt
       ? new Date(e.completedAt * 1000).toISOString().split("T")[0]
       : undefined,
     osfLink: e.osfLink ?? undefined,
+    version: e.version ?? 1,
     results: results[e.id]
       ? {
           pValue: results[e.id].pValue ?? undefined,

@@ -100,10 +100,10 @@ async function getHomeData(): Promise<{
     .from(datasetProblemStatements)
     .innerJoin(datasets, eq(datasetProblemStatements.datasetId, datasets.id));
 
-  const dsMap = new Map<string, { id: string; name: string; huggingfaceUrl: string | null }[]>();
+  const dsMap = new Map<string, { id: string; name: string; huggingfaceUrl: string }[]>();
   for (const row of allDsLinks) {
     const list = dsMap.get(row.problemStatementId) ?? [];
-    list.push({ id: row.id, name: row.name, huggingfaceUrl: row.huggingfaceUrl });
+    list.push({ id: row.id, name: row.name, huggingfaceUrl: row.huggingfaceUrl ?? "" });
     dsMap.set(row.problemStatementId, list);
   }
 
