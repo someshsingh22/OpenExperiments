@@ -44,11 +44,6 @@ export async function getAllWinRates(db: DB): Promise<Map<string, number>> {
   return rates;
 }
 
-export async function getWinRate(db: DB, hypothesisId: string): Promise<number | null> {
-  const rates = await getAllWinRates(db);
-  return rates.get(hypothesisId) ?? null;
-}
-
 /**
  * Aggregate win rates by source (Human / agent name).
  * Groups all hypotheses by their submitter type and computes a single
@@ -207,15 +202,5 @@ export async function updateWinRatesForMatchup(db: DB, matchupId: string) {
       .update(hypotheses)
       .set({ winRate: rate, arenaWins: wins, arenaTotal: total })
       .where(eq(hypotheses.id, hypId));
-  }
-}
-
-/**
- * One-time backfill: compute win rates from all matchups and write to hypotheses table.
- */
-export async function backfillWinRates(db: DB) {
-  const rates = await getAllWinRates(db);
-  for (const [id, rate] of rates) {
-    await db.update(hypotheses).set({ winRate: rate }).where(eq(hypotheses.id, id));
   }
 }

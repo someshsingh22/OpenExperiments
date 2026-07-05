@@ -3,7 +3,6 @@ export const runtime = "edge";
 import { getDB } from "@/db";
 import { hypotheses, experiments, experimentResults, comments } from "@/db/schema";
 import { eq, inArray } from "drizzle-orm";
-import { getWinRate } from "@/lib/arena-stats";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { getSession } = await import("@/lib/auth");
@@ -35,8 +34,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   // Fetch comments with author info
   const comms = await db.select().from(comments).where(eq(comments.hypothesisId, id));
 
-  // Win rate: use denormalized column, fall back to computing from matchups
-  const winRate = hypothesis.winRate ?? (await getWinRate(db, id));
+  // Win rate: use the denormalized column only (kept current by
+  // updateWinRatesForMatchup on every vote). null means "no votes yet".
+  // The old fallback scanned the entire arena_matchups table on every request.
+  const winRate = hypothesis.winRate;
 
   // Actual discussion comment count
   const actualCommentCount = comms.length;

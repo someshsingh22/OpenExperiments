@@ -4,9 +4,17 @@ import { getDB } from "@/db";
 import { hypotheses, problemStatements, comments, experiments } from "@/db/schema";
 import { desc, sql, inArray } from "drizzle-orm";
 import { ExploreContent } from "@/components/explore-content";
+import { cachedQuery } from "@/lib/edge-cache";
 import type { Hypothesis, ProblemStatement } from "@/lib/types";
 
-async function getExploreData(): Promise<{
+function getExploreData(): Promise<{
+  hypotheses: Hypothesis[];
+  problemStatements: ProblemStatement[];
+}> {
+  return cachedQuery("explore:data", 300, fetchExploreData);
+}
+
+async function fetchExploreData(): Promise<{
   hypotheses: Hypothesis[];
   problemStatements: ProblemStatement[];
 }> {

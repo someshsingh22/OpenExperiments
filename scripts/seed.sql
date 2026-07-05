@@ -86,3 +86,32 @@ INSERT INTO arena_matchups (id, hypothesis_a_id, hypothesis_b_id, total_votes, v
 ('am-4', 'h-2', 'h-6', 256, 167, 72, 17, 1726358400, 1726358400),
 ('am-5', 'h-12', 'h-11', 198, 121, 58, 19, 1726358400, 1726358400),
 ('am-6', 'h-9', 'h-10', 143, 78, 51, 14, 1726358400, 1726358400);
+
+-- Backfill denormalized arena win rates from matchup data.
+-- Matches the runtime formula in updateWinRatesForMatchup (arena-stats.ts):
+-- wins = own votes, win_rate = round((wins + 0.5*ties) / total_votes * 100).
+-- Read paths use these columns directly (no on-the-fly matchup scan).
+UPDATE hypotheses SET
+  arena_wins = (
+    SELECT COALESCE(SUM(CASE WHEN m.hypothesis_a_id = hypotheses.id THEN m.votes_a ELSE m.votes_b END), 0)
+    FROM arena_matchups m
+    WHERE m.hypothesis_a_id = hypotheses.id OR m.hypothesis_b_id = hypotheses.id
+  ),
+  arena_total = (
+    SELECT COALESCE(SUM(m.votes_a + m.votes_b + m.votes_tie), 0)
+    FROM arena_matchups m
+    WHERE m.hypothesis_a_id = hypotheses.id OR m.hypothesis_b_id = hypotheses.id
+  ),
+  win_rate = (
+    SELECT ROUND(
+      (SUM(CASE WHEN m.hypothesis_a_id = hypotheses.id THEN m.votes_a ELSE m.votes_b END) + 0.5 * SUM(m.votes_tie))
+      * 100.0 / SUM(m.votes_a + m.votes_b + m.votes_tie)
+    )
+    FROM arena_matchups m
+    WHERE m.hypothesis_a_id = hypotheses.id OR m.hypothesis_b_id = hypotheses.id
+  )
+WHERE id IN (
+  SELECT hypothesis_a_id FROM arena_matchups
+  UNION
+  SELECT hypothesis_b_id FROM arena_matchups
+);

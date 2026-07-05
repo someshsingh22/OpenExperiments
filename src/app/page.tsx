@@ -13,9 +13,17 @@ import {
 } from "@/db/schema";
 import { eq, desc, sql, inArray } from "drizzle-orm";
 import { HomeDynamicSections } from "@/components/home-dynamic-sections";
+import { cachedQuery } from "@/lib/edge-cache";
 import type { Hypothesis, ProblemStatement } from "@/lib/types";
 
-async function getHomeData(): Promise<{
+function getHomeData(): Promise<{
+  hypotheses: Hypothesis[];
+  problems: ProblemStatement[];
+}> {
+  return cachedQuery("home:data", 300, fetchHomeData);
+}
+
+async function fetchHomeData(): Promise<{
   hypotheses: Hypothesis[];
   problems: ProblemStatement[];
 }> {

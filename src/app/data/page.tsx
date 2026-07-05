@@ -4,9 +4,14 @@ import { getDB } from "@/db";
 import { datasets, datasetProblemStatements, experiments } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { DataContent } from "@/components/data-content";
+import { cachedQuery } from "@/lib/edge-cache";
 import type { Dataset } from "@/lib/types";
 
 async function getInitialDatasets(): Promise<Dataset[]> {
+  return cachedQuery("datasets:list", 300, fetchInitialDatasets);
+}
+
+async function fetchInitialDatasets(): Promise<Dataset[]> {
   const db = getDB();
   const rows = await db.select().from(datasets);
 

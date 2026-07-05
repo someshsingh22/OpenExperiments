@@ -3,12 +3,16 @@ export const runtime = "edge";
 import { getDB } from "@/db";
 import { hypotheses, experiments, experimentResults, comments } from "@/db/schema";
 import { eq, inArray } from "drizzle-orm";
-import { getWinRate } from "@/lib/arena-stats";
 import { HypothesisDetailContent } from "@/components/hypothesis-detail-content";
+import { cachedQuery } from "@/lib/edge-cache";
 import type { Hypothesis, Experiment, Comment } from "@/lib/types";
 import { notFound } from "next/navigation";
 
-async function getHypothesisDetail(id: string) {
+function getHypothesisDetail(id: string) {
+  return cachedQuery(`hypothesis:${id}`, 300, () => fetchHypothesisDetail(id));
+}
+
+async function fetchHypothesisDetail(id: string) {
   const db = getDB();
 
   const [row] = await db.select().from(hypotheses).where(eq(hypotheses.id, id)).limit(1);
@@ -31,8 +35,10 @@ async function getHypothesisDetail(id: string) {
   // Fetch comments
   const comms = await db.select().from(comments).where(eq(comments.hypothesisId, id));
 
-  // Win rate
-  const winRate = row.winRate ?? (await getWinRate(db, id));
+  // Win rate: use the denormalized column only. It is kept current by
+  // updateWinRatesForMatchup on every vote, so a null value means "no votes yet".
+  // Avoid the per-view full scan of arena_matchups that the old fallback triggered.
+  const winRate = row.winRate;
 
   const isAnon = row.isAnonymous === 1;
 

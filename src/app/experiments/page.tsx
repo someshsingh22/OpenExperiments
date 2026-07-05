@@ -4,9 +4,14 @@ import { getDB } from "@/db";
 import { experiments, experimentResults, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { ExperimentsContent } from "@/components/experiments-content";
+import { cachedQuery } from "@/lib/edge-cache";
 import type { Experiment } from "@/lib/types";
 
-async function getInitialExperiments(): Promise<Experiment[]> {
+function getInitialExperiments(): Promise<Experiment[]> {
+  return cachedQuery("experiments:list", 300, fetchInitialExperiments);
+}
+
+async function fetchInitialExperiments(): Promise<Experiment[]> {
   const db = getDB();
   const rows = await db.select().from(experiments);
 

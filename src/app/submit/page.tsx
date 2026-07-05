@@ -182,6 +182,10 @@ function SubmitContent() {
               {submittedId}
             </code>
           </p>
+          <p className="mb-3 text-xs text-stone-400">
+            Your hypothesis is live now, but may take up to 5 minutes to appear in the explore and
+            home listings.
+          </p>
           <p className="mb-5 text-xs text-stone-400">
             Redirecting in {redirectCountdown}s...{" "}
             <button
