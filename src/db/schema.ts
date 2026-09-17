@@ -7,6 +7,7 @@ import {
   uniqueIndex,
   primaryKey,
 } from "drizzle-orm/sqlite-core";
+import type { OsfCharacterization } from "@/lib/osf";
 
 // -- Phase B tables (defined now for FK references) --
 
@@ -108,11 +109,22 @@ export const datasets = sqliteTable(
     id: text("id").primaryKey(),
     name: text("name").notNull(),
     huggingfaceUrl: text("huggingface_url").notNull(),
-    taskDescription: text("task_description").notNull(),
-    dataColumnNames: text("data_column_names", { mode: "json" }).notNull().$type<string[]>(),
-    targetColumnName: text("target_column_name").notNull(),
+    // Legacy ML-benchmark framing — deprecated in favor of the OSF-style
+    // scientific characterization below. Kept nullable for back-compat reads.
+    taskDescription: text("task_description"),
+    dataColumnNames: text("data_column_names", { mode: "json" }).$type<string[]>(),
+    targetColumnName: text("target_column_name"),
     description: text("description"),
     domain: text("domain"), // nullable — "persuasion" | "memorability"
+    // OSF-style scientific characterization: the dataset as a research
+    // instrument. Prose answers live in the JSON blob; a few fields are
+    // promoted to indexed columns for filtering and display.
+    osfCharacterization: text("osf_characterization", {
+      mode: "json",
+    }).$type<OsfCharacterization>(),
+    license: text("license"),
+    foreknowledgeStatus: text("foreknowledge_status"), // OSF foreknowledge code
+    unitOfAnalysis: text("unit_of_analysis"),
     submittedBy: text("submitted_by").references(() => users.id),
     createdAt: integer("created_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
@@ -120,6 +132,8 @@ export const datasets = sqliteTable(
   (table) => [
     index("idx_datasets_domain").on(table.domain),
     index("idx_datasets_submitted_by").on(table.submittedBy),
+    index("idx_datasets_license").on(table.license),
+    index("idx_datasets_foreknowledge").on(table.foreknowledgeStatus),
   ],
 );
 

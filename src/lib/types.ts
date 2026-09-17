@@ -1,3 +1,5 @@
+import type { OsfCharacterization } from "@/lib/osf";
+
 export type HypothesisStatus = "proposed" | "arena_ranked" | "data_tested" | "field_validated";
 export type Phase = "live" | "completed";
 export type Source = "human" | "ai_agent";
@@ -89,11 +91,17 @@ export interface Dataset {
   id: string;
   name: string;
   huggingfaceUrl: string;
-  taskDescription: string;
-  dataColumnNames: string[];
-  targetColumnName: string;
-  description?: string;
-  domain?: Domain;
+  // Legacy ML-benchmark fields — nullable; only present on pre-OSF datasets.
+  taskDescription?: string | null;
+  dataColumnNames?: string[] | null;
+  targetColumnName?: string | null;
+  description?: string | null;
+  domain?: Domain | null;
+  // OSF-style scientific characterization.
+  license?: string | null;
+  foreknowledgeStatus?: string | null;
+  unitOfAnalysis?: string | null;
+  osfCharacterization?: OsfCharacterization | null;
   createdAt: string;
   problemStatementCount?: number;
   experimentCount?: number;

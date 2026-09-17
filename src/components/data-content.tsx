@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { ExternalLink, Database, AlertCircle } from "lucide-react";
+import { ExternalLink, Database, AlertCircle, Plus } from "lucide-react";
 import { getDatasets } from "@/lib/api";
 import { DomainTag } from "@/components/domain-tag";
 import { SITE_CONFIG } from "@/lib/constants";
@@ -50,10 +50,19 @@ export function DataContent({ initialDatasets }: DataContentProps) {
           Datasets
         </h1>
         <p className="mt-3 text-base leading-relaxed text-stone-600">
-          Curated Hugging Face datasets powering our hypothesis testing and experiments. Each
-          dataset comes with a clear task description, schema, and links to related problem
-          statements.
+          Hugging Face datasets registered as research instruments. Each carries an OSF-style
+          scientific characterization — provenance, collection, variables, and inclusion rules — so
+          every hypothesis tested on it inherits a shared understanding of the data.
         </p>
+        <div className="mt-5">
+          <Link
+            href="/data/submit"
+            className="inline-flex items-center gap-2 rounded-md border border-stone-900 bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-stone-800"
+          >
+            <Plus className="h-4 w-4" />
+            Register a dataset
+          </Link>
+        </div>
       </header>
 
       {/* Domain filter */}
@@ -106,20 +115,27 @@ export function DataContent({ initialDatasets }: DataContentProps) {
       {/* Suggest a Dataset CTA */}
       <section className="mt-16 rounded-2xl border border-stone-200 bg-stone-50/50 p-8 text-center">
         <Database className="mx-auto mb-3 h-8 w-8 text-stone-500" />
-        <h2 className="text-xl font-semibold text-stone-900">Have a dataset to suggest?</h2>
+        <h2 className="text-xl font-semibold text-stone-900">Have a dataset to register?</h2>
         <p className="mx-auto mt-3 max-w-2xl text-base leading-relaxed text-stone-600">
-          Datasets and problem statements are reviewed weekly by our team. To suggest a new dataset,
-          open a pull request on GitHub with the Hugging Face link, task description, column names,
-          and target column.
+          Link a Hugging Face dataset and answer a few OSF-style questions about its provenance,
+          variables, and inclusion rules. It becomes a first-class instrument that hypotheses can be
+          tested against and cite.
         </p>
-        <div className="mt-6 flex justify-center">
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
+          <Link
+            href="/data/submit"
+            className="inline-flex items-center gap-2 rounded-md border border-stone-900 bg-stone-900 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-stone-800"
+          >
+            <Plus className="h-4 w-4" />
+            Register a dataset
+          </Link>
           <a
             href={SITE_CONFIG.links.github}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-md border border-stone-900 bg-stone-900 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-stone-800"
+            className="inline-flex items-center gap-2 rounded-md border border-stone-300 px-6 py-3 text-sm font-semibold text-stone-600 transition-colors hover:bg-stone-50"
           >
-            Open a PR on GitHub
+            Discuss on GitHub
             <ExternalLink className="h-4 w-4" />
           </a>
         </div>
@@ -155,7 +171,10 @@ function DatasetCard({ dataset, highlighted }: { dataset: Dataset; highlighted?:
       </div>
 
       <p className="line-clamp-2 text-[13px] leading-relaxed text-stone-600">
-        {dataset.taskDescription}
+        {dataset.description ||
+          dataset.osfCharacterization?.provenance ||
+          dataset.unitOfAnalysis ||
+          dataset.taskDescription}
       </p>
 
       <div className="mt-3 flex items-center gap-3 text-[11px] text-stone-500">

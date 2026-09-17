@@ -3,6 +3,7 @@ export const runtime = "edge";
 import { getDB } from "@/db";
 import { datasets, datasetProblemStatements, experiments } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
+import { validateDataset } from "@/lib/validation";
 
 export async function GET(request: Request) {
   const db = getDB();
@@ -39,6 +40,9 @@ export async function GET(request: Request) {
         targetColumnName: d.targetColumnName,
         description: d.description,
         domain: d.domain,
+        license: d.license,
+        foreknowledgeStatus: d.foreknowledgeStatus,
+        unitOfAnalysis: d.unitOfAnalysis,
         createdAt: new Date(d.createdAt * 1000).toISOString().split("T")[0],
         problemStatementCount: psCount.count,
         experimentCount: expCount.count,
@@ -59,4 +63,50 @@ export async function GET(request: Request) {
       headers: { "Cache-Control": "public, max-age=600, s-maxage=1800" },
     },
   );
+}
+
+export async function POST(request: Request) {
+  const { getSession, requireSession } = await import("@/lib/auth");
+  const user = await getSession(request);
+  const unauthorized = requireSession(user);
+  if (unauthorized) return unauthorized;
+
+  const db = getDB();
+  const body = await request.json();
+  const result = validateDataset(body as Record<string, unknown>);
+
+  if (!result.ok) {
+    return Response.json({ errors: result.errors }, { status: 400 });
+  }
+
+  const {
+    name,
+    huggingfaceUrl,
+    description,
+    domain,
+    license,
+    foreknowledgeStatus,
+    unitOfAnalysis,
+    osf,
+  } = result.data;
+
+  const id = crypto.randomUUID();
+  const now = Math.floor(Date.now() / 1000);
+
+  await db.insert(datasets).values({
+    id,
+    name,
+    huggingfaceUrl,
+    description: description ?? null,
+    domain: domain ?? null,
+    license: license ?? null,
+    foreknowledgeStatus,
+    unitOfAnalysis,
+    osfCharacterization: osf,
+    submittedBy: user!.id,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  return Response.json({ data: { id } }, { status: 201 });
 }

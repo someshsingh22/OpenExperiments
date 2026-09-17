@@ -8,17 +8,22 @@ import Link from "next/link";
 import { ExternalLink, Database, FlaskConical, ArrowLeft } from "lucide-react";
 import { getDataset } from "@/lib/api";
 import { DomainTag } from "@/components/domain-tag";
+import { OSF_SECTIONS, foreknowledgeLabel, type OsfCharacterization } from "@/lib/osf";
 import type { Domain } from "@/lib/types";
 
 interface DatasetDetail {
   id: string;
   name: string;
   huggingfaceUrl: string;
-  taskDescription: string;
-  dataColumnNames: string[];
-  targetColumnName: string;
-  description?: string;
-  domain?: string;
+  taskDescription?: string | null;
+  dataColumnNames?: string[] | null;
+  targetColumnName?: string | null;
+  description?: string | null;
+  domain?: string | null;
+  license?: string | null;
+  foreknowledgeStatus?: string | null;
+  unitOfAnalysis?: string | null;
+  osfCharacterization?: OsfCharacterization | null;
   createdAt: string;
 }
 
@@ -125,59 +130,132 @@ export default function DatasetDetailPage() {
         </div>
       </header>
 
-      {/* Task Description */}
-      <section className="mb-10">
-        <h2 className="mb-3 text-sm font-semibold tracking-wider text-stone-400 uppercase">
-          Task Description
-        </h2>
-        <div className="rounded-lg border border-stone-200 bg-stone-50/50 p-5">
-          <p className="text-sm leading-relaxed text-stone-700">{dataset.taskDescription}</p>
-        </div>
-      </section>
-
-      {/* Description (if any) */}
-      {dataset.description && (
-        <section className="mb-10">
-          <h2 className="mb-3 text-sm font-semibold tracking-wider text-stone-400 uppercase">
-            About
-          </h2>
-          <p className="text-sm leading-relaxed text-stone-600">{dataset.description}</p>
+      {/* Registration metadata strip */}
+      {(dataset.license || dataset.foreknowledgeStatus || dataset.unitOfAnalysis) && (
+        <section className="mb-10 grid gap-3 rounded-lg border border-stone-200 bg-stone-50/50 p-5 sm:grid-cols-3">
+          {dataset.unitOfAnalysis && (
+            <div>
+              <span className="text-[10px] font-medium tracking-wider text-stone-400 uppercase">
+                Unit of analysis
+              </span>
+              <p className="mt-1 text-sm text-stone-700">{dataset.unitOfAnalysis}</p>
+            </div>
+          )}
+          {dataset.foreknowledgeStatus && (
+            <div>
+              <span className="text-[10px] font-medium tracking-wider text-stone-400 uppercase">
+                Foreknowledge
+              </span>
+              <p className="mt-1 text-sm text-stone-700">
+                {foreknowledgeLabel(dataset.foreknowledgeStatus)}
+              </p>
+            </div>
+          )}
+          {dataset.license && (
+            <div>
+              <span className="text-[10px] font-medium tracking-wider text-stone-400 uppercase">
+                License
+              </span>
+              <p className="mt-1 text-sm text-stone-700">{dataset.license}</p>
+            </div>
+          )}
         </section>
       )}
 
-      {/* Schema */}
-      <section className="mb-10">
-        <h2 className="mb-3 text-sm font-semibold tracking-wider text-stone-400 uppercase">
-          Schema
-        </h2>
-        <div className="rounded-lg border border-stone-200 bg-white p-5">
-          <div className="mb-4">
-            <span className="text-xs font-medium tracking-wider text-stone-400 uppercase">
-              Data Columns
-            </span>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {dataset.dataColumnNames.map((col) => (
-                <code
-                  key={col}
-                  className="rounded-md bg-stone-100 px-2.5 py-1 font-mono text-xs text-stone-700"
+      {/* OSF scientific characterization */}
+      {dataset.osfCharacterization ? (
+        <section className="mb-10">
+          <h2 className="mb-4 text-sm font-semibold tracking-wider text-stone-400 uppercase">
+            Scientific Characterization
+          </h2>
+          <div className="space-y-5">
+            {OSF_SECTIONS.map((section) => {
+              const value = dataset.osfCharacterization?.[section.key];
+              if (!value) return null;
+              return (
+                <div key={section.key} className="rounded-lg border border-stone-200 bg-white p-5">
+                  <h3 className="mb-1 text-sm font-semibold text-stone-800">{section.title}</h3>
+                  <p className="text-sm leading-relaxed whitespace-pre-line text-stone-600">
+                    {value}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+          {dataset.osfCharacterization.tags && dataset.osfCharacterization.tags.length > 0 && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {dataset.osfCharacterization.tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="rounded-full bg-stone-100 px-2.5 py-1 text-[11px] font-medium text-stone-600"
                 >
-                  {col}
-                </code>
+                  {tag}
+                </span>
               ))}
             </div>
-          </div>
-          <div>
-            <span className="text-xs font-medium tracking-wider text-stone-400 uppercase">
-              Target Column
-            </span>
-            <div className="mt-2">
-              <code className="rounded-md bg-teal-50 px-2.5 py-1 font-mono text-xs font-semibold text-teal-700 ring-1 ring-teal-600/20 ring-inset">
-                {dataset.targetColumnName}
-              </code>
-            </div>
-          </div>
-        </div>
-      </section>
+          )}
+        </section>
+      ) : (
+        <>
+          {/* Legacy datasets: task description + schema */}
+          {dataset.taskDescription && (
+            <section className="mb-10">
+              <h2 className="mb-3 text-sm font-semibold tracking-wider text-stone-400 uppercase">
+                Task Description
+              </h2>
+              <div className="rounded-lg border border-stone-200 bg-stone-50/50 p-5">
+                <p className="text-sm leading-relaxed text-stone-700">{dataset.taskDescription}</p>
+              </div>
+            </section>
+          )}
+
+          {dataset.description && (
+            <section className="mb-10">
+              <h2 className="mb-3 text-sm font-semibold tracking-wider text-stone-400 uppercase">
+                About
+              </h2>
+              <p className="text-sm leading-relaxed text-stone-600">{dataset.description}</p>
+            </section>
+          )}
+
+          {dataset.dataColumnNames && dataset.dataColumnNames.length > 0 && (
+            <section className="mb-10">
+              <h2 className="mb-3 text-sm font-semibold tracking-wider text-stone-400 uppercase">
+                Schema
+              </h2>
+              <div className="rounded-lg border border-stone-200 bg-white p-5">
+                <div className="mb-4">
+                  <span className="text-xs font-medium tracking-wider text-stone-400 uppercase">
+                    Data Columns
+                  </span>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {dataset.dataColumnNames.map((col) => (
+                      <code
+                        key={col}
+                        className="rounded-md bg-stone-100 px-2.5 py-1 font-mono text-xs text-stone-700"
+                      >
+                        {col}
+                      </code>
+                    ))}
+                  </div>
+                </div>
+                {dataset.targetColumnName && (
+                  <div>
+                    <span className="text-xs font-medium tracking-wider text-stone-400 uppercase">
+                      Target Column
+                    </span>
+                    <div className="mt-2">
+                      <code className="rounded-md bg-teal-50 px-2.5 py-1 font-mono text-xs font-semibold text-teal-700 ring-1 ring-teal-600/20 ring-inset">
+                        {dataset.targetColumnName}
+                      </code>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+        </>
+      )}
 
       {/* Linked Problem Statements */}
       <section className="mb-10">

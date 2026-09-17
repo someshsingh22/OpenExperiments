@@ -1,3 +1,5 @@
+import { FOREKNOWLEDGE_CODES, OSF_SECTIONS, type OsfCharacterization } from "@/lib/osf";
+
 type FieldError = { field: string; message: string };
 type ValidationResult<T> = { ok: true; data: T } | { ok: false; errors: FieldError[] };
 
@@ -21,6 +23,8 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const URL_RE = /^https?:\/\/.+/;
 const DOI_RE = /^10\.\d{4,9}\/[^\s]+$/;
 const ORCID_RE = /^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/;
+// Hugging Face dataset URL: huggingface.co/datasets/<owner>[/<name>]
+const HF_DATASET_RE = /^https?:\/\/huggingface\.co\/datasets\/[\w.-]+(\/[\w.-]+)?\/?$/i;
 
 const VALID_SOURCES = ["human", "ai_agent"] as const;
 
@@ -207,6 +211,113 @@ export function validateProfile(body: Record<string, unknown>): ValidationResult
 
 export function validateCitation(citation: string): boolean {
   return CITATION_RE.test(citation);
+}
+
+export function validateDataset(body: Record<string, unknown>): ValidationResult<{
+  name: string;
+  huggingfaceUrl: string;
+  description: string | null;
+  domain: string | null;
+  license: string | null;
+  foreknowledgeStatus: string;
+  unitOfAnalysis: string;
+  osf: OsfCharacterization;
+}> {
+  const errors: FieldError[] = [];
+
+  const name = trimmed(body.name);
+  const huggingfaceUrl = trimmed(body.huggingfaceUrl);
+  const description = body.description ? trimmed(body.description) : null;
+  const domain = body.domain ? trimmed(body.domain) : null;
+  const license = body.license ? trimmed(body.license) : null;
+  const foreknowledgeStatus = trimmed(body.foreknowledgeStatus);
+  const unitOfAnalysis = trimmed(body.unitOfAnalysis);
+  const osfInput =
+    body.osf && typeof body.osf === "object" ? (body.osf as Record<string, unknown>) : {};
+  const tags = Array.isArray((osfInput as Record<string, unknown>).tags)
+    ? ((osfInput as Record<string, unknown>).tags as unknown[]).filter(
+        (t): t is string => typeof t === "string" && t.trim().length > 0,
+      )
+    : [];
+
+  if (!name) errors.push({ field: "name", message: "Please provide a dataset name" });
+  else {
+    const e = between(name, 3, 120, "name", "Name");
+    if (e) errors.push(e);
+  }
+
+  // Hugging Face URL is validated by shape only (no metadata is scraped).
+  if (!huggingfaceUrl)
+    errors.push({
+      field: "huggingfaceUrl",
+      message: "Please provide the Hugging Face dataset URL",
+    });
+  else if (!HF_DATASET_RE.test(huggingfaceUrl)) {
+    errors.push({
+      field: "huggingfaceUrl",
+      message:
+        "Must be a Hugging Face dataset URL (e.g. https://huggingface.co/datasets/owner/name)",
+    });
+  }
+
+  if (description) {
+    const e = between(description, 1, 2000, "description", "Description");
+    if (e) errors.push(e);
+  }
+
+  if (domain) {
+    const e = between(domain, 2, 60, "domain", "Domain");
+    if (e) errors.push(e);
+  }
+
+  if (!foreknowledgeStatus) {
+    errors.push({
+      field: "foreknowledgeStatus",
+      message: "Please select the foreknowledge status of the data",
+    });
+  } else if (!FOREKNOWLEDGE_CODES.includes(foreknowledgeStatus)) {
+    errors.push({ field: "foreknowledgeStatus", message: "Invalid foreknowledge status" });
+  }
+
+  if (!unitOfAnalysis)
+    errors.push({ field: "unitOfAnalysis", message: "Please describe the unit of analysis" });
+  else {
+    const e = between(unitOfAnalysis, 3, 300, "unitOfAnalysis", "Unit of analysis");
+    if (e) errors.push(e);
+  }
+
+  // OSF prose sections, driven by the shared section metadata so the form,
+  // validation, and detail page never drift.
+  const osf: Partial<OsfCharacterization> = { tags };
+  for (const section of OSF_SECTIONS) {
+    const value = trimmed(osfInput[section.key]);
+    if (section.required && !value) {
+      errors.push({ field: section.key, message: `Please complete "${section.title}"` });
+    } else if (value && value.length < section.minLength) {
+      errors.push({
+        field: section.key,
+        message: `"${section.title}" must be at least ${section.minLength} characters`,
+      });
+    } else if (value.length > 8000) {
+      errors.push({ field: section.key, message: `"${section.title}" is too long (max 8000)` });
+    }
+    if (value) osf[section.key] = value;
+  }
+
+  if (errors.length > 0) return { ok: false, errors };
+  return {
+    ok: true,
+    data: {
+      name,
+      huggingfaceUrl: huggingfaceUrl.replace(/\/$/, ""),
+      description,
+      domain,
+      license,
+      foreknowledgeStatus,
+      unitOfAnalysis,
+      osf: osf as OsfCharacterization,
+    },
+  };
 }
 
 export function validateRegistration(body: Record<string, unknown>): ValidationResult<{

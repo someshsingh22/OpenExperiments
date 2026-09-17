@@ -6,6 +6,7 @@ import type {
   ProblemStatement,
   Dataset,
 } from "./types";
+import type { OsfCharacterization } from "./osf";
 
 const BASE = "";
 
@@ -165,6 +166,32 @@ export async function getDataset(id: string): Promise<{
   }>;
 }> {
   return fetchJSON(`/api/datasets/${id}`);
+}
+
+export async function submitDataset(data: {
+  name: string;
+  huggingfaceUrl: string;
+  description?: string;
+  domain?: string;
+  license?: string;
+  foreknowledgeStatus: string;
+  unitOfAnalysis: string;
+  osf: OsfCharacterization;
+}): Promise<{ data: { id: string } }> {
+  const res = await fetch(`${BASE}/api/datasets`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const parsed = err as { error?: string; errors?: { field: string; message: string }[] };
+    if (parsed.errors?.length) {
+      throw new Error(parsed.errors.map((e) => e.message).join(". "));
+    }
+    throw new Error(parsed.error || `API error: ${res.status}`);
+  }
+  return res.json();
 }
 
 // Submit Experiment
