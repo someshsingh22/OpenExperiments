@@ -103,7 +103,18 @@ export async function GET(request: Request) {
   });
 
   // Clear OAuth cookies + set session cookie
-  const redirectTo = isNewUser ? `${env.APP_URL}/complete-profile` : env.APP_URL;
+  const loginReturnTo = getCookie(request, "login_return_to");
+  const decodedReturnTo = loginReturnTo ? decodeURIComponent(loginReturnTo) : null;
+
+  let redirectTo: string;
+  if (decodedReturnTo) {
+    redirectTo = `${env.APP_URL}${decodedReturnTo}`;
+  } else if (isNewUser) {
+    redirectTo = `${env.APP_URL}/complete-profile`;
+  } else {
+    redirectTo = env.APP_URL;
+  }
+
   const headers = new Headers();
   headers.set("Location", redirectTo);
   headers.append(
@@ -112,6 +123,7 @@ export async function GET(request: Request) {
   );
   headers.append("Set-Cookie", `oauth_state=; Path=/; HttpOnly; Secure; Max-Age=0`);
   headers.append("Set-Cookie", `code_verifier=; Path=/; HttpOnly; Secure; Max-Age=0`);
+  headers.append("Set-Cookie", `login_return_to=; Path=/; HttpOnly; Secure; Max-Age=0`);
 
   return new Response(null, { status: 302, headers });
 }

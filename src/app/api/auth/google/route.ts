@@ -3,13 +3,16 @@ export const runtime = "edge";
 import { Google } from "arctic";
 import { getRequestContext } from "@cloudflare/next-on-pages";
 
-export async function GET() {
+export async function GET(request: Request) {
   const { env } = getRequestContext();
   const google = new Google(
     env.GOOGLE_CLIENT_ID,
     env.GOOGLE_CLIENT_SECRET,
     `${env.APP_URL}/api/auth/google/callback`,
   );
+
+  const reqUrl = new URL(request.url);
+  const returnTo = reqUrl.searchParams.get("returnTo");
 
   const state = crypto.randomUUID();
   const codeVerifier = crypto.randomUUID() + crypto.randomUUID();
@@ -25,6 +28,12 @@ export async function GET() {
     "Set-Cookie",
     `code_verifier=${codeVerifier}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=600`,
   );
+  if (returnTo) {
+    headers.append(
+      "Set-Cookie",
+      `login_return_to=${encodeURIComponent(returnTo)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=600`,
+    );
+  }
 
   return new Response(null, { status: 302, headers });
 }

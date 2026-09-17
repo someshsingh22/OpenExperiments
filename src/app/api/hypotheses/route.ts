@@ -34,6 +34,16 @@ export async function GET(request: Request) {
     );
   }
 
+  const mine = url.searchParams.get("mine");
+  if (mine === "true") {
+    if (!viewer) {
+      return Response.json(
+        { data: [], total: 0 },
+        { headers: { "Cache-Control": "private, no-store" } },
+      );
+    }
+  }
+
   const domain = url.searchParams.get("domain");
   const phase = url.searchParams.get("phase");
   const status = url.searchParams.get("status");
@@ -43,6 +53,9 @@ export async function GET(request: Request) {
   const offset = parseInt(url.searchParams.get("offset") || "0");
 
   const conditions: SQL[] = [];
+  if (mine === "true" && viewer) {
+    conditions.push(eq(hypotheses.submittedBy, viewer.id));
+  }
   if (phase) conditions.push(eq(hypotheses.phase, phase));
   if (status) conditions.push(eq(hypotheses.status, status));
   if (search) {
