@@ -179,59 +179,64 @@ export async function POST(request: Request) {
   const id = crypto.randomUUID();
   const now = Math.floor(Date.now() / 1000);
 
-  await db.insert(experiments).values({
-    id,
-    hypothesisId: hypothesisId as string,
-    problemStatementId: (problemStatementId as string) || null,
-    type: type as string,
-    status: status as string,
-    datasetId: (datasetId as string) || null,
-    datasetName: (datasetName as string) || "",
-    methodology: (methodology as string) || null,
-    analysisPlan: (analysisPlan as string) || null,
-    osfLink: (osfLink as string) || null,
-    startedAt: now,
-    completedAt: status === "completed" ? now : null,
-    submittedBy: user.id,
-    version: 1,
-    createdAt: now,
-    updatedAt: now,
-  });
-
   // Handle results for completed experiments
   const hasResults =
     r && (r.summary || r.pValue != null || r.effectSize != null || r.sampleSize != null);
-  if (hasResults) {
-    await db.insert(experimentResults).values({
-      experimentId: id,
-      pValue: (r.pValue as number) ?? 0,
-      effectSize: (r.effectSize as number) ?? 0,
-      sampleSize: (r.sampleSize as number) ?? 0,
-      confidenceIntervalLow: (r.confidenceIntervalLow as number) ?? 0,
-      confidenceIntervalHigh: (r.confidenceIntervalHigh as number) ?? 0,
-      summary: (r.summary as string) || "",
-      createdAt: now,
-    });
-  }
 
-  // Create version 1 snapshot
-  await db.insert(experimentVersions).values({
-    id: crypto.randomUUID(),
-    experimentId: id,
-    version: 1,
-    status: status as string,
-    methodology: (methodology as string) || null,
-    analysisPlan: (analysisPlan as string) || null,
-    osfLink: (osfLink as string) || null,
-    pValue: hasResults ? ((r.pValue as number) ?? null) : null,
-    effectSize: hasResults ? ((r.effectSize as number) ?? null) : null,
-    sampleSize: hasResults ? ((r.sampleSize as number) ?? null) : null,
-    confidenceIntervalLow: hasResults ? ((r.confidenceIntervalLow as number) ?? null) : null,
-    confidenceIntervalHigh: hasResults ? ((r.confidenceIntervalHigh as number) ?? null) : null,
-    summary: hasResults ? (r.summary as string) || null : null,
-    changeSummary: "Initial submission",
-    createdAt: now,
-  });
+  // The experiment, its results, and its v1 snapshot must all land or none:
+  // batch them into a single D1 transaction so a mid-sequence failure can't
+  // leave an experiment with a version snapshot but no results row.
+  await db.batch([
+    db.insert(experiments).values({
+      id,
+      hypothesisId: hypothesisId as string,
+      problemStatementId: (problemStatementId as string) || null,
+      type: type as string,
+      status: status as string,
+      datasetId: (datasetId as string) || null,
+      datasetName: (datasetName as string) || "",
+      methodology: (methodology as string) || null,
+      analysisPlan: (analysisPlan as string) || null,
+      osfLink: (osfLink as string) || null,
+      startedAt: now,
+      completedAt: status === "completed" ? now : null,
+      submittedBy: user.id,
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    }),
+    ...(hasResults
+      ? [
+          db.insert(experimentResults).values({
+            experimentId: id,
+            pValue: (r.pValue as number) ?? 0,
+            effectSize: (r.effectSize as number) ?? 0,
+            sampleSize: (r.sampleSize as number) ?? 0,
+            confidenceIntervalLow: (r.confidenceIntervalLow as number) ?? 0,
+            confidenceIntervalHigh: (r.confidenceIntervalHigh as number) ?? 0,
+            summary: (r.summary as string) || "",
+            createdAt: now,
+          }),
+        ]
+      : []),
+    db.insert(experimentVersions).values({
+      id: crypto.randomUUID(),
+      experimentId: id,
+      version: 1,
+      status: status as string,
+      methodology: (methodology as string) || null,
+      analysisPlan: (analysisPlan as string) || null,
+      osfLink: (osfLink as string) || null,
+      pValue: hasResults ? ((r.pValue as number) ?? null) : null,
+      effectSize: hasResults ? ((r.effectSize as number) ?? null) : null,
+      sampleSize: hasResults ? ((r.sampleSize as number) ?? null) : null,
+      confidenceIntervalLow: hasResults ? ((r.confidenceIntervalLow as number) ?? null) : null,
+      confidenceIntervalHigh: hasResults ? ((r.confidenceIntervalHigh as number) ?? null) : null,
+      summary: hasResults ? (r.summary as string) || null : null,
+      changeSummary: "Initial submission",
+      createdAt: now,
+    }),
+  ]);
 
   // New experiment changes the experiments list and the linked hypothesis's
   // evidence surface; drop their cached snapshots.

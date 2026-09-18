@@ -7,6 +7,7 @@ import {
   uniqueIndex,
   primaryKey,
 } from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
 import type { OsfCharacterization } from "@/lib/osf";
 
 // -- Phase B tables (defined now for FK references) --
@@ -286,6 +287,12 @@ export const arenaVotes = sqliteTable(
   (table) => [
     index("idx_arena_votes_matchup_id").on(table.matchupId),
     uniqueIndex("idx_arena_votes_ip_matchup").on(table.matchupId, table.voterIpHash),
+    // Enforce one vote per authenticated user per matchup at the DB level.
+    // Partial (user_id IS NOT NULL) so anonymous rows — deduped by the IP
+    // index above — don't collide on NULL user_id.
+    uniqueIndex("idx_arena_votes_user_matchup")
+      .on(table.matchupId, table.userId)
+      .where(sql`${table.userId} IS NOT NULL`),
   ],
 );
 
