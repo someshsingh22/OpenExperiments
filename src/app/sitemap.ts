@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { SITE_CONFIG } from "@/lib/constants";
 import { getDB } from "@/db";
 import { hypotheses } from "@/db/schema";
+import { cachedQuery } from "@/lib/edge-cache";
 
 export const runtime = "edge";
 
@@ -54,10 +55,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Dynamic hypothesis pages
   let hypothesisPages: MetadataRoute.Sitemap = [];
   try {
-    const db = getDB();
-    const allHypotheses = await db
-      .select({ id: hypotheses.id, updatedAt: hypotheses.updatedAt })
-      .from(hypotheses);
+    // Crawlers hit /sitemap.xml often; cache the full-table scan for an hour
+    // instead of reading every hypothesis row on each request.
+    const allHypotheses = await cachedQuery("sitemap:hyps", 3600, () => {
+      const db = getDB();
+      return db.select({ id: hypotheses.id, updatedAt: hypotheses.updatedAt }).from(hypotheses);
+    });
 
     hypothesisPages = allHypotheses.map((h) => ({
       url: `${SITE_CONFIG.url}/hypothesis/${h.id}`,

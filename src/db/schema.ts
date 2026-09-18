@@ -245,21 +245,31 @@ export const comments = sqliteTable(
   ],
 );
 
-export const arenaMatchups = sqliteTable("arena_matchups", {
-  id: text("id").primaryKey(),
-  hypothesisAId: text("hypothesis_a_id")
-    .notNull()
-    .references(() => hypotheses.id),
-  hypothesisBId: text("hypothesis_b_id")
-    .notNull()
-    .references(() => hypotheses.id),
-  totalVotes: integer("total_votes").notNull().default(0),
-  votesA: integer("votes_a").notNull().default(0),
-  votesB: integer("votes_b").notNull().default(0),
-  votesTie: integer("votes_tie").notNull().default(0),
-  createdAt: integer("created_at").notNull(),
-  updatedAt: integer("updated_at").notNull(),
-});
+export const arenaMatchups = sqliteTable(
+  "arena_matchups",
+  {
+    id: text("id").primaryKey(),
+    hypothesisAId: text("hypothesis_a_id")
+      .notNull()
+      .references(() => hypotheses.id),
+    hypothesisBId: text("hypothesis_b_id")
+      .notNull()
+      .references(() => hypotheses.id),
+    totalVotes: integer("total_votes").notNull().default(0),
+    votesA: integer("votes_a").notNull().default(0),
+    votesB: integer("votes_b").notNull().default(0),
+    votesTie: integer("votes_tie").notNull().default(0),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  // Win-rate recompute filters matchups by either hypothesis column on every
+  // vote (WHERE hyp_a IN (...) OR hyp_b IN (...)); index both so SQLite can
+  // serve the OR via an index union instead of a full table scan.
+  (table) => [
+    index("idx_arena_matchups_hyp_a").on(table.hypothesisAId),
+    index("idx_arena_matchups_hyp_b").on(table.hypothesisBId),
+  ],
+);
 
 export const arenaVotes = sqliteTable(
   "arena_votes",

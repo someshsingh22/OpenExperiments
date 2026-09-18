@@ -4,6 +4,7 @@ import { getDB } from "@/db";
 import { hypotheses, comments, experiments, problemStatements } from "@/db/schema";
 import { eq, and, or, like, desc, sql, inArray, type SQL } from "drizzle-orm";
 import { validateHypothesis } from "@/lib/validation";
+import { invalidateCached } from "@/lib/edge-cache";
 
 export async function GET(request: Request) {
   const { getSession } = await import("@/lib/auth");
@@ -222,6 +223,9 @@ export async function POST(request: Request) {
     createdAt: now,
     updatedAt: now,
   });
+
+  // A new hypothesis appears on the home and explore listings.
+  await Promise.all([invalidateCached("home:data"), invalidateCached("explore:data")]);
 
   return Response.json({ data: { id } }, { status: 201 });
 }

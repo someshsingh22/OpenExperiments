@@ -43,6 +43,13 @@
       "when": 1789615946244,
       "tag": "0005_dataset_osf_registration",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1789632128262,
+      "tag": "0006_square_thunderball",
+      "breakpoints": true
     }
   ]
 }

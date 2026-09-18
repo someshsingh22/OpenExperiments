@@ -2,8 +2,9 @@ export const runtime = "edge";
 
 import { getDB } from "@/db";
 import { experiments, experimentResults, experimentVersions, users } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray, desc } from "drizzle-orm";
 import { getSession } from "@/lib/auth";
+import { invalidateCached } from "@/lib/edge-cache";
 
 function buildResultsResponse(result: {
   pValue: number;
@@ -48,49 +49,71 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const hypothesisId = url.searchParams.get("hypothesisId");
 
+  // Bound the unfiltered list so it can't scan/return the whole table.
+  const limit = Math.min(Number(url.searchParams.get("limit")) || 100, 100);
+  const offset = Math.max(Number(url.searchParams.get("offset")) || 0, 0);
+
   const rows = hypothesisId
-    ? await db.select().from(experiments).where(eq(experiments.hypothesisId, hypothesisId))
-    : await db.select().from(experiments);
-
-  const data = await Promise.all(
-    rows.map(async (e) => {
-      const [result] = await db
+    ? await db
         .select()
-        .from(experimentResults)
-        .where(eq(experimentResults.experimentId, e.id))
-        .limit(1);
+        .from(experiments)
+        .where(eq(experiments.hypothesisId, hypothesisId))
+        .orderBy(desc(experiments.startedAt))
+    : await db
+        .select()
+        .from(experiments)
+        .orderBy(desc(experiments.startedAt))
+        .limit(limit)
+        .offset(offset);
 
-      let submitter = null;
-      if (e.submittedBy) {
-        const [u] = await db
-          .select({ id: users.id, name: users.name, avatarUrl: users.avatarUrl })
-          .from(users)
-          .where(eq(users.id, e.submittedBy))
-          .limit(1);
-        submitter = u || null;
-      }
+  // Batch-load results and submitters for all rows instead of 2 queries per
+  // row (N+1). Two IN(...) queries regardless of page size.
+  const expIds = rows.map((e) => e.id);
+  const submitterIds = [...new Set(rows.map((e) => e.submittedBy).filter((v): v is string => !!v))];
 
-      return {
-        id: e.id,
-        hypothesisId: e.hypothesisId,
-        problemStatementId: e.problemStatementId,
-        type: e.type,
-        status: e.status,
-        datasetId: e.datasetId,
-        datasetName: e.datasetName,
-        methodology: e.methodology,
-        analysisPlan: e.analysisPlan,
-        submitter,
-        startedAt: new Date(e.startedAt * 1000).toISOString().split("T")[0],
-        completedAt: e.completedAt
-          ? new Date(e.completedAt * 1000).toISOString().split("T")[0]
-          : undefined,
-        osfLink: e.osfLink,
-        version: e.version,
-        results: result ? buildResultsResponse(result) : undefined,
-      };
-    }),
-  );
+  const resultsById = new Map<string, typeof experimentResults.$inferSelect>();
+  if (expIds.length) {
+    const resultRows = await db
+      .select()
+      .from(experimentResults)
+      .where(inArray(experimentResults.experimentId, expIds));
+    for (const r of resultRows) resultsById.set(r.experimentId, r);
+  }
+
+  const submitterById = new Map<
+    string,
+    { id: string; name: string | null; avatarUrl: string | null }
+  >();
+  if (submitterIds.length) {
+    const userRows = await db
+      .select({ id: users.id, name: users.name, avatarUrl: users.avatarUrl })
+      .from(users)
+      .where(inArray(users.id, submitterIds));
+    for (const u of userRows) submitterById.set(u.id, u);
+  }
+
+  const data = rows.map((e) => {
+    const result = resultsById.get(e.id);
+    return {
+      id: e.id,
+      hypothesisId: e.hypothesisId,
+      problemStatementId: e.problemStatementId,
+      type: e.type,
+      status: e.status,
+      datasetId: e.datasetId,
+      datasetName: e.datasetName,
+      methodology: e.methodology,
+      analysisPlan: e.analysisPlan,
+      submitter: e.submittedBy ? (submitterById.get(e.submittedBy) ?? null) : null,
+      startedAt: new Date(e.startedAt * 1000).toISOString().split("T")[0],
+      completedAt: e.completedAt
+        ? new Date(e.completedAt * 1000).toISOString().split("T")[0]
+        : undefined,
+      osfLink: e.osfLink,
+      version: e.version,
+      results: result ? buildResultsResponse(result) : undefined,
+    };
+  });
 
   return Response.json(
     { data },
@@ -209,6 +232,13 @@ export async function POST(request: Request) {
     changeSummary: "Initial submission",
     createdAt: now,
   });
+
+  // New experiment changes the experiments list and the linked hypothesis's
+  // evidence surface; drop their cached snapshots.
+  await Promise.all([
+    invalidateCached("experiments:list"),
+    invalidateCached(`hypothesis:${hypothesisId as string}`),
+  ]);
 
   return Response.json({ data: { id } }, { status: 201 });
 }

@@ -4,6 +4,7 @@ import { getDB } from "@/db";
 import { arenaVotes, arenaMatchups } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { updateWinRatesForMatchup } from "@/lib/arena-stats";
+import { invalidateCached } from "@/lib/edge-cache";
 
 export async function POST(request: Request) {
   const { getSession } = await import("@/lib/auth");
@@ -99,6 +100,15 @@ export async function POST(request: Request) {
 
   // Update denormalized win rates for both hypotheses
   await updateWinRatesForMatchup(db, matchupId);
+
+  // Win rate is displayed on the home/explore listings and both hypothesis
+  // detail pages; drop their cached snapshots so the vote is reflected.
+  await Promise.all([
+    invalidateCached("home:data"),
+    invalidateCached("explore:data"),
+    invalidateCached(`hypothesis:${matchup.hypothesisAId}`),
+    invalidateCached(`hypothesis:${matchup.hypothesisBId}`),
+  ]);
 
   // Return updated matchup
   const [updated] = await db
