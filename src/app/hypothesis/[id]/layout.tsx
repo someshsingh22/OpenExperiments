@@ -3,6 +3,7 @@ export const runtime = "edge";
 import { cache } from "react";
 import type { Metadata } from "next";
 import { SITE_CONFIG } from "@/lib/constants";
+import { serializeJsonLd } from "@/lib/json-ld";
 import { getDB } from "@/db";
 import { hypotheses } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -159,7 +160,7 @@ export default async function HypothesisLayout({ params, children }: Props) {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
       />
       {children}
     </>
