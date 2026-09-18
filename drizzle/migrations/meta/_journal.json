@@ -36,6 +36,27 @@
       "when": 1773536300160,
       "tag": "0004_unique_problem_statement_question",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1789615946244,
+      "tag": "0005_dataset_osf_registration",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1789632128262,
+      "tag": "0006_square_thunderball",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1789721606850,
+      "tag": "0007_first_morlocks",
+      "breakpoints": true
     }
   ]
 }

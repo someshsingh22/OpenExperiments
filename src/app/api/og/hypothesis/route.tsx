@@ -191,6 +191,11 @@ export async function GET(request: Request) {
     {
       width: 1200,
       height: 630,
+      headers: {
+        // Rasterizing this image + the D1 read are expensive; cache hard at the
+        // edge/CDN and in social-crawler caches. Keyed by id, changes rarely.
+        "Cache-Control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800",
+      },
     },
   );
 }

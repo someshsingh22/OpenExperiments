@@ -82,6 +82,11 @@ export async function GET() {
     {
       width: 1200,
       height: 630,
+      headers: {
+        // Fully static image — cache indefinitely instead of re-rasterizing
+        // via Satori on every hit.
+        "Cache-Control": "public, max-age=31536000, immutable",
+      },
     },
   );
 }

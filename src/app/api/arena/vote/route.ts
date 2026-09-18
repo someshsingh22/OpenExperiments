@@ -4,6 +4,7 @@ import { getDB } from "@/db";
 import { arenaVotes, arenaMatchups } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { updateWinRatesForMatchup } from "@/lib/arena-stats";
+import { invalidateCached } from "@/lib/edge-cache";
 
 export async function POST(request: Request) {
   const { getSession } = await import("@/lib/auth");
@@ -67,38 +68,55 @@ export async function POST(request: Request) {
   const voteId = crypto.randomUUID();
   const now = Math.floor(Date.now() / 1000);
 
-  // Insert vote
-  await db.insert(arenaVotes).values({
-    id: voteId,
-    matchupId,
-    userId: user?.id ?? null,
-    voterIpHash: ipHash,
-    vote,
-    createdAt: now,
-  });
+  // Build the counter update (both_weak bumps only total_votes).
+  const base = {
+    totalVotes: sql`${arenaMatchups.totalVotes} + 1`,
+    updatedAt: now,
+  };
+  const counters =
+    vote === "a"
+      ? { ...base, votesA: sql`${arenaMatchups.votesA} + 1` }
+      : vote === "b"
+        ? { ...base, votesB: sql`${arenaMatchups.votesB} + 1` }
+        : vote === "tie"
+          ? { ...base, votesTie: sql`${arenaMatchups.votesTie} + 1` }
+          : base;
 
-  // Update aggregate counts (both_weak only increments total_votes, not any vote column)
-  const voteColumn =
-    vote === "a" ? "votes_a" : vote === "b" ? "votes_b" : vote === "tie" ? "votes_tie" : null;
-  if (voteColumn) {
-    await db.run(sql`
-      UPDATE arena_matchups
-      SET total_votes = total_votes + 1,
-          ${sql.raw(voteColumn)} = ${sql.raw(voteColumn)} + 1,
-          updated_at = ${now}
-      WHERE id = ${matchupId}
-    `);
-  } else {
-    await db.run(sql`
-      UPDATE arena_matchups
-      SET total_votes = total_votes + 1,
-          updated_at = ${now}
-      WHERE id = ${matchupId}
-    `);
+  // Insert the vote row and bump the matchup counters atomically. D1 runs a
+  // batch as a single transaction, so the vote and its count can't desync, and
+  // the (matchup_id, user_id) unique index makes a concurrent double-vote fail
+  // here rather than slip past the check-then-insert above (TOCTOU).
+  try {
+    await db.batch([
+      db.insert(arenaVotes).values({
+        id: voteId,
+        matchupId,
+        userId: user?.id ?? null,
+        voterIpHash: ipHash,
+        vote,
+        createdAt: now,
+      }),
+      db.update(arenaMatchups).set(counters).where(eq(arenaMatchups.id, matchupId)),
+    ]);
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("UNIQUE")) {
+      return Response.json({ error: "Already voted on this matchup" }, { status: 409 });
+    }
+    throw err;
   }
 
-  // Update denormalized win rates for both hypotheses
+  // Recompute denormalized win rates. Derived + idempotent, so it's fine that
+  // this runs after (not inside) the atomic batch — a later vote recomputes it.
   await updateWinRatesForMatchup(db, matchupId);
+
+  // Win rate is displayed on the home/explore listings and both hypothesis
+  // detail pages; drop their cached snapshots so the vote is reflected.
+  await Promise.all([
+    invalidateCached("home:data"),
+    invalidateCached("explore:data"),
+    invalidateCached(`hypothesis:${matchup.hypothesisAId}`),
+    invalidateCached(`hypothesis:${matchup.hypothesisBId}`),
+  ]);
 
   // Return updated matchup
   const [updated] = await db

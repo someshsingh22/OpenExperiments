@@ -4,6 +4,7 @@ import { getDB } from "@/db";
 import { hypotheses, comments, experiments, problemStatements } from "@/db/schema";
 import { eq, and, or, like, desc, sql, inArray, type SQL } from "drizzle-orm";
 import { validateHypothesis } from "@/lib/validation";
+import { invalidateCached } from "@/lib/edge-cache";
 
 export async function GET(request: Request) {
   const { getSession } = await import("@/lib/auth");
@@ -63,10 +64,16 @@ export async function GET(request: Request) {
   let orderBy;
   switch (sort) {
     case "top_rated":
-      orderBy = desc(hypotheses.arenaElo);
+      // arena_elo is never updated after seeding; rank by the live win rate
+      // that voting actually maintains (NULLs — no votes yet — sort last).
+      orderBy = desc(hypotheses.winRate);
       break;
     case "most_discussed":
-      orderBy = desc(hypotheses.commentCount);
+      // Sort by the same live comment count the response displays, not the
+      // denormalized comment_count column which can drift from it.
+      orderBy = desc(
+        sql`(select count(*) from comments where comments.hypothesis_id = ${hypotheses.id})`,
+      );
       break;
     case "newest":
     default:
@@ -193,17 +200,9 @@ export async function POST(request: Request) {
     }
   }
 
-  if (psId) {
-    await db
-      .update(problemStatements)
-      .set({
-        hypothesisCount: sql`${problemStatements.hypothesisCount} + 1`,
-        updatedAt: now,
-      })
-      .where(eq(problemStatements.id, psId));
-  }
-
-  await db.insert(hypotheses).values({
+  // Increment the problem-statement counter and insert the hypothesis in one
+  // D1 transaction, so a failed insert can't leave hypothesisCount inflated.
+  const insertHypothesis = db.insert(hypotheses).values({
     id,
     statement,
     rationale,
@@ -222,6 +221,24 @@ export async function POST(request: Request) {
     createdAt: now,
     updatedAt: now,
   });
+
+  if (psId) {
+    await db.batch([
+      db
+        .update(problemStatements)
+        .set({
+          hypothesisCount: sql`${problemStatements.hypothesisCount} + 1`,
+          updatedAt: now,
+        })
+        .where(eq(problemStatements.id, psId)),
+      insertHypothesis,
+    ]);
+  } else {
+    await insertHypothesis;
+  }
+
+  // A new hypothesis appears on the home and explore listings.
+  await Promise.all([invalidateCached("home:data"), invalidateCached("explore:data")]);
 
   return Response.json({ data: { id } }, { status: 201 });
 }

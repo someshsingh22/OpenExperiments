@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `idx_arena_votes_user_matchup` ON `arena_votes` (`matchup_id`,`user_id`) WHERE "arena_votes"."user_id" IS NOT NULL;

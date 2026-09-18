@@ -4,6 +4,7 @@ import { getDB } from "@/db";
 import { comments, users } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { getSession, requireSession } from "@/lib/auth";
+import { invalidateCached } from "@/lib/edge-cache";
 
 export async function GET(request: Request) {
   const db = getDB();
@@ -84,6 +85,9 @@ export async function POST(request: Request) {
   await db.run(
     sql`UPDATE hypotheses SET comment_count = comment_count + 1, updated_at = ${now} WHERE id = ${hypothesisId}`,
   );
+
+  // Comment count + comment list are part of the cached hypothesis detail.
+  await invalidateCached(`hypothesis:${hypothesisId}`);
 
   return Response.json(
     {

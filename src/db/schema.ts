@@ -7,6 +7,8 @@ import {
   uniqueIndex,
   primaryKey,
 } from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
+import type { OsfCharacterization } from "@/lib/osf";
 
 // -- Phase B tables (defined now for FK references) --
 
@@ -108,11 +110,22 @@ export const datasets = sqliteTable(
     id: text("id").primaryKey(),
     name: text("name").notNull(),
     huggingfaceUrl: text("huggingface_url").notNull(),
-    taskDescription: text("task_description").notNull(),
-    dataColumnNames: text("data_column_names", { mode: "json" }).notNull().$type<string[]>(),
-    targetColumnName: text("target_column_name").notNull(),
+    // Legacy ML-benchmark framing — deprecated in favor of the OSF-style
+    // scientific characterization below. Kept nullable for back-compat reads.
+    taskDescription: text("task_description"),
+    dataColumnNames: text("data_column_names", { mode: "json" }).$type<string[]>(),
+    targetColumnName: text("target_column_name"),
     description: text("description"),
     domain: text("domain"), // nullable — "persuasion" | "memorability"
+    // OSF-style scientific characterization: the dataset as a research
+    // instrument. Prose answers live in the JSON blob; a few fields are
+    // promoted to indexed columns for filtering and display.
+    osfCharacterization: text("osf_characterization", {
+      mode: "json",
+    }).$type<OsfCharacterization>(),
+    license: text("license"),
+    foreknowledgeStatus: text("foreknowledge_status"), // OSF foreknowledge code
+    unitOfAnalysis: text("unit_of_analysis"),
     submittedBy: text("submitted_by").references(() => users.id),
     createdAt: integer("created_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
@@ -120,6 +133,8 @@ export const datasets = sqliteTable(
   (table) => [
     index("idx_datasets_domain").on(table.domain),
     index("idx_datasets_submitted_by").on(table.submittedBy),
+    index("idx_datasets_license").on(table.license),
+    index("idx_datasets_foreknowledge").on(table.foreknowledgeStatus),
   ],
 );
 
@@ -231,21 +246,31 @@ export const comments = sqliteTable(
   ],
 );
 
-export const arenaMatchups = sqliteTable("arena_matchups", {
-  id: text("id").primaryKey(),
-  hypothesisAId: text("hypothesis_a_id")
-    .notNull()
-    .references(() => hypotheses.id),
-  hypothesisBId: text("hypothesis_b_id")
-    .notNull()
-    .references(() => hypotheses.id),
-  totalVotes: integer("total_votes").notNull().default(0),
-  votesA: integer("votes_a").notNull().default(0),
-  votesB: integer("votes_b").notNull().default(0),
-  votesTie: integer("votes_tie").notNull().default(0),
-  createdAt: integer("created_at").notNull(),
-  updatedAt: integer("updated_at").notNull(),
-});
+export const arenaMatchups = sqliteTable(
+  "arena_matchups",
+  {
+    id: text("id").primaryKey(),
+    hypothesisAId: text("hypothesis_a_id")
+      .notNull()
+      .references(() => hypotheses.id),
+    hypothesisBId: text("hypothesis_b_id")
+      .notNull()
+      .references(() => hypotheses.id),
+    totalVotes: integer("total_votes").notNull().default(0),
+    votesA: integer("votes_a").notNull().default(0),
+    votesB: integer("votes_b").notNull().default(0),
+    votesTie: integer("votes_tie").notNull().default(0),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  // Win-rate recompute filters matchups by either hypothesis column on every
+  // vote (WHERE hyp_a IN (...) OR hyp_b IN (...)); index both so SQLite can
+  // serve the OR via an index union instead of a full table scan.
+  (table) => [
+    index("idx_arena_matchups_hyp_a").on(table.hypothesisAId),
+    index("idx_arena_matchups_hyp_b").on(table.hypothesisBId),
+  ],
+);
 
 export const arenaVotes = sqliteTable(
   "arena_votes",
@@ -262,6 +287,12 @@ export const arenaVotes = sqliteTable(
   (table) => [
     index("idx_arena_votes_matchup_id").on(table.matchupId),
     uniqueIndex("idx_arena_votes_ip_matchup").on(table.matchupId, table.voterIpHash),
+    // Enforce one vote per authenticated user per matchup at the DB level.
+    // Partial (user_id IS NOT NULL) so anonymous rows — deduped by the IP
+    // index above — don't collide on NULL user_id.
+    uniqueIndex("idx_arena_votes_user_matchup")
+      .on(table.matchupId, table.userId)
+      .where(sql`${table.userId} IS NOT NULL`),
   ],
 );
 

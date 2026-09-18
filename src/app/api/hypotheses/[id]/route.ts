@@ -152,5 +152,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .set({ citationDois: updated, updatedAt: now })
     .where(eq(hypotheses.id, id));
 
+  const { invalidateCached } = await import("@/lib/edge-cache");
+  await invalidateCached(`hypothesis:${id}`);
+
   return Response.json({ data: { citationDois: updated } });
 }
