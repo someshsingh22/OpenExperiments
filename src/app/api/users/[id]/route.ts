@@ -124,7 +124,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       },
     },
     {
-      headers: { "Cache-Control": "public, max-age=120, s-maxage=300" },
+      headers: { "Cache-Control": "private, no-store" },
     },
   );
 }

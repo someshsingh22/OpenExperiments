@@ -5,8 +5,6 @@ import { hypotheses, experiments, experimentResults, comments } from "@/db/schem
 import { eq, inArray } from "drizzle-orm";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { getSession } = await import("@/lib/auth");
-  const viewer = await getSession(request);
   const { id } = await params;
   const db = getDB();
 
@@ -42,9 +40,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   // Actual discussion comment count
   const actualCommentCount = comms.length;
 
-  // Anonymous visibility
+  // Anonymous visibility. The body is served via a shared (public) edge cache,
+  // so it MUST be viewer-independent: anonymous hypotheses always hide the
+  // author, regardless of who is asking. Special-casing the owner here would
+  // let a cached owner response leak the author id to other viewers.
   const isAnon = hypothesis.isAnonymous === 1;
-  const isOwner = viewer?.id != null && hypothesis.submittedBy === viewer.id;
 
   return Response.json(
     {
@@ -59,7 +59,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         status: hypothesis.status,
         phase: hypothesis.phase,
         submittedAt: new Date(hypothesis.submittedAt * 1000).toISOString().split("T")[0],
-        submittedBy: isAnon && !isOwner ? null : hypothesis.submittedBy,
+        submittedBy: isAnon ? null : hypothesis.submittedBy,
         isAnonymous: isAnon,
         arenaElo: hypothesis.arenaElo,
         winRate,
@@ -113,6 +113,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+
+  // Editing citations is a write: require an authenticated owner. Without this
+  // check any anonymous caller could append citations to anyone's hypothesis.
+  const { getSession } = await import("@/lib/auth");
+  const user = await getSession(request);
+  if (!user) {
+    return Response.json({ error: "Authentication required" }, { status: 401 });
+  }
+
   const db = getDB();
   const body = await request.json();
   const { addCitation } = body as { addCitation?: string };
@@ -137,6 +146,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   if (!hypothesis) {
     return Response.json({ error: "Not found" }, { status: 404 });
+  }
+
+  if (hypothesis.submittedBy !== user.id) {
+    return Response.json({ error: "Only the author can edit this hypothesis" }, { status: 403 });
   }
 
   const existing = hypothesis.citationDois as string[];
