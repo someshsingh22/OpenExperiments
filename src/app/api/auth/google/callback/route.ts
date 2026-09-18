@@ -108,10 +108,10 @@ export async function GET(request: Request) {
   headers.set("Location", redirectTo);
   headers.append(
     "Set-Cookie",
-    `session=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}`,
+    `session=${sessionId}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}`,
   );
-  headers.append("Set-Cookie", `oauth_state=; Path=/; HttpOnly; Max-Age=0`);
-  headers.append("Set-Cookie", `code_verifier=; Path=/; HttpOnly; Max-Age=0`);
+  headers.append("Set-Cookie", `oauth_state=; Path=/; HttpOnly; Secure; Max-Age=0`);
+  headers.append("Set-Cookie", `code_verifier=; Path=/; HttpOnly; Secure; Max-Age=0`);
 
   return new Response(null, { status: 302, headers });
 }

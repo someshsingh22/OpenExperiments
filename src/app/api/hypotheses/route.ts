@@ -7,8 +7,6 @@ import { validateHypothesis } from "@/lib/validation";
 import { invalidateCached } from "@/lib/edge-cache";
 
 export async function GET(request: Request) {
-  const { getSession } = await import("@/lib/auth");
-  const viewer = await getSession(request);
   const db = getDB();
   const url = new URL(request.url);
 
@@ -27,7 +25,7 @@ export async function GET(request: Request) {
     const rows = await db.select().from(hypotheses).where(inArray(hypotheses.id, ids));
     return Response.json(
       {
-        data: rows.map((r) => deserializeHypothesis(r, viewer?.id)),
+        data: rows.map((r) => deserializeHypothesis(r)),
         total: rows.length,
       },
       {
@@ -127,7 +125,7 @@ export async function GET(request: Request) {
 
   return Response.json(
     {
-      data: rows.map((r) => deserializeHypothesis(r, viewer?.id, commentCounts, experimentCounts)),
+      data: rows.map((r) => deserializeHypothesis(r, commentCounts, experimentCounts)),
       total: count,
     },
     {
@@ -243,14 +241,16 @@ export async function POST(request: Request) {
   return Response.json({ data: { id } }, { status: 201 });
 }
 
+// The list body is served via a shared (public) edge cache, so it MUST be
+// viewer-independent: anonymous hypotheses always hide the author, regardless
+// of who is asking. Special-casing the owner here would let a cached owner
+// response leak the author id to other viewers.
 function deserializeHypothesis(
   row: typeof hypotheses.$inferSelect,
-  viewerId?: string,
   commentCounts?: Map<string, number>,
   experimentCounts?: Map<string, number>,
 ) {
   const isAnon = row.isAnonymous === 1;
-  const isOwner = viewerId != null && row.submittedBy === viewerId;
   return {
     id: row.id,
     statement: row.statement,
@@ -262,7 +262,7 @@ function deserializeHypothesis(
     status: row.status,
     phase: row.phase,
     submittedAt: new Date(row.submittedAt * 1000).toISOString().split("T")[0],
-    submittedBy: isAnon && !isOwner ? null : row.submittedBy,
+    submittedBy: isAnon ? null : row.submittedBy,
     isAnonymous: isAnon,
     arenaElo: row.arenaElo,
     evidenceScore: row.evidenceScore,
