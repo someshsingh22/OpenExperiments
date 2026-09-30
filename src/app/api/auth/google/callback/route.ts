@@ -5,6 +5,7 @@ import { getRequestContext } from "@cloudflare/next-on-pages";
 import { getDB } from "@/db";
 import { users, sessions } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { decodeSafeReturnTo } from "@/lib/safe-redirect";
 
 function getCookie(request: Request, name: string): string | null {
   const cookie = request.headers.get("cookie") || "";
@@ -103,7 +104,18 @@ export async function GET(request: Request) {
   });
 
   // Clear OAuth cookies + set session cookie
-  const redirectTo = isNewUser ? `${env.APP_URL}/complete-profile` : env.APP_URL;
+  const loginReturnTo = getCookie(request, "login_return_to");
+  const decodedReturnTo = decodeSafeReturnTo(loginReturnTo);
+
+  let redirectTo: string;
+  if (decodedReturnTo) {
+    redirectTo = `${env.APP_URL}${decodedReturnTo}`;
+  } else if (isNewUser) {
+    redirectTo = `${env.APP_URL}/complete-profile`;
+  } else {
+    redirectTo = env.APP_URL;
+  }
+
   const headers = new Headers();
   headers.set("Location", redirectTo);
   headers.append(
@@ -112,6 +124,7 @@ export async function GET(request: Request) {
   );
   headers.append("Set-Cookie", `oauth_state=; Path=/; HttpOnly; Secure; Max-Age=0`);
   headers.append("Set-Cookie", `code_verifier=; Path=/; HttpOnly; Secure; Max-Age=0`);
+  headers.append("Set-Cookie", `login_return_to=; Path=/; HttpOnly; Secure; Max-Age=0`);
 
   return new Response(null, { status: 302, headers });
 }

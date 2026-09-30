@@ -5,6 +5,8 @@ import type {
   Comment,
   ProblemStatement,
   Dataset,
+  McpTokenSummary,
+  CreatedMcpToken,
 } from "./types";
 import type { OsfCharacterization } from "./osf";
 
@@ -353,6 +355,37 @@ export async function updateProfile(
       throw new Error(parsed.errors.map((e) => e.message).join(". "));
     }
     throw new Error(parsed.error || `API error: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function getMcpTokens(): Promise<{ data: McpTokenSummary[] }> {
+  return fetchJSON("/api/auth/mcp/tokens");
+}
+
+export async function createMcpToken(data: {
+  label?: string;
+  expiresInDays?: 7 | 30 | 90 | 365 | null;
+}): Promise<CreatedMcpToken> {
+  const res = await fetch(`${BASE}/api/auth/mcp/tokens`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || `API error: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function revokeMcpToken(id: string): Promise<{ ok: boolean }> {
+  const res = await fetch(`${BASE}/api/auth/mcp/tokens/${id}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || `API error: ${res.status}`);
   }
   return res.json();
 }

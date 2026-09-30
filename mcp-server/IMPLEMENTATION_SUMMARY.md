@@ -436,9 +436,9 @@ Implementation is successful if:
 3. ✅ Documentation complete
 4. [ ] Run quick smoke test (15 min)
 5. [ ] Fix any critical issues found
-6. [ ] Run full test suite (2 hours)
+6. ✅ Run full automated test suite (`npm test`)
 7. [ ] Record test results in `test-logs/`
-8. [ ] Update README.md with v1.1.0 notes
+8. ✅ Update README.md with v1.2.0 notes
 
 ### Post-Merge
 
@@ -452,7 +452,7 @@ Implementation is successful if:
 
 1. Move extractability maps to database schema
 2. Add extractability validation in backend API
-3. Create automated tests for MCP server
+3. ✅ Create automated tests for MCP server
 4. Add more ✅/❌ examples based on user feedback
 5. Integrate with VLM/LLM feature extraction pipelines
 

@@ -1,0 +1,22 @@
+{
+  "name": "openexperiments-mcp",
+  "compatibility_date": "2025-04-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "src/index.ts",
+  "vars": {
+    "OPENEXPERIMENTS_API_URL": "https://openexperiments.pages.dev",
+    "OPENEXPERIMENTS_SITE_URL": "https://openexperiments.pages.dev"
+  },
+  "kv_namespaces": [
+    // Create with: npx wrangler kv namespace create OAUTH_KV
+    { "binding": "OAUTH_KV", "id": "placeholder-fill-after-create" }
+  ],
+  "durable_objects": {
+    "bindings": [
+      { "name": "MCP_AGENT", "class_name": "OpenExperimentsMCP" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["OpenExperimentsMCP"] }
+  ]
+}

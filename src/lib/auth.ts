@@ -10,7 +10,35 @@ export interface SessionUser {
   profileCompleted: boolean;
 }
 
-export async function getSession(request: Request): Promise<SessionUser | null> {
+export type SessionSource = "cookie" | "bearer";
+
+export interface SessionWithSource {
+  user: SessionUser;
+  source: SessionSource;
+}
+
+export async function getSessionWithSource(request: Request): Promise<SessionWithSource | null> {
+  const authHeader = request.headers.get("authorization") || "";
+  if (authHeader.startsWith("Bearer ")) {
+    const token = authHeader.slice(7);
+    const { resolveTokenToUser } = await import("@/lib/mcp-tokens");
+    const db = getDB();
+    const row = await resolveTokenToUser(db, token);
+    if (row) {
+      return {
+        source: "bearer",
+        user: {
+          id: row.id,
+          email: row.email,
+          name: row.name,
+          avatarUrl: row.avatarUrl,
+          profileCompleted: row.profileCompleted === 1,
+        },
+      };
+    }
+    return null;
+  }
+
   const cookie = request.headers.get("cookie") || "";
   const match = cookie.match(/session=([^;]+)/);
   if (!match) return null;
@@ -35,12 +63,20 @@ export async function getSession(request: Request): Promise<SessionUser | null> 
   if (rows.length === 0) return null;
 
   return {
-    id: rows[0].userId,
-    email: rows[0].email,
-    name: rows[0].name,
-    avatarUrl: rows[0].avatarUrl,
-    profileCompleted: rows[0].profileCompleted === 1,
+    source: "cookie",
+    user: {
+      id: rows[0].userId,
+      email: rows[0].email,
+      name: rows[0].name,
+      avatarUrl: rows[0].avatarUrl,
+      profileCompleted: rows[0].profileCompleted === 1,
+    },
   };
+}
+
+export async function getSession(request: Request): Promise<SessionUser | null> {
+  const session = await getSessionWithSource(request);
+  return session?.user ?? null;
 }
 
 export function requireSession(user: SessionUser | null): Response | null {

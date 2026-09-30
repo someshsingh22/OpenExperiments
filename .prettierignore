@@ -5,3 +5,5 @@ node_modules
 mcp-server/node_modules
 mcp-server/dist
 *.tsbuildinfo
+mcp-worker/node_modules
+mcp-worker/.wrangler

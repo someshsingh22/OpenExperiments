@@ -1,117 +1,91 @@
 # OpenExperiments MCP Server
 
-MCP (Model Context Protocol) server for [OpenExperiments](https://openexperiments.pages.dev) — gives LLMs access to hypothesis discovery, dataset exploration, and guided hypothesis formulation.
+Model Context Protocol (MCP) server for OpenExperiments. It exposes the website workflows to AI assistants: account lookup, hypothesis discovery/submission, comments, stars, arena voting, experiment planning/versioning, dataset registration, profiles, prompts, and resources.
+
+Version: **1.2.0**
+
+## Features
+
+- Runtime-neutral shared registration module (`src/register.ts`) for stdio and the remote worker.
+- Authenticated writes through `Authorization: Bearer <token>` when `OPENEXPERIMENTS_TOKEN` is set.
+- Read-only tools for the full public site surface, plus idempotent star/unstar wrappers around the toggle API.
+- Write tools include confirmation-oriented descriptions so clients should show exact content before calling.
+- Central timeout/error handling: 401/403/404/409/400/422/429/5xx/network failures become MCP `isError` results.
 
 ## Tools
 
-| Tool                      | Description                                          |
-| ------------------------- | ---------------------------------------------------- |
-| `platform_overview`       | Stats, domains, lifecycle — call first to orient     |
-| `list_problem_statements` | All open research questions with linked datasets     |
-| `list_datasets`           | All Hugging Face datasets with column schemas        |
-| `get_dataset`             | Deep dive into one dataset                           |
-| `search_hypotheses`       | Keyword search across hypotheses                     |
-| `get_hypothesis`          | Full hypothesis detail with experiments and comments |
-| `get_arena_rankings`      | Leaderboard by community vote win rate               |
-| `list_experiments`        | Browse experiments, filter by hypothesis             |
-| `get_experiment`          | Full experiment detail with stats                    |
-| `generate_submission_url` | Pre-filled link to the submit page                   |
+| Tool | Mode | Auth | Purpose |
+| --- | --- | --- | --- |
+| `whoami` | Read | Optional | Show the signed-in user or token setup help. |
+| `platform_overview` | Read | No | Platform stats, lifecycle, workflow, and feature-extractability guidance. |
+| `list_problem_statements` | Read | No | List research questions and linked datasets. |
+| `list_datasets` | Read | No | Browse datasets by domain. |
+| `get_dataset` | Read | No | Dataset detail, OSF characterization, problem statements, experiments. |
+| `submit_dataset` | Write | Yes | Register a Hugging Face dataset with OSF-style fields. |
+| `browse_hypotheses` | Read | No | Full explore filters: domain, phase, status, problem statement/search, sort, limit/offset. |
+| `search_hypotheses` | Read | No | Back-compatible keyword search. |
+| `get_hypothesis` | Read | No | Hypothesis detail with experiments, comments, citations. |
+| `submit_hypothesis` | Write | Yes | Submit a confirmed hypothesis. |
+| `add_citation` | Write | Yes | Add DOI/arXiv citation to the author's hypothesis. |
+| `generate_submission_url` | Read | No | Create prefilled `/submit` URL. |
+| `get_my_hypotheses` | Read | Yes | Authenticated user's hypotheses. |
+| `list_comments` | Read | No | Comments for a hypothesis. |
+| `post_comment` | Write | Yes | Post comment or reply. |
+| `get_star_status` | Read | Optional | Star count and viewer status. |
+| `star_hypothesis` | Write | Yes | Idempotently star a hypothesis. |
+| `unstar_hypothesis` | Write | Yes | Idempotently unstar a hypothesis. |
+| `get_arena_rankings` | Read | No | Arena leaderboard. |
+| `get_arena_matchup` | Read | No | Random pairwise matchup. |
+| `vote_arena` | Write | Yes | Cast arena vote after confirmation. |
+| `list_experiments` | Read | No | Browse experiments, optionally by hypothesis. |
+| `get_experiment` | Read | No | Experiment detail and versions. |
+| `submit_experiment` | Write | Yes | Submit planned/running/completed experiment. |
+| `update_experiment` | Write | Yes | Update owned experiment and create a new version. |
+| `get_user_profile` | Read | Optional | User profile, stats, hypotheses, stars. |
+| `update_my_profile` | Write | Yes | Update the signed-in user's profile. |
 
-## Prompts
+## Prompts and resources
 
-| Prompt                 | Description                                                            |
-| ---------------------- | ---------------------------------------------------------------------- |
-| `formulate-hypothesis` | Loads all context to help turn a rough idea into a testable hypothesis |
-| `co-ideate`            | Brainstorm new research directions from existing work                  |
-
-## Philosophy: ExperiGen Feature Extractability
-
-The MCP server guides users based on the **ExperiGen** approach ([arxiv.org/abs/2602.07983](https://arxiv.org/abs/2602.07983)):
-
-**Core Principle**: Hypotheses must test features COMPUTABLE from available dataset columns.
-
-**✅ Extractable Features:**
-
-- **Code-based**: Brightness from pixels, length from text, counts, ratios
-- **NLP/LLM-based**: Sentiment, readability, named entities, topics from text
-- **VLM-based**: Face count, object types, scene category from images
-- **Statistical**: Correlations, aggregations from numerical data
-
-**❌ Not Extractable:**
-
-- Viewer's mood (not stored in data)
-- Author's true intent (not measurable)
-- Temporal features when timestamps missing
-- User demographics when data is anonymized
-
-**Example**: "Warm colors make images more memorable" is testable because color can be extracted from RGB pixel values. "Viewer's mood affects memory" is NOT testable because mood isn't in the dataset.
-
-## Domain Flexibility
-
-The MCP server accepts hypotheses in **any domain**, not just persuasion/memorability:
-
-- **Standard domains**: `persuasion`, `memorability` (fully supported)
-- **New domains**: `attention`, `learning`, `decision-making`, etc. (exploratory)
-- Users can propose problem statements in any domain
-- Problem statements can exist without datasets initially
-- Datasets can be suggested via GitHub PR later
-
-When generating submission URLs for non-standard domains, the MCP shows a warning explaining the current platform restrictions and how to propose new domains.
-
-## Quick Start (Local Development)
-
-```bash
-# 1. Install and build
-cd mcp-server
-npm install
-npm run build
-
-# 2. Configure (choose one)
-bash configure-claude-code.sh      # For Claude Code CLI
-bash configure-claude-desktop.sh   # For Claude Desktop app
-
-# 3. Start your local dev server (in main project)
-cd ..
-npm run dev
-```
-
-See [LOCAL_SETUP.md](./LOCAL_SETUP.md) for detailed local development instructions.
+| Name | Type | Purpose |
+| --- | --- | --- |
+| `formulate-hypothesis` | Prompt | Turn an idea into a testable hypothesis; submit after explicit confirmation or generate URL. |
+| `co-ideate` | Prompt | Brainstorm research directions using existing hypotheses/questions. |
+| `review-arena` | Prompt | Guide matchup judging with `get_arena_matchup` and `vote_arena`. |
+| `design-experiment` | Prompt | Plan and submit/update experiments after confirmation. |
+| `openexperiments://guide` | Resource | Platform/MCP guide and full tool summary. |
+| `openexperiments://hypothesis/{id}` | Resource template | Fetch a hypothesis as markdown. |
 
 ## Setup
 
-### 1. Install
-
 ```bash
 cd mcp-server
 npm install
 npm run build
 ```
 
-### 2. Configure in Claude Desktop
+Environment variables:
 
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+| Variable | Default | Description |
+| --- | --- | --- |
+| `OPENEXPERIMENTS_API_URL` | `https://openexperiments.pages.dev` | App API origin. Use `http://localhost:3000` for local dev. |
+| `OPENEXPERIMENTS_SITE_URL` | Same as API URL | Site links emitted in tool output. |
+| `OPENEXPERIMENTS_TOKEN` | unset | Personal access token from `/settings/mcp` for authenticated tools. |
 
-```json
-{
-  "mcpServers": {
-    "openexperiments": {
-      "command": "node",
-      "args": ["/absolute/path/to/mcp-server/dist/index.js"],
-      "env": {
-        "OPENEXPERIMENTS_API_URL": "https://openexperiments.pages.dev"
-      }
-    }
-  }
-}
+Create a token at `<site>/settings/mcp`, then set `OPENEXPERIMENTS_TOKEN` in your MCP client config.
+
+### Claude Code
+
+```bash
+OPENEXPERIMENTS_TOKEN=... bash configure-claude-code.sh
 ```
 
-### 3. Configure in Claude Code
+Or manually:
 
 ```bash
 claude mcp add openexperiments node /absolute/path/to/mcp-server/dist/index.js
 ```
 
-Or add to `.claude/settings.json`:
+Add env vars in Claude Code settings if needed:
 
 ```json
 {
@@ -120,58 +94,69 @@ Or add to `.claude/settings.json`:
       "command": "node",
       "args": ["/absolute/path/to/mcp-server/dist/index.js"],
       "env": {
-        "OPENEXPERIMENTS_API_URL": "https://openexperiments.pages.dev"
+        "OPENEXPERIMENTS_API_URL": "http://localhost:3000",
+        "OPENEXPERIMENTS_SITE_URL": "http://localhost:3000",
+        "OPENEXPERIMENTS_TOKEN": "oe_pat_..."
       }
     }
   }
 }
 ```
 
-## Environment Variables
+### Claude Desktop
 
-| Variable                   | Default                             | Description                  |
-| -------------------------- | ----------------------------------- | ---------------------------- |
-| `OPENEXPERIMENTS_API_URL`  | `https://openexperiments.pages.dev` | API base URL                 |
-| `OPENEXPERIMENTS_SITE_URL` | Same as API URL                     | Site URL for generated links |
+Run:
 
-Configuration priority (highest to lowest):
+```bash
+OPENEXPERIMENTS_TOKEN=... bash configure-claude-desktop.sh
+```
 
-1. Environment variables in Claude config (`env` field)
-2. `.env` file in `mcp-server/` directory
-3. Built-in defaults (production URLs)
-
-For local development, the `.env` file is pre-configured to use `localhost:3000`. Just start your dev server and it works.
-
-To override for production, edit `mcp-server/.env` or add `env` to your Claude config:
+Or add this to `claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "openexperiments": {
       "command": "node",
-      "args": ["/path/to/dist/index.js"],
+      "args": ["/absolute/path/to/mcp-server/dist/index.js"],
       "env": {
-        "OPENEXPERIMENTS_API_URL": "https://openexperiments.pages.dev"
+        "OPENEXPERIMENTS_API_URL": "https://openexperiments.pages.dev",
+        "OPENEXPERIMENTS_SITE_URL": "https://openexperiments.pages.dev",
+        "OPENEXPERIMENTS_TOKEN": "oe_pat_..."
       }
     }
   }
 }
 ```
 
-## Development
+### Cursor / other stdio clients
 
-```bash
-npm run dev     # Run with tsx (no build needed)
-npm run build   # Compile TypeScript
-npm start       # Run compiled output
-```
+Use command `node` with args `[/absolute/path/to/mcp-server/dist/index.js]` and the same environment variables above.
+
+### Remote connector
+
+The remote Cloudflare Worker imports `@openexperiments/mcp-server/register`. See `../mcp-worker/README.md` for OAuth connector setup.
 
 ## Testing
 
-See [TESTING.md](./TESTING.md) for the full testing plan.
+```bash
+npm run build
+npm test
+```
 
-Quick smoke test with MCP Inspector:
+The test suite uses a local mock HTTP server and in-memory MCP transports; it has no external network dependency.
+
+Live smoke against a running app:
 
 ```bash
-npx @modelcontextprotocol/inspector node dist/index.js
+OPENEXPERIMENTS_API_URL=http://localhost:3000 npm run smoke
 ```
+
+## v1.2.0 changelog
+
+- Added full website MCP coverage: account, comments, stars, arena matchup/vote, experiment submit/update, dataset submit, profile read/update.
+- Migrated tools to `server.registerTool` with MCP annotations.
+- Added typed API responses (`src/api-types.ts`) and removed `any` from MCP source.
+- Added central authenticated API helper with timeouts and user-friendly error mapping.
+- Added prompt updates, `review-arena`, `design-experiment`, and hypothesis resource template.
+- Added automated mock-server tests and live smoke script.

@@ -1,0 +1,6 @@
+# Shared secret — must match the app's MCP_SERVER_SECRET
+MCP_SERVER_SECRET=dev-secret-123
+# App API base URL (local: http://localhost:3000)
+OPENEXPERIMENTS_API_URL=http://localhost:3000
+# Public site URL shown in MCP resource/tool links; defaults to API URL if omitted
+OPENEXPERIMENTS_SITE_URL=http://localhost:3000

@@ -47,6 +47,40 @@ export const sessions = sqliteTable(
   ],
 );
 
+export const mcpAuthCodes = sqliteTable(
+  "mcp_auth_codes",
+  {
+    codeHash: text("code_hash").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    expiresAt: integer("expires_at").notNull(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => [index("idx_mcp_auth_codes_expires_at").on(table.expiresAt)],
+);
+
+export const mcpTokens = sqliteTable(
+  "mcp_tokens",
+  {
+    id: text("id").primaryKey(),
+    tokenHash: text("token_hash").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    label: text("label"),
+    source: text("source").notNull().$type<"oauth" | "personal">(),
+    expiresAt: integer("expires_at"),
+    createdAt: integer("created_at").notNull(),
+    lastUsedAt: integer("last_used_at"),
+  },
+  (table) => [
+    uniqueIndex("idx_mcp_tokens_token_hash").on(table.tokenHash),
+    index("idx_mcp_tokens_user_id").on(table.userId),
+    index("idx_mcp_tokens_expires_at").on(table.expiresAt),
+  ],
+);
+
 // -- Phase A tables --
 
 export const hypotheses = sqliteTable(

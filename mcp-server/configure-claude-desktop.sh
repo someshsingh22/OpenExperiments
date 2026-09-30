@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# Quick setup helper for Claude Desktop
-# Run with: bash configure-claude-desktop.sh
+# Quick setup helper for Claude Desktop. Prints JSON to paste into config.
+# Optional env before running:
+#   OPENEXPERIMENTS_API_URL=http://localhost:3000 OPENEXPERIMENTS_SITE_URL=http://localhost:3000 OPENEXPERIMENTS_TOKEN=oe_pat_... bash configure-claude-desktop.sh
 
 set -e
 
@@ -14,7 +15,6 @@ if [ ! -f "$DIST_PATH" ]; then
   exit 1
 fi
 
-# Detect config path based on OS
 if [[ "$OSTYPE" == "darwin"* ]]; then
   CONFIG_PATH="$HOME/Library/Application Support/Claude/claude_desktop_config.json"
 elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
@@ -22,36 +22,33 @@ elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
 elif [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "win32" ]]; then
   CONFIG_PATH="$APPDATA/Claude/claude_desktop_config.json"
 else
-  echo "⚠️  Unknown OS type: $OSTYPE"
   CONFIG_PATH="<path to claude_desktop_config.json>"
 fi
 
+API_URL="${OPENEXPERIMENTS_API_URL:-https://openexperiments.pages.dev}"
+SITE_URL="${OPENEXPERIMENTS_SITE_URL:-$API_URL}"
+TOKEN="${OPENEXPERIMENTS_TOKEN:-oe_pat_...}"
+
 echo "📦 OpenExperiments MCP Server Configuration"
+echo "MCP Server Path: $DIST_PATH"
+echo "Claude Desktop Config: $CONFIG_PATH"
 echo ""
-echo "MCP Server Path:"
-echo "  $DIST_PATH"
+echo "Add/merge this JSON:"
 echo ""
-echo "Claude Desktop Config:"
-echo "  $CONFIG_PATH"
+cat <<JSON
+{
+  "mcpServers": {
+    "openexperiments": {
+      "command": "node",
+      "args": ["$DIST_PATH"],
+      "env": {
+        "OPENEXPERIMENTS_API_URL": "$API_URL",
+        "OPENEXPERIMENTS_SITE_URL": "$SITE_URL",
+        "OPENEXPERIMENTS_TOKEN": "$TOKEN"
+      }
+    }
+  }
+}
+JSON
 echo ""
-echo "Add this to your claude_desktop_config.json:"
-echo ""
-echo "{"
-echo "  \"mcpServers\": {"
-echo "    \"openexperiments\": {"
-echo "      \"command\": \"node\","
-echo "      \"args\": ["
-echo "        \"$DIST_PATH\""
-echo "      ]"
-echo "    }"
-echo "  }"
-echo "}"
-echo ""
-echo "📝 Steps:"
-echo "  1. Open the config file in your editor"
-echo "  2. Add the configuration above (merge with existing mcpServers if present)"
-echo "  3. Save the file"
-echo "  4. Quit and restart Claude Desktop completely"
-echo ""
-echo "To open the config file now:"
-echo "  open \"$CONFIG_PATH\""
+echo "Create a token at $SITE_URL/settings/mcp. Omit OPENEXPERIMENTS_TOKEN for read-only use."

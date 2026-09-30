@@ -17,7 +17,7 @@ const eslintConfig = [
     },
   },
   {
-    ignores: [".next/**", "out/**", "build/**", "next-env.d.ts", "mcp-server/**"],
+    ignores: [".next/**", "out/**", "build/**", "next-env.d.ts", "mcp-server/**", "mcp-worker/**"],
   },
 ];
 

@@ -1,0 +1,28 @@
+{
+  "name": "openexperiments-mcp-worker",
+  "version": "1.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "predev": "npm --prefix ../mcp-server run build",
+    "dev": "wrangler dev",
+    "build": "wrangler deploy --dry-run --outdir .wrangler/build",
+    "typecheck": "tsc --noEmit -p .",
+    "predeploy": "npm --prefix ../mcp-server run build",
+    "deploy": "wrangler deploy",
+    "types": "wrangler types"
+  },
+  "dependencies": {
+    "@cloudflare/workers-oauth-provider": "^0.2.4",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@openexperiments/mcp-server": "file:../mcp-server",
+    "agents": "^0.0.78",
+    "hono": "^4.12.27",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260702.1",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.107.0"
+  }
+}
