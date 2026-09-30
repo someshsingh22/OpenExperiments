@@ -5,6 +5,7 @@ import { getRequestContext } from "@cloudflare/next-on-pages";
 import { getDB } from "@/db";
 import { users, sessions } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { decodeSafeReturnTo } from "@/lib/safe-redirect";
 
 function getCookie(request: Request, name: string): string | null {
   const cookie = request.headers.get("cookie") || "";
@@ -104,7 +105,7 @@ export async function GET(request: Request) {
 
   // Clear OAuth cookies + set session cookie
   const loginReturnTo = getCookie(request, "login_return_to");
-  const decodedReturnTo = loginReturnTo ? decodeURIComponent(loginReturnTo) : null;
+  const decodedReturnTo = decodeSafeReturnTo(loginReturnTo);
 
   let redirectTo: string;
   if (decodedReturnTo) {

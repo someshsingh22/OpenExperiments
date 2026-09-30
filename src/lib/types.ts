@@ -115,3 +115,23 @@ export interface Comment {
   createdAt: string;
   parentId?: string;
 }
+
+export type McpTokenSource = "oauth" | "personal";
+
+export interface McpTokenSummary {
+  id: string;
+  label: string | null;
+  source: McpTokenSource;
+  createdAt: string | null;
+  lastUsedAt: string | null;
+  expiresAt: string | null;
+}
+
+export interface CreatedMcpToken {
+  token: string;
+  id: string;
+  label: string | null;
+  source: "personal";
+  createdAt: string | null;
+  expiresAt: string | null;
+}

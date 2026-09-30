@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
-import { Menu, X, LogOut, User } from "lucide-react";
+import { Bot, Menu, X, LogOut, User } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import clsx from "clsx";
 import { useAuth } from "./auth-provider";
@@ -129,6 +129,14 @@ export function Navbar() {
                         <User className="h-3.5 w-3.5" />
                         My Profile
                       </Link>
+                      <Link
+                        href="/settings/mcp"
+                        onClick={() => setUserMenuOpen(false)}
+                        className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm text-stone-600 transition-colors hover:bg-stone-50 hover:text-stone-900"
+                      >
+                        <Bot className="h-3.5 w-3.5" />
+                        AI / MCP access
+                      </Link>
                       <button
                         onClick={async () => {
                           setUserMenuOpen(false);
@@ -224,6 +232,13 @@ export function Navbar() {
                     className="block rounded-md px-3 py-2 text-sm font-medium text-stone-500"
                   >
                     My Profile
+                  </Link>
+                  <Link
+                    href="/settings/mcp"
+                    onClick={() => setMobileOpen(false)}
+                    className="block rounded-md px-3 py-2 text-sm font-medium text-stone-500"
+                  >
+                    AI / MCP access
                   </Link>
                   <button
                     onClick={async () => {

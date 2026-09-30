@@ -34,14 +34,20 @@ export async function GET(request: Request) {
     );
   }
 
-  const mine = url.searchParams.get("mine");
-  if (mine === "true") {
+  // `mine=true` is user-scoped: resolve the viewer and never let the response
+  // be stored in a shared cache.
+  const mine = url.searchParams.get("mine") === "true";
+  let viewerId: string | null = null;
+  if (mine) {
+    const { getSession } = await import("@/lib/auth");
+    const viewer = await getSession(request);
     if (!viewer) {
       return Response.json(
-        { data: [], total: 0 },
-        { headers: { "Cache-Control": "private, no-store" } },
+        { error: "Unauthorized" },
+        { status: 401, headers: { "Cache-Control": "private, no-store" } },
       );
     }
+    viewerId = viewer.id;
   }
 
   const domain = url.searchParams.get("domain");
@@ -53,8 +59,8 @@ export async function GET(request: Request) {
   const offset = parseInt(url.searchParams.get("offset") || "0");
 
   const conditions: SQL[] = [];
-  if (mine === "true" && viewer) {
-    conditions.push(eq(hypotheses.submittedBy, viewer.id));
+  if (viewerId) {
+    conditions.push(eq(hypotheses.submittedBy, viewerId));
   }
   if (phase) conditions.push(eq(hypotheses.phase, phase));
   if (status) conditions.push(eq(hypotheses.status, status));
@@ -142,7 +148,9 @@ export async function GET(request: Request) {
       total: count,
     },
     {
-      headers: { "Cache-Control": "public, max-age=60, s-maxage=300" },
+      headers: {
+        "Cache-Control": mine ? "private, no-store" : "public, max-age=60, s-maxage=300",
+      },
     },
   );
 }

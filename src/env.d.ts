@@ -5,4 +5,5 @@ interface CloudflareEnv {
   GOOGLE_CLIENT_SECRET: string;
   SESSION_SECRET: string;
   MCP_SERVER_SECRET: string;
+  MCP_WORKER_URL?: string;
 }

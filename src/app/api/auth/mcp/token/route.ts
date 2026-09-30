@@ -4,11 +4,43 @@ import { getRequestContext } from "@cloudflare/next-on-pages";
 import { getDB } from "@/db";
 import { consumeAuthCode, createMcpToken } from "@/lib/mcp-tokens";
 
+function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
+  let diff = a.length ^ b.length;
+  const length = Math.max(a.length, b.length);
+  for (let i = 0; i < length; i += 1) {
+    diff |= (a[i] ?? 0) ^ (b[i] ?? 0);
+  }
+  return diff === 0;
+}
+
+async function sha256Bytes(value: string): Promise<Uint8Array> {
+  const encoded = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest("SHA-256", encoded);
+  return new Uint8Array(digest);
+}
+
+async function isValidSecret(
+  candidate: string | null,
+  expected: string | undefined,
+): Promise<boolean> {
+  if (candidate === null || !expected) return false;
+
+  const [candidateHash, expectedHash] = await Promise.all([
+    sha256Bytes(candidate),
+    sha256Bytes(expected),
+  ]);
+  return constantTimeEqual(candidateHash, expectedHash);
+}
+
 export async function POST(request: Request) {
   const { env } = getRequestContext();
 
+  if (!env.MCP_SERVER_SECRET) {
+    return Response.json({ error: "MCP token exchange is not configured" }, { status: 503 });
+  }
+
   const secret = request.headers.get("x-mcp-secret");
-  if (!secret || secret !== env.MCP_SERVER_SECRET) {
+  if (!(await isValidSecret(secret, env.MCP_SERVER_SECRET))) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -30,6 +62,9 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid or expired authorization code" }, { status: 400 });
   }
 
-  const token = await createMcpToken(db, userId, "mcp-remote");
-  return Response.json({ token, userId });
+  const created = await createMcpToken(db, userId, {
+    label: "Remote MCP connector",
+    source: "oauth",
+  });
+  return Response.json({ token: created.token, userId });
 }

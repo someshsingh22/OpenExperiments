@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "fa335420-8c32-428e-87c5-a830e253429b",
+  "id": "cd984573-f38a-4a1e-99df-ed72d0d3d197",
   "prevId": "4643106f-0915-4b8a-a126-29e7de2c19ab",
   "tables": {
     "arena_matchups": {
@@ -1107,8 +1107,8 @@
     "mcp_auth_codes": {
       "name": "mcp_auth_codes",
       "columns": {
-        "code": {
-          "name": "code",
+        "code_hash": {
+          "name": "code_hash",
           "type": "text",
           "primaryKey": true,
           "notNull": true,
@@ -1161,10 +1161,17 @@
     "mcp_tokens": {
       "name": "mcp_tokens",
       "columns": {
-        "token": {
-          "name": "token",
+        "id": {
+          "name": "id",
           "type": "text",
           "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
@@ -1180,6 +1187,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false,
+          "autoincrement": false
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
           "autoincrement": false
         },
         "expires_at": {
@@ -1205,9 +1219,19 @@
         }
       },
       "indexes": {
+        "idx_mcp_tokens_token_hash": {
+          "name": "idx_mcp_tokens_token_hash",
+          "columns": ["token_hash"],
+          "isUnique": true
+        },
         "idx_mcp_tokens_user_id": {
           "name": "idx_mcp_tokens_user_id",
           "columns": ["user_id"],
+          "isUnique": false
+        },
+        "idx_mcp_tokens_expires_at": {
+          "name": "idx_mcp_tokens_expires_at",
+          "columns": ["expires_at"],
           "isUnique": false
         }
       },

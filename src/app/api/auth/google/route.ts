@@ -2,6 +2,7 @@ export const runtime = "edge";
 
 import { Google } from "arctic";
 import { getRequestContext } from "@cloudflare/next-on-pages";
+import { isSafeReturnTo } from "@/lib/safe-redirect";
 
 export async function GET(request: Request) {
   const { env } = getRequestContext();
@@ -28,7 +29,7 @@ export async function GET(request: Request) {
     "Set-Cookie",
     `code_verifier=${codeVerifier}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=600`,
   );
-  if (returnTo) {
+  if (returnTo && isSafeReturnTo(returnTo)) {
     headers.append(
       "Set-Cookie",
       `login_return_to=${encodeURIComponent(returnTo)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=600`,
