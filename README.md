@@ -45,7 +45,8 @@ A platform for hypothesis generation, crowdsourced ranking, and empirical testin
 │       ├── auth.ts               # Session resolution
 │       └── types.ts              # Shared TypeScript interfaces
 ├── drizzle/migrations/           # SQL migration files
-├── mcp-server/                   # MCP server (separate package)
+├── mcp-server/                   # MCP server (separate package, stdio)
+├── mcp-worker/                   # Remote MCP connector (Cloudflare Worker, OAuth)
 ├── scripts/seed.sql              # Seed data
 ├── wrangler.toml                 # Cloudflare config
 └── next.config.ts                # Next.js config
@@ -208,25 +209,32 @@ npm run wrangler -- pages deployment rollback <DEPLOYMENT_ID> --project-name ope
 
 ## MCP Server
 
-The `mcp-server/` directory is a standalone Model Context Protocol server exposing the platform's API as tools for AI assistants.
+AI assistants can use every feature of the site through the Model Context Protocol: browse and search hypotheses, problem statements, datasets and experiments; submit hypotheses, experiments and datasets; comment, cite, star, vote in the arena, and edit your profile (28 tools, 4 prompts, resources).
 
-```bash
-cd mcp-server && npm install && npm run build
-```
+- **`mcp-server/`** — stdio server for Claude Code / Claude Desktop / Cursor. Read tools work anonymously; for write tools create a personal access token at `/settings/mcp` and set `OPENEXPERIMENTS_TOKEN`. See [`mcp-server/README.md`](mcp-server/README.md).
 
-Configure with `OPENEXPERIMENTS_API_URL` pointing to the running app.
+  ```bash
+  cd mcp-server && npm install && npm run build && npm test
+  ```
+
+- **`mcp-worker/`** — remote connector (Cloudflare Worker, Streamable HTTP at `/mcp` and SSE at `/sse`) with OAuth 2.1 sign-in delegated to the app, for Claude.ai / ChatGPT. See [`mcp-worker/README.md`](mcp-worker/README.md).
+
+The tool definitions live in one shared, runtime-neutral module (`mcp-server/src/register.ts`) used by both. The app accepts `Authorization: Bearer <token>` on all `/api/*` routes; tokens are stored hashed (`mcp_tokens`) and can be revoked from `/settings/mcp`.
 
 ## Environment Variables
 
-| Variable                    | Required  | Description                                        |
-| --------------------------- | --------- | -------------------------------------------------- |
-| `GOOGLE_CLIENT_ID`          | Yes       | Google OAuth client ID                             |
-| `GOOGLE_CLIENT_SECRET`      | Yes       | Google OAuth client secret                         |
-| `APP_URL`                   | Yes       | Base URL (no trailing slash)                       |
-| `CLOUDFLARE_ACCOUNT_ID`     | CI only   | Cloudflare account ID                              |
-| `CLOUDFLARE_API_TOKEN`      | CI only   | API token with Pages + D1 write permissions        |
-| `CLOUDFLARE_D1_DATABASE_ID` | Reference | D1 database UUID                                   |
-| `DB`                        | Runtime   | D1 binding (set in Cloudflare dashboard, not .env) |
+| Variable                     | Required   | Description                                                     |
+| ---------------------------- | ---------- | --------------------------------------------------------------- |
+| `GOOGLE_CLIENT_ID`           | Yes        | Google OAuth client ID                                          |
+| `GOOGLE_CLIENT_SECRET`       | Yes        | Google OAuth client secret                                      |
+| `APP_URL`                    | Yes        | Base URL (no trailing slash)                                    |
+| `CLOUDFLARE_ACCOUNT_ID`      | CI only    | Cloudflare account ID                                           |
+| `CLOUDFLARE_API_TOKEN`       | CI only    | API token with Pages + D1 write permissions                     |
+| `CLOUDFLARE_D1_DATABASE_ID`  | Reference  | D1 database UUID                                                |
+| `DB`                         | Runtime    | D1 binding (set in Cloudflare dashboard, not .env)              |
+| `MCP_SERVER_SECRET`          | Remote MCP | Shared secret with `mcp-worker` for code→token exchange         |
+| `MCP_WORKER_URL`             | Remote MCP | Worker origin; OAuth `redirect_uri` must be `<origin>/callback` |
+| `NEXT_PUBLIC_MCP_WORKER_URL` | Optional   | Worker origin shown on `/settings/mcp`                          |
 
 ## Troubleshooting
 

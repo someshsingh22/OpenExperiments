@@ -20,6 +20,7 @@ OpenExperiments is a Next.js 15 app deployed on Cloudflare Pages. It uses Cloudf
 | `scripts/seed.sql`    | Seed data for local and remote D1                        |
 | `wrangler.toml`       | Cloudflare project config (D1 binding, build output dir) |
 | `mcp-server/`         | Standalone MCP server — separate package, separate deps  |
+| `mcp-worker/`         | Remote MCP connector (Cloudflare Worker + OAuth)         |
 
 ## Hard Rules
 
@@ -96,4 +97,6 @@ Husky + lint-staged runs ESLint and Prettier on every commit. If the commit fail
 
 ## MCP Server
 
-`mcp-server/` is a separate package with its own `package.json` and `node_modules`. Changes there require `cd mcp-server && npm run build`. It calls the app's `/api/*` routes over HTTP — it does not import from `src/`.
+`mcp-server/` is a separate package with its own `package.json` and `node_modules`. Changes there require `cd mcp-server && npm run build && npm test`. It calls the app's `/api/*` routes over HTTP — it does not import from `src/`. Tools, prompts and resources live in `mcp-server/src/register.ts`, which must stay runtime-neutral (no `process`, no Node built-ins) because `mcp-worker/` (the remote Cloudflare Worker connector) imports it too. When you add or change a user-facing API capability, add/update the matching MCP tool and its test in `mcp-server/test/`.
+
+Auth: `getSession()` in `src/lib/auth.ts` accepts the session cookie or `Authorization: Bearer <token>` (hashed `mcp_tokens`, managed at `/settings/mcp`). Token-management routes (`/api/auth/mcp/tokens`) are cookie-only.
