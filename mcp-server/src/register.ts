@@ -1,546 +1,482 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { ResourceTemplate, type McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
+import type {
+  ApiData,
+  ApiErrorBody,
+  ApiList,
+  ArenaMatchup,
+  ArenaRanking,
+  ArenaVote,
+  AuthMeResponse,
+  Comment,
+  Dataset,
+  DatasetDetailResponse,
+  Experiment,
+  ExperimentDetailResponse,
+  Hypothesis,
+  HypothesisDetailResponse,
+  OsfCharacterization,
+  ProblemStatement,
+  StarStatus,
+  UserProfileResponse,
+  VoteResponse,
+} from "./api-types.js";
 
 export interface RegisterOptions {
   apiUrl: string;
   siteUrl: string;
   getAuthToken?: () => string | undefined;
+  authHelp?: string;
+}
+
+type HttpMethod = "GET" | "POST" | "PATCH" | "DELETE";
+type ApiResult<T> = { ok: true; data: T } | { ok: false; result: CallToolResult; status?: number };
+
+const READ_ANNOTATIONS = { readOnlyHint: true, openWorldHint: true } as const;
+const WRITE_ANNOTATIONS = { readOnlyHint: false, openWorldHint: true, destructiveHint: false } as const;
+const IDEMPOTENT_WRITE_ANNOTATIONS = {
+  readOnlyHint: false,
+  openWorldHint: true,
+  destructiveHint: false,
+  idempotentHint: true,
+} as const;
+
+const hypothesisStatusSchema = z.enum([
+  "proposed",
+  "arena_ranked",
+  "data_tested",
+  "field_validated",
+]);
+const phaseSchema = z.enum(["live", "completed"]);
+const sourceSchema = z.enum(["human", "ai_agent"]);
+const sortSchema = z.enum(["newest", "top_rated", "most_discussed"]);
+const experimentTypeSchema = z.enum(["observational", "survey", "ab_test", "pre_registered"]);
+const experimentStatusSchema = z.enum(["planned", "running", "completed"]);
+const voteSchema = z.enum(["a", "b", "tie", "both_weak"]);
+
+const osfSchema = z.object({
+  provenance: z.string().min(30).max(8000),
+  foreknowledgeExplanation: z.string().max(8000).optional(),
+  collectionProcedure: z.string().min(30).max(8000),
+  startStopRules: z.string().max(8000).optional(),
+  variables: z.string().min(30).max(8000),
+  inclusionExclusion: z.string().min(30).max(8000),
+  missingData: z.string().min(15).max(8000),
+  limitations: z.string().max(8000).optional(),
+  tags: z.array(z.string().min(1)).optional(),
+});
+
+const experimentResultsSchema = z.object({
+  pValue: z.number().optional(),
+  effectSize: z.number().optional(),
+  sampleSize: z.number().int().positive().optional(),
+  confidenceIntervalLow: z.number().optional(),
+  confidenceIntervalHigh: z.number().optional(),
+  summary: z.string().min(1).max(5000).optional(),
+});
+
+function textResult(text: string, isError = false): CallToolResult {
+  return { content: [{ type: "text", text }], isError };
+}
+
+function idLink(siteUrl: string, kind: "hypothesis" | "experiments" | "data" | "profile", id: string): string {
+  return `${siteUrl}/${kind}/${encodeURIComponent(id)}`;
+}
+
+function makeQuery(params: Record<string, string | number | boolean | undefined>): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== "") query.set(key, String(value));
+  }
+  const qs = query.toString();
+  return qs ? `?${qs}` : "";
+}
+
+function domainsText(domains: string[] | string | undefined | null): string {
+  if (Array.isArray(domains)) return domains.join(", ");
+  return domains ?? "unspecified";
+}
+
+function truncate(value: string | undefined | null, length = 180): string {
+  const text = value ?? "";
+  return text.length > length ? `${text.slice(0, length)}...` : text;
+}
+
+function fieldErrorText(errors: ApiErrorBody["errors"]): string | null {
+  if (!errors?.length) return null;
+  return errors.map((e) => `${e.field}: ${e.message}`).join("; ");
+}
+
+function parseJson(text: string): unknown {
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
+function extractability(datasetId: string): string {
+  const map: Record<string, string> = {
+    "ds-1": "Text sentiment, length, readability, named entities (NLP); user karma/history if present; temporal patterns if timestamps exist.",
+    "ds-2": "Image brightness, contrast, color distribution; faces/objects/scenes via VLMs; composition features from pixels.",
+    "ds-3": "Tweet sentiment, hashtags, mentions, length; engagement metrics; topic and stance features from text.",
+    "ds-4": "Image features plus attention-map gaze patterns, fixation duration, and saliency statistics.",
+  };
+  return map[datasetId] ?? "Derive code-based features from structured columns, NLP/LLM features from text, and VLM features from images when present.";
+}
+
+function formatHypothesis(siteUrl: string, h: Hypothesis, heading = "###"): string {
+  let text = `${heading} ${h.id}: ${h.statement}\n`;
+  text += `- Link: ${idLink(siteUrl, "hypothesis", h.id)}\n`;
+  text += `- Status: ${h.status} | Phase: ${h.phase} | Source: ${h.source}${h.agentName ? ` (${h.agentName})` : ""}\n`;
+  text += `- Domain: ${domainsText(h.domain)} | Problem: ${h.problemStatement}\n`;
+  if (h.winRate != null) text += `- Arena win rate: ${h.winRate}%\n`;
+  else if (h.arenaElo != null) text += `- Arena Elo: ${h.arenaElo}\n`;
+  if (h.pValue != null || h.effectSize != null) text += `- Evidence: p=${h.pValue ?? "n/a"}, d=${h.effectSize ?? "n/a"}\n`;
+  text += `- Comments: ${h.commentCount}${h.experimentCount != null ? ` | Experiments: ${h.experimentCount}` : ""}\n`;
+  return text;
+}
+
+function formatExperiment(siteUrl: string, e: Experiment, heading = "##"): string {
+  let text = `${heading} ${e.id} — ${e.type} (${e.status})\n`;
+  text += `- Link: ${idLink(siteUrl, "experiments", e.id)}\n`;
+  text += `- Hypothesis: ${e.hypothesisId}\n`;
+  if (e.datasetId) text += `- Dataset: ${e.datasetName} (${idLink(siteUrl, "data", e.datasetId)})\n`;
+  else text += `- Dataset: ${e.datasetName}\n`;
+  text += `- Period: ${e.startedAt}${e.completedAt ? ` to ${e.completedAt}` : " (ongoing)"}\n`;
+  if (e.methodology) text += `- Methodology: ${truncate(e.methodology, 260)}\n`;
+  if (e.analysisPlan) text += `- Analysis plan: ${truncate(e.analysisPlan, 220)}\n`;
+  if (e.results) {
+    text += `- Results: p=${e.results.pValue ?? "n/a"}, d=${e.results.effectSize ?? "n/a"}, n=${e.results.sampleSize ?? "n/a"}\n`;
+    if (e.results.summary) text += `  ${truncate(e.results.summary, 240)}\n`;
+  }
+  return text;
+}
+
+function authRequiredResult(authHelp: string): CallToolResult {
+  return textResult(`Not signed in / token invalid. ${authHelp}`, true);
 }
 
 export function registerOpenExperiments(server: McpServer, opts: RegisterOptions): void {
-  const { apiUrl, siteUrl } = opts;
+  const apiUrl = opts.apiUrl.replace(/\/$/, "");
+  const siteUrl = opts.siteUrl.replace(/\/$/, "");
+  const authHelp =
+    opts.authHelp ??
+    `Create a personal access token at ${siteUrl}/settings/mcp and set OPENEXPERIMENTS_TOKEN.`;
 
-  async function api<T>(path: string): Promise<T> {
-    const headers: Record<string, string> = {};
-    const token = opts.getAuthToken?.();
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
-
-    let res: Response;
-    try {
-      res = await fetch(`${apiUrl}${path}`, { headers });
-    } catch (err) {
-      throw new Error(
-        `Cannot reach OpenExperiments API at ${apiUrl}. Is the server running?\n${
-          err instanceof Error ? err.message : err
-        }`,
-      );
-    }
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      throw new Error(`API ${res.status} on ${path}: ${body.slice(0, 300)}`);
-    }
-    return res.json() as Promise<T>;
+  function hasToken(): boolean {
+    return !!opts.getAuthToken?.();
   }
 
-  // ===================================================================
-  // TOOLS
-  // ===================================================================
+  async function api<T>(
+    path: string,
+    options: { method?: HttpMethod; body?: unknown; requireAuth?: boolean } = {},
+  ): Promise<ApiResult<T>> {
+    const token = opts.getAuthToken?.();
+    if (options.requireAuth && !token) return { ok: false, result: authRequiredResult(authHelp), status: 401 };
 
-  // --- Problem Statements ------------------------------------------------
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    if (options.body !== undefined) headers["Content-Type"] = "application/json";
 
-  server.tool(
-    "list_problem_statements",
-    "List all open research questions on OpenExperiments with linked datasets. " +
-      "Call this first when helping formulate a hypothesis — it shows what " +
-      "research areas are active and what data is available for testing.",
-    {},
-    async () => {
-      const { data } = await api<{ data: Record<string, unknown>[] }>(
-        "/api/problem-statements?includeDatasets=true",
-      );
-      let text = `# Problem Statements (${data.length})\n\n`;
-      for (const ps of data) {
-        text += `## ${ps.question}\n`;
-        text += `- ID: ${ps.id}\n`;
-        text += `- Domain: ${ps.domain}\n`;
-        text += `- Hypotheses: ${ps.hypothesisCount}\n`;
-        text += `- Description: ${ps.description}\n`;
-        const datasets = ps.datasets as Array<{ name: string; id: string }> | undefined;
-        if (datasets && datasets.length > 0) {
-          text += `- Datasets: ${datasets.map((d) => `${d.name} (${d.id})`).join(", ")}\n`;
-        } else {
-          text += `- Datasets: None — new datasets needed\n`;
-        }
-        text += `\n`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20_000);
+    try {
+      const res = await fetch(`${apiUrl}${path}`, {
+        method: options.method ?? "GET",
+        headers,
+        body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+        signal: controller.signal,
+      });
+      const rawText = await res.text();
+      const parsed = rawText ? parseJson(rawText) : undefined;
+      if (!res.ok) {
+        const body = (parsed && typeof parsed === "object" ? parsed : {}) as ApiErrorBody;
+        const message = fieldErrorText(body.errors) ?? body.error ?? rawText.slice(0, 300);
+        let text: string;
+        if (res.status === 401) text = `Not signed in / token invalid. ${authHelp}`;
+        else if (res.status === 403) text = `Forbidden: ${message || "access denied"}. If your profile is incomplete, complete it at ${siteUrl}/complete-profile.`;
+        else if (res.status === 404) text = `Not found: ${message || path}`;
+        else if (res.status === 409) text = `Conflict: ${message || "request conflicts with existing state"}`;
+        else if (res.status === 400 || res.status === 422) text = `Invalid request: ${message || "validation failed"}`;
+        else if (res.status === 429) text = "Rate limited by the OpenExperiments API. Try again later.";
+        else if (res.status >= 500) text = `API unavailable (${res.status}). Try again later.`;
+        else text = `API error ${res.status}: ${message || "unknown error"}`;
+        return { ok: false, result: textResult(text, true), status: res.status };
       }
-      return { content: [{ type: "text" as const, text }] };
+      return { ok: true, data: parsed as T };
+    } catch (err) {
+      const suffix = err instanceof Error && err.name === "AbortError" ? "request timed out" : err instanceof Error ? err.message : "network error";
+      return { ok: false, result: textResult(`API unavailable at ${apiUrl}: ${suffix}`, true) };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  // Problem statements
+  server.registerTool(
+    "list_problem_statements",
+    {
+      title: "List problem statements",
+      description: "List all open research questions with linked datasets. Use this first when helping formulate a hypothesis.",
+      inputSchema: {},
+      annotations: READ_ANNOTATIONS,
+    },
+    async () => {
+      const res = await api<ApiList<ProblemStatement>>("/api/problem-statements?includeDatasets=true");
+      if (!res.ok) return res.result;
+      let text = `# Problem Statements (${res.data.data.length})\n\n`;
+      for (const ps of res.data.data) {
+        text += `## ${ps.question}\n- ID: ${ps.id}\n- Domain: ${ps.domain}\n- Hypotheses: ${ps.hypothesisCount}\n- Description: ${ps.description || "n/a"}\n`;
+        text += `- Datasets: ${ps.datasets?.length ? ps.datasets.map((d) => `${d.name} (${d.id})`).join(", ") : "None — new datasets needed"}\n\n`;
+      }
+      return textResult(text);
     },
   );
 
-  // --- Datasets ----------------------------------------------------------
-
-  server.tool(
+  // Datasets
+  server.registerTool(
     "list_datasets",
-    "List all Hugging Face datasets with column schemas and extractable features. " +
-      "For each dataset, see what features can be DERIVED: brightness from image pixels, " +
-      "sentiment from text, object counts from images via VLMs, etc. Filter by domain if needed.",
     {
-      domain: z
-        .string()
-        .optional()
-        .describe("Filter by domain (any string, e.g., 'attention', 'learning')"),
+      title: "List datasets",
+      description: "List Hugging Face datasets, OSF characterization fields, linked problem-statement counts, and extractable features. Filter by free-form domain.",
+      inputSchema: { domain: z.string().min(1).max(60).optional().describe("Filter by domain (free-form string)") },
+      annotations: READ_ANNOTATIONS,
     },
     async ({ domain }) => {
-      const qs = domain ? `?domain=${domain}` : "";
-      const { data } = await api<{ data: Record<string, unknown>[] }>(`/api/datasets${qs}`);
-      let text = `# Datasets (${data.length})\n\n`;
-      for (const d of data) {
-        text += `## ${d.name} (${d.id})\n`;
-        text += `- Domain: ${d.domain || "unspecified"}\n`;
-        text += `- HuggingFace: ${d.huggingfaceUrl}\n`;
-        text += `- Task: ${d.taskDescription}\n`;
-        const cols = Array.isArray(d.dataColumnNames)
-          ? d.dataColumnNames.join(", ")
-          : d.dataColumnNames;
-        text += `- Columns: ${cols}\n`;
-        text += `- Target: ${d.targetColumnName}\n`;
-        if (d.description) text += `- Description: ${d.description}\n`;
+      const res = await api<ApiList<Dataset>>(`/api/datasets${makeQuery({ domain })}`);
+      if (!res.ok) return res.result;
+      let text = `# Datasets (${res.data.data.length})\n\n`;
+      for (const d of res.data.data) {
+        text += `## ${d.name} (${d.id})\n- Link: ${idLink(siteUrl, "data", d.id)}\n- Domain: ${d.domain || "unspecified"}\n- Hugging Face: ${d.huggingfaceUrl || "n/a"}\n`;
+        if (d.taskDescription) text += `- Task: ${d.taskDescription}\n`;
+        if (d.unitOfAnalysis) text += `- Unit of analysis: ${d.unitOfAnalysis}\n`;
+        if (d.foreknowledgeStatus) text += `- Foreknowledge: ${d.foreknowledgeStatus}\n`;
+        if (d.dataColumnNames?.length) text += `- Columns: ${d.dataColumnNames.join(", ")}\n`;
+        if (d.targetColumnName) text += `- Target: ${d.targetColumnName}\n`;
+        if (d.description) text += `- Description: ${truncate(d.description)}\n`;
         text += `- Problem statements: ${d.problemStatementCount ?? 0} | Experiments: ${d.experimentCount ?? 0}\n`;
-
-        text += `- **Extractable Features**: `;
-        const extractabilityMap: Record<string, string> = {
-          "ds-1":
-            "Text sentiment, length, readability, named entities (NLP); User karma, post history (if not anonymized); Temporal patterns (from timestamp)",
-          "ds-2":
-            "Image brightness, contrast, color distribution, dominant colors (pixel analysis); Face count, object types, scene category (VLM); Composition features (rule of thirds, focal points)",
-          "ds-3":
-            "Tweet sentiment, hashtags, mentions, length; Engagement metrics (retweets, likes)",
-          "ds-4": "Same as LaMem + attention map gaze patterns, fixation duration",
-        };
-        text +=
-          extractabilityMap[d.id as string] ||
-          "Code-based from structured data; LLM/NLP-based from text; VLM-based from images";
-        text += `\n\n`;
+        text += `- Extractable features: ${extractability(d.id)}\n\n`;
       }
-      return { content: [{ type: "text" as const, text }] };
+      return textResult(text);
     },
   );
 
-  server.tool(
+  server.registerTool(
     "get_dataset",
-    "Get full details of a specific dataset: schema, linked problem statements, " +
-      "and experiments. CRITICAL: Focus on what features can be EXTRACTED from the " +
-      "available columns (e.g., brightness from pixels, sentiment from text, face count via VLMs).",
     {
-      datasetId: z.string().describe("Dataset ID (e.g., 'ds-1')"),
+      title: "Get dataset",
+      description: "Get full details of a dataset, including schema, OSF characterization, linked problem statements, experiments, and extractability guidance.",
+      inputSchema: { datasetId: z.string().min(1).describe("Dataset ID, e.g. ds-1") },
+      annotations: READ_ANNOTATIONS,
     },
     async ({ datasetId }) => {
-      const res = await api<{
-        data: Record<string, unknown>;
-        problemStatements: Array<Record<string, unknown>>;
-        experiments: Array<Record<string, unknown>>;
-      }>(`/api/datasets/${datasetId}`);
-      const d = res.data;
-      let text = `# ${d.name}\n\n`;
-      text += `- HuggingFace: ${d.huggingfaceUrl}\n`;
-      text += `- Domain: ${d.domain || "unspecified"}\n`;
-      text += `- Task: ${d.taskDescription}\n`;
-      const cols = Array.isArray(d.dataColumnNames)
-        ? d.dataColumnNames.join(", ")
-        : d.dataColumnNames;
-      text += `- Columns: ${cols}\n`;
-      text += `- Target: ${d.targetColumnName}\n`;
-      if (d.description) text += `- Description: ${d.description}\n`;
-
-      text += `\n**Extractable Features**:\n`;
-      const extractabilityMap: Record<string, string> = {
-        "ds-1":
-          "• Text: sentiment, length, readability, named entities (via NLP)\n• User: karma, post history (if not anonymized)\n• Temporal: time since post, posting patterns (from timestamp)\n• Cannot extract: author intent, viewer mood",
-        "ds-2":
-          "• Image: brightness, contrast, color distribution, dominant colors\n• Objects: face count, object types, scene category (via VLM)\n• Composition: focal points, rule of thirds alignment\n• Cannot extract: emotional impact on viewer, cultural significance",
-        "ds-3":
-          "• Tweet: sentiment, hashtags, mentions, length\n• Engagement: retweet counts, like counts\n• Cannot extract: sarcasm (unreliable), user demographics (if anonymized)",
-        "ds-4":
-          "• Image: same as LaMem\n• Attention: gaze patterns, fixation duration\n• Cannot extract: viewer prior knowledge, personal associations",
-      };
-      text +=
-        extractabilityMap[datasetId] ||
-        "• Code-based: statistical aggregations from structured data\n• LLM-based: semantic features from text fields\n• VLM-based: visual features from image fields\n";
-
-      text += `\n## Problem Statements (${res.problemStatements.length})\n\n`;
-      for (const ps of res.problemStatements) {
-        text += `- ${ps.question} (${ps.id}, ${ps.domain}, ${ps.hypothesisCount} hypotheses)\n`;
+      const res = await api<DatasetDetailResponse>(`/api/datasets/${encodeURIComponent(datasetId)}`);
+      if (!res.ok) return res.result;
+      const d = res.data.data;
+      let text = `# ${d.name} (${d.id})\n\nLink: ${idLink(siteUrl, "data", d.id)}\n\n`;
+      text += `- Hugging Face: ${d.huggingfaceUrl || "n/a"}\n- Domain: ${d.domain || "unspecified"}\n`;
+      if (d.taskDescription) text += `- Task: ${d.taskDescription}\n`;
+      if (d.dataColumnNames?.length) text += `- Columns: ${d.dataColumnNames.join(", ")}\n`;
+      if (d.targetColumnName) text += `- Target: ${d.targetColumnName}\n`;
+      if (d.unitOfAnalysis) text += `- Unit of analysis: ${d.unitOfAnalysis}\n`;
+      if (d.license) text += `- License: ${d.license}\n`;
+      if (d.foreknowledgeStatus) text += `- Foreknowledge: ${d.foreknowledgeStatus}\n`;
+      if (d.description) text += `\n${d.description}\n`;
+      if (d.osfCharacterization) {
+        const osf = d.osfCharacterization;
+        text += `\n## OSF-style characterization\n- Provenance: ${truncate(osf.provenance, 500)}\n- Collection: ${truncate(osf.collectionProcedure, 500)}\n- Variables: ${truncate(osf.variables, 500)}\n- Inclusion/exclusion: ${truncate(osf.inclusionExclusion, 500)}\n- Missing data: ${truncate(osf.missingData, 500)}\n`;
       }
-
-      text += `\n## Experiments (${res.experiments.length})\n\n`;
-      for (const exp of res.experiments) {
-        const methodology = String(exp.methodology ?? "");
-        text += `- ${exp.id}: ${exp.type} (${exp.status}) — hypothesis ${exp.hypothesisId}\n`;
-        text += `  ${methodology.slice(0, 150)}...\n`;
-      }
-      return { content: [{ type: "text" as const, text }] };
+      text += `\n## Extractable Features\n${extractability(d.id)}\n\n`;
+      text += `## Problem Statements (${res.data.problemStatements.length})\n`;
+      for (const ps of res.data.problemStatements) text += `- ${ps.question} (${ps.id}, ${ps.domain}, ${ps.hypothesisCount} hypotheses)\n`;
+      text += `\n## Experiments (${res.data.experiments.length})\n`;
+      for (const exp of res.data.experiments) text += `- ${exp.id}: ${exp.type} (${exp.status}) testing ${exp.hypothesisId} — ${truncate(exp.methodology, 120)}\n`;
+      return textResult(text);
     },
   );
 
-  // --- Hypotheses --------------------------------------------------------
-
-  server.tool(
-    "search_hypotheses",
-    "Search hypotheses by keyword across statements, rationales, and problem " +
-      "statements. Use to find related work across ALL domains, check for duplicates, " +
-      "or get inspiration. Supports filtering by domain, phase, and status.",
+  server.registerTool(
+    "submit_dataset",
     {
-      query: z.string().describe("Search keywords"),
-      domain: z.string().optional().describe("Filter by domain (any string)"),
-      phase: z.enum(["live", "completed"]).optional().describe("Filter by phase"),
-      status: z
-        .enum(["proposed", "arena_ranked", "data_tested", "field_validated"])
-        .optional()
-        .describe("Filter by evidence status"),
-      limit: z.number().optional().describe("Max results (default 20)"),
+      title: "Submit dataset",
+      description: "Register a dataset. Before calling, show the user the exact dataset fields and OSF characterization that will be submitted and get explicit confirmation.",
+      inputSchema: {
+        name: z.string().min(3).max(120),
+        huggingfaceUrl: z.string().url().regex(/^https?:\/\/huggingface\.co\/datasets\/[\w.-]+(\/[\w.-]+)?\/?$/i, "Must be a Hugging Face dataset URL"),
+        description: z.string().min(1).max(2000).optional(),
+        domain: z.string().min(2).max(60).optional(),
+        license: z.string().max(100).optional(),
+        foreknowledgeStatus: z.enum([
+          "data_not_exist",
+          "data_inaccessible",
+          "data_unobserved",
+          "others_observed",
+          "limited_observation",
+          "observed_not_analyzed",
+          "observed_cannot_certify",
+          "analyses_conducted",
+        ]),
+        unitOfAnalysis: z.string().min(3).max(300),
+        osf: osfSchema,
+      },
+      annotations: WRITE_ANNOTATIONS,
+    },
+    async (input) => {
+      const body = { ...input, osf: { ...input.osf, tags: input.osf.tags ?? [] } };
+      const res = await api<ApiData<{ id: string }>>("/api/datasets", { method: "POST", body, requireAuth: true });
+      if (!res.ok) return res.result;
+      return textResult(`Dataset registered: ${res.data.data.id}\n\n${idLink(siteUrl, "data", res.data.data.id)}`);
+    },
+  );
+
+  // Hypotheses
+  server.registerTool(
+    "browse_hypotheses",
+    {
+      title: "Browse hypotheses",
+      description: "Browse hypotheses with the full filter set from the Explore page: domain, phase, status, problem statement search, free-text search, sort, and pagination.",
+      inputSchema: {
+        domain: z.string().min(1).max(60).optional(),
+        phase: phaseSchema.optional(),
+        status: hypothesisStatusSchema.optional(),
+        problemStatement: z.string().min(1).max(500).optional().describe("Problem statement text to search/filter"),
+        search: z.string().min(1).max(300).optional(),
+        sort: sortSchema.optional(),
+        limit: z.number().int().min(1).max(100).optional(),
+        offset: z.number().int().min(0).optional(),
+      },
+      annotations: READ_ANNOTATIONS,
+    },
+    async ({ domain, phase, status, problemStatement, search, sort, limit, offset }) => {
+      const effectiveSearch = search ?? problemStatement;
+      const res = await api<ApiList<Hypothesis>>(
+        `/api/hypotheses${makeQuery({ domain, phase, status, search: effectiveSearch, sort, limit: limit ?? 50, offset })}`,
+      );
+      if (!res.ok) return res.result;
+      let text = `# Hypotheses (${res.data.data.length}${res.data.total != null ? ` of ${res.data.total}` : ""})\n\n`;
+      for (const h of res.data.data) text += `${formatHypothesis(siteUrl, h)}\n`;
+      return textResult(text);
+    },
+  );
+
+  server.registerTool(
+    "search_hypotheses",
+    {
+      title: "Search hypotheses",
+      description: "Search hypotheses by keyword across statements, rationales, and problem statements. Kept for backwards compatibility; supports domain, phase, status, and limit.",
+      inputSchema: {
+        query: z.string().min(1).max(300).describe("Search keywords"),
+        domain: z.string().min(1).max(60).optional(),
+        phase: phaseSchema.optional(),
+        status: hypothesisStatusSchema.optional(),
+        limit: z.number().int().min(1).max(100).optional(),
+      },
+      annotations: READ_ANNOTATIONS,
     },
     async ({ query, domain, phase, status, limit }) => {
-      const params = new URLSearchParams({
-        search: query,
-        limit: String(limit || 20),
-      });
-      if (domain) params.set("domain", domain);
-      if (phase) params.set("phase", phase);
-      if (status) params.set("status", status);
-
-      const { data, total } = await api<{
-        data: Array<Record<string, unknown>>;
-        total: number;
-      }>(`/api/hypotheses?${params}`);
-
-      let text = `# Search: "${query}" — ${data.length} of ${total} results\n\n`;
-      for (const h of data) {
-        text += `### ${h.id}: ${h.statement}\n`;
-        text += `- Status: ${h.status} | Phase: ${h.phase} | Source: ${h.source}${h.agentName ? ` (${h.agentName})` : ""}\n`;
-        const domains = Array.isArray(h.domain) ? h.domain.join(", ") : h.domain;
-        text += `- Domain: ${domains} | Problem: ${h.problemStatement}\n`;
-        if (h.arenaElo) text += `- ELO: ${h.arenaElo}`;
-        if (h.pValue != null) text += ` | p=${h.pValue}, d=${h.effectSize}`;
-        if (h.arenaElo || h.pValue != null) text += `\n`;
-        text += `- Comments: ${h.commentCount}\n\n`;
-      }
-      return { content: [{ type: "text" as const, text }] };
+      const res = await api<ApiList<Hypothesis>>(
+        `/api/hypotheses${makeQuery({ search: query, domain, phase, status, limit: limit ?? 20 })}`,
+      );
+      if (!res.ok) return res.result;
+      let text = `# Search: "${query}" — ${res.data.data.length}${res.data.total != null ? ` of ${res.data.total}` : ""} results\n\n`;
+      for (const h of res.data.data) text += `${formatHypothesis(siteUrl, h)}\n`;
+      return textResult(text);
     },
   );
 
-  server.tool(
+  server.registerTool(
     "get_hypothesis",
-    "Get full details of a hypothesis: statement, rationale, all experiments " +
-      "with results, comments, and citations.",
     {
-      hypothesisId: z.string().describe("Hypothesis ID (e.g., 'h-1')"),
+      title: "Get hypothesis",
+      description: "Get full details of a hypothesis: statement, rationale, experiments with results, comments, citations, and site link.",
+      inputSchema: { hypothesisId: z.string().min(1).describe("Hypothesis ID") },
+      annotations: READ_ANNOTATIONS,
     },
     async ({ hypothesisId }) => {
-      const res = await api<{
-        data: Record<string, unknown>;
-        experiments: Array<Record<string, unknown>>;
-        comments: Array<Record<string, unknown>>;
-      }>(`/api/hypotheses/${hypothesisId}`);
-
-      const h = res.data;
-      let text = `# Hypothesis ${h.id}\n\n`;
-      text += `**Statement:** ${h.statement}\n\n`;
-      text += `**Rationale:** ${h.rationale}\n\n`;
-      text += `- Status: ${h.status} | Phase: ${h.phase}\n`;
-      text += `- Source: ${h.source}${h.agentName ? ` (${h.agentName})` : ""}\n`;
-      const domains = Array.isArray(h.domain) ? h.domain.join(", ") : h.domain;
-      text += `- Domain: ${domains}\n`;
-      text += `- Problem: ${h.problemStatement}\n`;
-      text += `- Submitted: ${h.submittedAt}\n`;
-      if (h.arenaElo) text += `- ELO: ${h.arenaElo}\n`;
-      if (h.evidenceScore) text += `- Evidence Score: ${h.evidenceScore}\n`;
-      if (h.pValue != null) text += `- p=${h.pValue}, d=${h.effectSize}\n`;
-      const citations = h.citationDois as string[] | undefined;
-      if (citations && citations.length > 0) text += `- Citations: ${citations.join(", ")}\n`;
-      const related = h.relatedHypothesisIds as string[] | undefined;
-      if (related && related.length > 0) text += `- Related: ${related.join(", ")}\n`;
-
-      text += `\n## Experiments (${res.experiments.length})\n\n`;
-      for (const exp of res.experiments) {
-        text += `### ${exp.id} — ${exp.type} (${exp.status})\n`;
-        text += `- Dataset: ${exp.datasetName}\n`;
-        text += `- Methodology: ${exp.methodology}\n`;
-        const results = exp.results as Record<string, unknown> | undefined;
-        if (results) {
-          text += `- **Results:** p=${results.pValue}, d=${results.effectSize}, n=${results.sampleSize}\n`;
-          const ci = results.confidenceInterval as [number, number] | undefined;
-          if (ci) text += `  CI: [${ci[0]}, ${ci[1]}]\n`;
-          text += `  ${results.summary}\n`;
-          if (results.uplift) text += `  Uplift: ${results.uplift}\n`;
-        }
-        text += `\n`;
-      }
-
-      text += `## Comments (${res.comments.length})\n\n`;
-      for (const c of res.comments) {
-        text += `- ${c.body}${c.doi ? ` [DOI: ${c.doi}]` : ""}\n`;
-      }
-      return { content: [{ type: "text" as const, text }] };
+      const res = await api<HypothesisDetailResponse>(`/api/hypotheses/${encodeURIComponent(hypothesisId)}`);
+      if (!res.ok) return res.result;
+      const h = res.data.data;
+      let text = `# Hypothesis ${h.id}\n\n${idLink(siteUrl, "hypothesis", h.id)}\n\n`;
+      text += `**Statement:** ${h.statement}\n\n**Rationale:** ${h.rationale}\n\n`;
+      text += `- Status: ${h.status} | Phase: ${h.phase}\n- Source: ${h.source}${h.agentName ? ` (${h.agentName})` : ""}\n- Domain: ${domainsText(h.domain)}\n- Problem: ${h.problemStatement}\n- Submitted: ${h.submittedAt}\n`;
+      if (h.winRate != null) text += `- Win rate: ${h.winRate}%\n`;
+      if (h.evidenceScore != null) text += `- Evidence score: ${h.evidenceScore}\n`;
+      if (h.pValue != null || h.effectSize != null) text += `- Evidence: p=${h.pValue ?? "n/a"}, d=${h.effectSize ?? "n/a"}\n`;
+      if (h.citationDois.length) text += `- Citations: ${h.citationDois.join(", ")}\n`;
+      if (h.relatedHypothesisIds.length) text += `- Related: ${h.relatedHypothesisIds.join(", ")}\n`;
+      text += `\n## Experiments (${res.data.experiments.length})\n\n`;
+      for (const exp of res.data.experiments) text += `${formatExperiment(siteUrl, exp, "###")}\n`;
+      text += `## Comments (${res.data.comments.length})\n`;
+      for (const c of res.data.comments) text += `- ${c.body}${c.doi ? ` [${c.doi}]` : ""}${c.parentId ? ` (reply to ${c.parentId})` : ""}\n`;
+      return textResult(text);
     },
   );
 
-  // --- My Hypotheses (authenticated) -------------------------------------
-
-  server.tool(
-    "get_my_hypotheses",
-    "List hypotheses submitted by the currently authenticated user. " +
-      "Requires sign-in via the MCP auth flow.",
-    {},
-    async () => {
-      const token = opts.getAuthToken?.();
-      if (!token) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text:
-                "You are not signed in. To see your hypotheses, connect your " +
-                "OpenExperiments account via the MCP auth flow.\n\n" +
-                `Authorize at: ${siteUrl}/api/auth/mcp/authorize`,
-            },
-          ],
-        };
-      }
-
-      const { data, total } = await api<{
-        data: Array<Record<string, unknown>>;
-        total: number;
-      }>("/api/hypotheses?mine=true");
-
-      if (data.length === 0) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: "You haven't submitted any hypotheses yet. Use `generate_submission_url` to create one!",
-            },
-          ],
-        };
-      }
-
-      let text = `# My Hypotheses (${data.length} of ${total})\n\n`;
-      for (const h of data) {
-        text += `### ${h.id}: ${h.statement}\n`;
-        text += `- Status: ${h.status} | Phase: ${h.phase}\n`;
-        const domains = Array.isArray(h.domain) ? h.domain.join(", ") : h.domain;
-        text += `- Domain: ${domains}\n`;
-        if (h.arenaElo) text += `- ELO: ${h.arenaElo}`;
-        if (h.pValue != null) text += ` | p=${h.pValue}, d=${h.effectSize}`;
-        if (h.arenaElo || h.pValue != null) text += `\n`;
-        text += `- Comments: ${h.commentCount}\n\n`;
-      }
-      return { content: [{ type: "text" as const, text }] };
+  server.registerTool(
+    "submit_hypothesis",
+    {
+      title: "Submit hypothesis",
+      description: "Submit a hypothesis. Before calling, show the user the exact statement, rationale, problem statement, domains, source, citations, and anonymity setting and get explicit confirmation.",
+      inputSchema: {
+        statement: z.string().min(10).max(2000),
+        rationale: z.string().min(10).max(5000),
+        problemStatement: z.string().min(5).max(500),
+        domains: z.array(z.string().min(1).max(60)).min(1),
+        source: sourceSchema.optional(),
+        agentName: z.string().min(1).max(100).optional(),
+        citationDois: z.array(z.string().min(1)).optional(),
+        isAnonymous: z.boolean().optional(),
+      },
+      annotations: WRITE_ANNOTATIONS,
+    },
+    async (input) => {
+      const body = { ...input, source: input.source ?? "human" };
+      const res = await api<ApiData<{ id: string }>>("/api/hypotheses", { method: "POST", body, requireAuth: true });
+      if (!res.ok) return res.result;
+      return textResult(`Hypothesis submitted: ${res.data.data.id}\n\n${idLink(siteUrl, "hypothesis", res.data.data.id)}`);
     },
   );
 
-  // --- Arena -------------------------------------------------------------
-
-  server.tool(
-    "get_arena_rankings",
-    "Get the arena leaderboard: top hypotheses ranked by community vote win " +
-      "rate. Only includes completed (validated) hypotheses.",
-    {},
-    async () => {
-      const { data } = await api<{ data: Array<Record<string, unknown>> }>("/api/arena/rankings");
-      let text = `# Arena Rankings — Top ${data.length}\n\n`;
-      text += `| # | ID | Win% | Domain | Hypothesis |\n`;
-      text += `|---|-----|------|--------|------------|\n`;
-      data.forEach((h, i: number) => {
-        const d = Array.isArray(h.domain) ? h.domain.join(", ") : h.domain;
-        const stmt = String(h.statement ?? "");
-        text += `| ${i + 1} | ${h.id} | ${h.winRate}% | ${d} | ${stmt.slice(0, 80)}... |\n`;
+  server.registerTool(
+    "add_citation",
+    {
+      title: "Add citation",
+      description: "Add a DOI or arXiv URL citation to one of the user's hypotheses. Before calling, show the exact hypothesis ID and citation and get explicit confirmation.",
+      inputSchema: {
+        hypothesisId: z.string().min(1),
+        citation: z.string().min(1).describe("DOI (10.xxxx/...) or arXiv URL"),
+      },
+      annotations: WRITE_ANNOTATIONS,
+    },
+    async ({ hypothesisId, citation }) => {
+      const res = await api<ApiData<{ citationDois: string[] }>>(`/api/hypotheses/${encodeURIComponent(hypothesisId)}`, {
+        method: "PATCH",
+        body: { addCitation: citation },
+        requireAuth: true,
       });
-      return { content: [{ type: "text" as const, text }] };
+      if (!res.ok) return res.result;
+      return textResult(`Citation added to ${hypothesisId}.\n\nCitations: ${res.data.data.citationDois.join(", ")}\n${idLink(siteUrl, "hypothesis", hypothesisId)}`);
     },
   );
 
-  // --- Experiments -------------------------------------------------------
-
-  server.tool(
-    "list_experiments",
-    "List experiments with methodology, dataset, status, and results. " +
-      "Optionally filter by hypothesis ID.",
-    {
-      hypothesisId: z.string().optional().describe("Filter by hypothesis ID"),
-    },
-    async ({ hypothesisId }) => {
-      const qs = hypothesisId ? `?hypothesisId=${hypothesisId}` : "";
-      const { data } = await api<{ data: Array<Record<string, unknown>> }>(`/api/experiments${qs}`);
-      let text = `# Experiments (${data.length})\n\n`;
-      for (const e of data) {
-        text += `## ${e.id} — ${e.type} (${e.status})\n`;
-        text += `- Hypothesis: ${e.hypothesisId}\n`;
-        text += `- Dataset: ${e.datasetName}\n`;
-        text += `- Period: ${e.startedAt}${e.completedAt ? ` to ${e.completedAt}` : " (ongoing)"}\n`;
-        text += `- Methodology: ${e.methodology}\n`;
-        const results = e.results as Record<string, unknown> | undefined;
-        if (results) {
-          text += `- **p=${results.pValue}**, d=${results.effectSize}, n=${results.sampleSize}\n`;
-          const ci = results.confidenceInterval as [number, number] | undefined;
-          if (ci) text += `  CI: [${ci[0]}, ${ci[1]}]\n`;
-          text += `  ${results.summary}\n`;
-        }
-        text += `\n`;
-      }
-      return { content: [{ type: "text" as const, text }] };
-    },
-  );
-
-  server.tool(
-    "get_experiment",
-    "Get full details of a specific experiment: methodology, statistical " +
-      "results, and the hypothesis it tests.",
-    {
-      experimentId: z.string().describe("Experiment ID (e.g., 'exp-1')"),
-    },
-    async ({ experimentId }) => {
-      const res = await api<{
-        data: Record<string, unknown>;
-        hypothesis: Record<string, unknown>;
-      }>(`/api/experiments/${experimentId}`);
-      const e = res.data;
-      let text = `# Experiment ${e.id}\n\n`;
-      text += `- Type: ${e.type} | Status: ${e.status}\n`;
-      text += `- Dataset: ${e.datasetName}\n`;
-      text += `- Period: ${e.startedAt}${e.completedAt ? ` to ${e.completedAt}` : ""}\n\n`;
-      text += `**Methodology:**\n${e.methodology}\n`;
-
-      const results = e.results as Record<string, unknown> | undefined;
-      if (results) {
-        text += `\n**Results:**\n`;
-        text += `- p-value: ${results.pValue}\n`;
-        text += `- Effect size: ${results.effectSize}\n`;
-        const ci = results.confidenceInterval as [number, number] | undefined;
-        if (ci) text += `- 95% CI: [${ci[0]}, ${ci[1]}]\n`;
-        text += `- Sample size: ${results.sampleSize}\n`;
-        text += `- Summary: ${results.summary}\n`;
-        if (results.uplift) text += `- Uplift: ${results.uplift}\n`;
-      }
-
-      if (res.hypothesis) {
-        text += `\n**Linked Hypothesis (${res.hypothesis.id}):**\n`;
-        text += `${res.hypothesis.statement}\n`;
-        text += `Status: ${res.hypothesis.status}, Phase: ${res.hypothesis.phase}\n`;
-      }
-      return { content: [{ type: "text" as const, text }] };
-    },
-  );
-
-  // --- Platform overview -------------------------------------------------
-
-  server.tool(
-    "platform_overview",
-    "High-level overview of the OpenExperiments platform: current stats, " +
-      "domains, hypothesis lifecycle, and how the workflow works. Call this " +
-      "first to orient yourself before using other tools.",
-    {},
-    async () => {
-      const [hypRes, psRes, dsRes, expRes, arenaRes] = await Promise.all([
-        api<{ data: Array<Record<string, unknown>>; total: number }>("/api/hypotheses?limit=100"),
-        api<{ data: Array<Record<string, unknown>> }>(
-          "/api/problem-statements?includeDatasets=true",
-        ),
-        api<{ data: Array<Record<string, unknown>> }>("/api/datasets"),
-        api<{ data: Array<Record<string, unknown>> }>("/api/experiments"),
-        api<{ data: Array<Record<string, unknown>> }>("/api/arena/rankings"),
-      ]);
-
-      const hyps = hypRes.data;
-      const byStatus = {
-        proposed: hyps.filter((h) => h.status === "proposed").length,
-        arena_ranked: hyps.filter((h) => h.status === "arena_ranked").length,
-        data_tested: hyps.filter((h) => h.status === "data_tested").length,
-        field_validated: hyps.filter((h) => h.status === "field_validated").length,
-      };
-      const byPhase = {
-        live: hyps.filter((h) => h.phase === "live").length,
-        completed: hyps.filter((h) => h.phase === "completed").length,
-      };
-
-      let text = `# OpenExperiments Platform Overview\n\n`;
-      text += `An open platform where anyone — humans and AI — can submit a scientific hypothesis, have the community evaluate it, and see it tested against real-world data.\n\n`;
-      text += `Website: ${siteUrl}\n\n`;
-
-      text += `## Stats\n\n`;
-      text += `| Metric | Count |\n|--------|-------|\n`;
-      text += `| Hypotheses | ${hypRes.total} |\n`;
-      text += `| Problem Statements | ${psRes.data.length} |\n`;
-      text += `| Datasets | ${dsRes.data.length} |\n`;
-      text += `| Experiments | ${expRes.data.length} |\n`;
-      text += `| Arena Ranked | ${arenaRes.data.length} |\n`;
-
-      text += `\n## By Status\n`;
-      text += `- Proposed: ${byStatus.proposed}\n`;
-      text += `- Arena Ranked: ${byStatus.arena_ranked}\n`;
-      text += `- Data Tested: ${byStatus.data_tested}\n`;
-      text += `- Field Validated: ${byStatus.field_validated}\n`;
-
-      text += `\n## By Phase\n`;
-      text += `- Live (accepting votes): ${byPhase.live}\n`;
-      text += `- Completed (results available): ${byPhase.completed}\n`;
-
-      text += `\n## Philosophy: ExperiGen Feature Extractability\n\n`;
-      text += `**Core Principle**: Hypotheses must test features COMPUTABLE from available data.\n\n`;
-      text += `**EXTRACTABLE (Testable)**:\n`;
-      text += `- Brightness, contrast, color -> extracted from image pixel values\n`;
-      text += `- Sentiment, readability, length -> extracted from text via NLP\n`;
-      text += `- Face count, object types -> extracted from images via VLMs\n`;
-      text += `- Duration, frequency -> calculated from timestamps\n`;
-      text += `- Correlation patterns -> statistical analysis of numerical data\n\n`;
-      text += `**NOT EXTRACTABLE (Need new data)**:\n`;
-      text += `- Viewer's mood, emotions -> not stored in any field\n`;
-      text += `- Author's true intent -> not measurable from text alone\n`;
-      text += `- Cultural significance -> requires external knowledge\n`;
-      text += `- Temporal trends -> requires timestamps (if missing)\n`;
-      text += `- User demographics -> requires user data (if anonymized)\n\n`;
-      text += `**Domains**: Start with persuasion or memorability, or PROPOSE NEW domains!\n`;
-      text += `(attention, learning, decision-making, memory, perception, etc.)\n`;
-
-      text += `\n## Hypothesis Lifecycle\n`;
-      text += `proposed -> arena_ranked -> data_tested -> field_validated\n`;
-      text += `Each hypothesis has a phase: live (accepting input) or completed (results in)\n`;
-
-      text += `\n## Workflow\n`;
-      text += `1. Ideate: Submit a testable hypothesis for a problem statement\n`;
-      text += `2. Evaluate: Community votes in head-to-head arena comparisons\n`;
-      text += `3. Test: AI agents test hypotheses against real-world datasets\n`;
-      text += `4. Validate: Top hypotheses advance to pre-registered field experiments\n`;
-
-      return { content: [{ type: "text" as const, text }] };
-    },
-  );
-
-  // --- Submission URL generator ------------------------------------------
-
-  server.tool(
+  server.registerTool(
     "generate_submission_url",
-    "Generate a pre-filled URL to the OpenExperiments submit page. Use this " +
-      "after helping a user formulate a hypothesis — they click the link, " +
-      "review the pre-filled form, and submit.",
     {
-      statement: z.string().describe("The hypothesis statement"),
-      rationale: z.string().describe("The rationale behind the hypothesis"),
-      problemStatementId: z
-        .string()
-        .optional()
-        .describe("Existing problem statement ID (e.g., 'ps-1')"),
-      customProblemStatement: z
-        .string()
-        .optional()
-        .describe("Custom problem statement if not using an existing one"),
-      domains: z
-        .array(z.string())
-        .describe("Research domains (any strings, e.g., ['attention'], ['memory', 'learning'])"),
-      source: z
-        .enum(["human", "ai_agent"])
-        .optional()
-        .describe("Who generated the hypothesis (default: human)"),
+      title: "Generate submission URL",
+      description: "Generate a pre-filled submit-page URL. Use when not authenticated or when the user prefers to review in the browser.",
+      inputSchema: {
+        statement: z.string().min(10).max(2000),
+        rationale: z.string().min(10).max(5000),
+        problemStatementId: z.string().optional(),
+        customProblemStatement: z.string().min(5).max(500).optional(),
+        domains: z.array(z.string().min(1).max(60)).min(1),
+        source: sourceSchema.optional(),
+      },
+      annotations: READ_ANNOTATIONS,
     },
-    async ({
-      statement,
-      rationale,
-      problemStatementId,
-      customProblemStatement,
-      domains,
-      source,
-    }) => {
+    async ({ statement, rationale, problemStatementId, customProblemStatement, domains, source }) => {
       const params = new URLSearchParams();
       params.set("statement", statement);
       params.set("rationale", rationale);
@@ -548,370 +484,619 @@ export function registerOpenExperiments(server: McpServer, opts: RegisterOptions
       if (problemStatementId) params.set("ps", problemStatementId);
       if (customProblemStatement) params.set("customPS", customProblemStatement);
       if (source) params.set("source", source);
-
       const url = `${siteUrl}/submit?${params.toString()}`;
-
-      let text = `## Ready to Submit\n\n`;
-      text += `Pre-filled submission link:\n\n`;
-      text += `${url}\n\n`;
-      text += `### Summary\n`;
-      text += `- Statement: ${statement}\n`;
-      text += `- Rationale: ${rationale.slice(0, 200)}${rationale.length > 200 ? "..." : ""}\n`;
-      text += `- Problem: ${problemStatementId || customProblemStatement || "not specified"}\n`;
-      text += `- Domains: ${domains.join(", ")}\n`;
-      text += `- Source: ${source || "human"}\n\n`;
-      text += `Click the link to review and submit on OpenExperiments.\n`;
-
-      if (rationale.length > 1500) {
-        text += `\nNote: The rationale is long (${rationale.length} chars). If the link `;
-        text += `doesn't load fully, the form will be partially pre-filled — `;
-        text += `paste the rationale manually.\n`;
-      }
-
-      const standardDomains = ["persuasion", "memorability"];
-      const nonStandardDomains = domains.filter((d) => !standardDomains.includes(d.toLowerCase()));
-
-      if (nonStandardDomains.length > 0) {
-        text += `\n---\n\n`;
-        text += `**Domain Submission Note**\n\n`;
-        text += `Your hypothesis uses: **${nonStandardDomains.join(", ")}**\n\n`;
-        text += `The platform currently accepts hypotheses in these domains through `;
-        text += `the web UI, but the domain field will be restricted to standard options. `;
-        text += `Your hypothesis will be associated with an existing domain that's closest.\n\n`;
-        text += `To propose "${nonStandardDomains[0]}" as a new official domain:\n`;
-        text += `1. Open an issue at ${siteUrl}/issues (GitHub link in footer)\n`;
-        text += `2. Describe the domain and why it's valuable\n`;
-        text += `3. Optionally: suggest datasets for this domain\n`;
-        text += `4. Community + maintainers will review\n\n`;
-        text += `Your hypothesis can still be submitted! The problem statement you `;
-        text += `propose will be recorded with your custom text.\n`;
-      }
-
-      return { content: [{ type: "text" as const, text }] };
+      let text = `## Ready to Submit\n\n${url}\n\n- Statement: ${statement}\n- Rationale: ${truncate(rationale, 220)}\n- Problem: ${problemStatementId || customProblemStatement || "not specified"}\n- Domains: ${domains.join(", ")}\n- Source: ${source || "human"}\n`;
+      const nonStandard = domains.filter((d) => !["persuasion", "memorability"].includes(d.toLowerCase()));
+      if (nonStandard.length) text += `\nNote: ${nonStandard.join(", ")} are non-standard domains. The site supports proposing new problem statements/domains; review carefully before submitting.\n`;
+      return textResult(text);
     },
   );
 
-  // ===================================================================
-  // PROMPTS
-  // ===================================================================
-
-  server.prompt(
-    "formulate-hypothesis",
-    "Load all OpenExperiments context (problem statements, datasets, example " +
-      "hypotheses) to help turn a rough idea into a testable hypothesis.",
+  server.registerTool(
+    "get_my_hypotheses",
     {
-      idea: z.string().optional().describe("The user's rough idea or area of interest"),
+      title: "Get my hypotheses",
+      description: "List hypotheses submitted by the authenticated user.",
+      inputSchema: {},
+      annotations: READ_ANNOTATIONS,
+    },
+    async () => {
+      if (!hasToken()) return authRequiredResult(authHelp);
+      const res = await api<ApiList<Hypothesis>>("/api/hypotheses?mine=true", { requireAuth: true });
+      if (!res.ok) return res.result;
+      if (res.data.data.length === 0) return textResult("You haven't submitted any hypotheses yet.");
+      let text = `# My Hypotheses (${res.data.data.length}${res.data.total != null ? ` of ${res.data.total}` : ""})\n\n`;
+      for (const h of res.data.data) text += `${formatHypothesis(siteUrl, h)}\n`;
+      return textResult(text);
+    },
+  );
+
+  // Comments
+  server.registerTool(
+    "list_comments",
+    {
+      title: "List comments",
+      description: "List discussion comments for a hypothesis.",
+      inputSchema: { hypothesisId: z.string().min(1) },
+      annotations: READ_ANNOTATIONS,
+    },
+    async ({ hypothesisId }) => {
+      const res = await api<ApiList<Comment>>(`/api/comments${makeQuery({ hypothesisId })}`);
+      if (!res.ok) return res.result;
+      let text = `# Comments on ${hypothesisId} (${res.data.data.length})\n\n${idLink(siteUrl, "hypothesis", hypothesisId)}\n\n`;
+      for (const c of res.data.data) {
+        text += `- ${c.id}${c.parentId ? ` (reply to ${c.parentId})` : ""} by ${c.author?.name ?? "Anonymous"} on ${c.createdAt}: ${c.body}${c.doi ? ` [${c.doi}]` : ""}\n`;
+      }
+      return textResult(text);
+    },
+  );
+
+  server.registerTool(
+    "post_comment",
+    {
+      title: "Post comment",
+      description: "Post a comment or reply. Before calling, show the user the exact comment text, DOI, hypothesis ID, and parent ID (if any) and get explicit confirmation.",
+      inputSchema: {
+        hypothesisId: z.string().min(1),
+        content: z.string().min(1).max(5000),
+        doi: z.string().min(1).optional(),
+        parentId: z.string().min(1).optional(),
+      },
+      annotations: WRITE_ANNOTATIONS,
+    },
+    async (input) => {
+      const res = await api<ApiData<Comment & { author: { id: string; name: string | null; avatarUrl: string | null } }>>("/api/comments", {
+        method: "POST",
+        body: input,
+        requireAuth: true,
+      });
+      if (!res.ok) return res.result;
+      return textResult(`Comment posted: ${res.data.data.id}\n\n${idLink(siteUrl, "hypothesis", input.hypothesisId)}`);
+    },
+  );
+
+  // Stars
+  server.registerTool(
+    "get_star_status",
+    {
+      title: "Get star status",
+      description: "Get star count and authenticated user's starred state for a hypothesis.",
+      inputSchema: { hypothesisId: z.string().min(1) },
+      annotations: READ_ANNOTATIONS,
+    },
+    async ({ hypothesisId }) => {
+      const res = await api<ApiData<StarStatus>>(`/api/hypotheses/${encodeURIComponent(hypothesisId)}/star`);
+      if (!res.ok) return res.result;
+      return textResult(`${hypothesisId}: ${res.data.data.count} stars; starred by you: ${res.data.data.starred ? "yes" : "no"}.`);
+    },
+  );
+
+  server.registerTool(
+    "star_hypothesis",
+    {
+      title: "Star hypothesis",
+      description: "Idempotently star a hypothesis. Before calling, show the user the exact hypothesis ID and get explicit confirmation.",
+      inputSchema: { hypothesisId: z.string().min(1) },
+      annotations: IDEMPOTENT_WRITE_ANNOTATIONS,
+    },
+    async ({ hypothesisId }) => {
+      const current = await api<ApiData<StarStatus>>(`/api/hypotheses/${encodeURIComponent(hypothesisId)}/star`, { requireAuth: true });
+      if (!current.ok) return current.result;
+      if (current.data.data.starred) return textResult(`Already starred ${hypothesisId}. Count: ${current.data.data.count}.`);
+      const res = await api<ApiData<StarStatus>>(`/api/hypotheses/${encodeURIComponent(hypothesisId)}/star`, { method: "POST", requireAuth: true });
+      if (!res.ok) return res.result;
+      return textResult(`Starred ${hypothesisId}. Count: ${res.data.data.count}.\n${idLink(siteUrl, "hypothesis", hypothesisId)}`);
+    },
+  );
+
+  server.registerTool(
+    "unstar_hypothesis",
+    {
+      title: "Unstar hypothesis",
+      description: "Idempotently unstar a hypothesis. Before calling, show the user the exact hypothesis ID and get explicit confirmation.",
+      inputSchema: { hypothesisId: z.string().min(1) },
+      annotations: IDEMPOTENT_WRITE_ANNOTATIONS,
+    },
+    async ({ hypothesisId }) => {
+      const current = await api<ApiData<StarStatus>>(`/api/hypotheses/${encodeURIComponent(hypothesisId)}/star`, { requireAuth: true });
+      if (!current.ok) return current.result;
+      if (!current.data.data.starred) return textResult(`Already not starred ${hypothesisId}. Count: ${current.data.data.count}.`);
+      const res = await api<ApiData<StarStatus>>(`/api/hypotheses/${encodeURIComponent(hypothesisId)}/star`, { method: "POST", requireAuth: true });
+      if (!res.ok) return res.result;
+      return textResult(`Unstarred ${hypothesisId}. Count: ${res.data.data.count}.\n${idLink(siteUrl, "hypothesis", hypothesisId)}`);
+    },
+  );
+
+  // Arena
+  server.registerTool(
+    "get_arena_rankings",
+    {
+      title: "Get arena rankings",
+      description: "Get the arena leaderboard: top completed hypotheses ranked by community win rate.",
+      inputSchema: {},
+      annotations: READ_ANNOTATIONS,
+    },
+    async () => {
+      const res = await api<ApiList<ArenaRanking>>("/api/arena/rankings");
+      if (!res.ok) return res.result;
+      let text = `# Arena Rankings — Top ${res.data.data.length}\n\n| # | ID | Win% | Domain | Hypothesis |\n|---|---|---:|---|---|\n`;
+      res.data.data.forEach((h, i) => {
+        text += `| ${i + 1} | [${h.id}](${idLink(siteUrl, "hypothesis", h.id)}) | ${h.winRate}% | ${domainsText(h.domain)} | ${truncate(h.statement, 90)} |\n`;
+      });
+      text += `\nArena: ${siteUrl}/arena`;
+      return textResult(text);
+    },
+  );
+
+  server.registerTool(
+    "get_arena_matchup",
+    {
+      title: "Get arena matchup",
+      description: "Get a random pair of hypotheses to judge in the arena.",
+      inputSchema: {},
+      annotations: READ_ANNOTATIONS,
+    },
+    async () => {
+      const res = await api<ApiData<ArenaMatchup>>("/api/arena/matchup");
+      if (!res.ok) return res.result;
+      const m = res.data.data;
+      let text = `# Arena Matchup ${m.id}\n\nArena: ${siteUrl}/arena\n\n`;
+      if (m.hypothesisA) text += `## A: ${m.hypothesisA.statement}\n- ID: ${m.hypothesisA.id}\n- Domain: ${domainsText(m.hypothesisA.domain)}\n- Link: ${idLink(siteUrl, "hypothesis", m.hypothesisA.id)}\n\n`;
+      if (m.hypothesisB) text += `## B: ${m.hypothesisB.statement}\n- ID: ${m.hypothesisB.id}\n- Domain: ${domainsText(m.hypothesisB.domain)}\n- Link: ${idLink(siteUrl, "hypothesis", m.hypothesisB.id)}\n\n`;
+      text += `Current votes: A ${m.votesA}, B ${m.votesB}, Tie ${m.votesTie}, Total ${m.totalVotes}.`;
+      return textResult(text);
+    },
+  );
+
+  server.registerTool(
+    "vote_arena",
+    {
+      title: "Vote arena",
+      description: "Cast an arena vote. Before calling, show the user the matchup ID, both hypothesis IDs/statements, and selected vote, then get explicit confirmation.",
+      inputSchema: { matchupId: z.string().min(1), vote: voteSchema },
+      annotations: WRITE_ANNOTATIONS,
+    },
+    async ({ matchupId, vote }) => {
+      const body: { matchupId: string; vote: ArenaVote } = { matchupId, vote };
+      const res = await api<ApiData<VoteResponse>>("/api/arena/vote", {
+        method: "POST",
+        body,
+        requireAuth: true,
+      });
+      if (!res.ok) return res.result;
+      return textResult(`Vote recorded for matchup ${res.data.data.id}. Total votes: ${res.data.data.totalVotes}.\n${siteUrl}/arena`);
+    },
+  );
+
+  // Experiments
+  server.registerTool(
+    "list_experiments",
+    {
+      title: "List experiments",
+      description: "List experiments with methodology, dataset, status, submitter, and results. Optionally filter by hypothesis ID with pagination.",
+      inputSchema: {
+        hypothesisId: z.string().min(1).optional(),
+        limit: z.number().int().min(1).max(100).optional(),
+        offset: z.number().int().min(0).optional(),
+      },
+      annotations: READ_ANNOTATIONS,
+    },
+    async ({ hypothesisId, limit, offset }) => {
+      const res = await api<ApiList<Experiment>>(`/api/experiments${makeQuery({ hypothesisId, limit, offset })}`);
+      if (!res.ok) return res.result;
+      let text = `# Experiments (${res.data.data.length})\n\n`;
+      for (const e of res.data.data) text += `${formatExperiment(siteUrl, e)}\n`;
+      return textResult(text);
+    },
+  );
+
+  server.registerTool(
+    "get_experiment",
+    {
+      title: "Get experiment",
+      description: "Get full details of an experiment, including selected version, version history, statistical results, and linked hypothesis.",
+      inputSchema: {
+        experimentId: z.string().min(1),
+        version: z.number().int().positive().optional(),
+      },
+      annotations: READ_ANNOTATIONS,
+    },
+    async ({ experimentId, version }) => {
+      const res = await api<ExperimentDetailResponse>(`/api/experiments/${encodeURIComponent(experimentId)}${makeQuery({ version })}`);
+      if (!res.ok) return res.result;
+      const e = res.data.data;
+      let text = `# Experiment ${e.id}\n\n${idLink(siteUrl, "experiments", e.id)}\n\n`;
+      text += formatExperiment(siteUrl, e, "##");
+      if (res.data.hypothesis) text += `\n## Linked Hypothesis\n[${res.data.hypothesis.id}](${idLink(siteUrl, "hypothesis", res.data.hypothesis.id)}): ${res.data.hypothesis.statement}\n`;
+      if (res.data.versions?.length) {
+        text += `\n## Versions\n`;
+        for (const v of res.data.versions) text += `- v${v.version} (${v.status}) ${v.createdAt}${v.changeSummary ? ` — ${v.changeSummary}` : ""}\n`;
+      }
+      return textResult(text);
+    },
+  );
+
+  server.registerTool(
+    "submit_experiment",
+    {
+      title: "Submit experiment",
+      description: "Submit an experiment. Before calling, show the user the exact hypothesis, dataset, status, methodology, analysis plan, OSF link, and results being submitted and get explicit confirmation.",
+      inputSchema: {
+        hypothesisId: z.string().min(1),
+        problemStatementId: z.string().min(1).optional(),
+        type: experimentTypeSchema,
+        datasetId: z.string().min(1).optional(),
+        datasetName: z.string().min(1).max(200).optional(),
+        status: experimentStatusSchema.optional(),
+        methodology: z.string().min(1).max(10000).optional(),
+        analysisPlan: z.string().min(1).max(10000).optional(),
+        osfLink: z.string().url().optional(),
+        results: experimentResultsSchema.optional(),
+      },
+      annotations: WRITE_ANNOTATIONS,
+    },
+    async (input) => {
+      const res = await api<ApiData<{ id: string }>>("/api/experiments", { method: "POST", body: input, requireAuth: true });
+      if (!res.ok) return res.result;
+      return textResult(`Experiment submitted: ${res.data.data.id}\n\n${idLink(siteUrl, "experiments", res.data.data.id)}`);
+    },
+  );
+
+  server.registerTool(
+    "update_experiment",
+    {
+      title: "Update experiment",
+      description: "Update an experiment and create a new version. Before calling, show the user the exact status, methodology, analysis plan, OSF link, results, and change summary and get explicit confirmation.",
+      inputSchema: {
+        experimentId: z.string().min(1),
+        status: experimentStatusSchema.optional(),
+        methodology: z.string().min(1).max(10000).optional(),
+        analysisPlan: z.string().min(1).max(10000).optional(),
+        osfLink: z.string().url().optional(),
+        results: experimentResultsSchema.optional(),
+        changeSummary: z.string().min(1).max(500).optional(),
+      },
+      annotations: WRITE_ANNOTATIONS,
+    },
+    async ({ experimentId, ...body }) => {
+      const res = await api<ApiData<{ id: string; version: number }>>(`/api/experiments/${encodeURIComponent(experimentId)}`, {
+        method: "PATCH",
+        body,
+        requireAuth: true,
+      });
+      if (!res.ok) return res.result;
+      return textResult(`Experiment ${res.data.data.id} updated to version ${res.data.data.version}.\n${idLink(siteUrl, "experiments", res.data.data.id)}`);
+    },
+  );
+
+  // Account and users
+  server.registerTool(
+    "whoami",
+    {
+      title: "Who am I",
+      description: "Show the authenticated OpenExperiments user or explain how to authenticate.",
+      inputSchema: {},
+      annotations: READ_ANNOTATIONS,
+    },
+    async () => {
+      if (!hasToken()) return textResult(`You are not signed in. ${authHelp}`);
+      const res = await api<AuthMeResponse>("/api/auth/me", { requireAuth: true });
+      if (!res.ok) return res.result;
+      if (!res.data.user) {
+        return textResult(`The configured OpenExperiments token is invalid, expired, or revoked. ${authHelp}`, true);
+      }
+      return textResult(`# Signed in\n\n- ID: ${res.data.user.id}\n- Name: ${res.data.user.name ?? "(no name)"}\n- Email: ${res.data.user.email ?? "(hidden)"}\n- Profile completed: ${res.data.user.profileCompleted ? "yes" : "no"}\n- Profile: ${idLink(siteUrl, "profile", res.data.user.id)}`);
+    },
+  );
+
+  server.registerTool(
+    "get_user_profile",
+    {
+      title: "Get user profile",
+      description: "Get a public user profile, contribution stats, submitted hypotheses, and starred hypotheses visible to the requester.",
+      inputSchema: { userId: z.string().min(1) },
+      annotations: READ_ANNOTATIONS,
+    },
+    async ({ userId }) => {
+      const res = await api<UserProfileResponse>(`/api/users/${encodeURIComponent(userId)}`);
+      if (!res.ok) return res.result;
+      const p = res.data.data;
+      let text = `# ${p.user.name ?? "Anonymous"}\n\n${idLink(siteUrl, "profile", p.user.id)}\n\n`;
+      text += `- ID: ${p.user.id}\n- Joined: ${p.user.joinedAt}\n- Position: ${p.user.position ?? "n/a"}\n- Affiliation: ${p.user.affiliation ?? "n/a"}\n- Website: ${p.user.website ?? "n/a"}\n- Scholar: ${p.user.scholarUrl ?? "n/a"}\n- ORCID: ${p.user.orcid ?? "n/a"}\n- X/Twitter: ${p.user.twitterHandle ?? "n/a"}\n- Bio: ${p.user.bio ?? "n/a"}\n`;
+      text += `\n## Stats\n- Hypotheses: ${p.stats.hypothesisCount}\n- Experiments: ${p.stats.experimentCount}\n- Comments: ${p.stats.commentCount}\n- Arena votes: ${p.stats.voteCount}\n`;
+      text += `\n## Hypotheses (${p.hypotheses.length})\n`;
+      for (const h of p.hypotheses) text += `- [${h.id}](${idLink(siteUrl, "hypothesis", h.id)}): ${h.statement} (${h.status}, ${h.phase}, ${domainsText(h.domain)})${h.isAnonymous ? " [anonymous]" : ""}\n`;
+      text += `\n## Starred (${p.starredHypotheses.length})\n`;
+      for (const h of p.starredHypotheses) text += `- [${h.id}](${idLink(siteUrl, "hypothesis", h.id)}): ${h.statement}\n`;
+      return textResult(text);
+    },
+  );
+
+  server.registerTool(
+    "update_my_profile",
+    {
+      title: "Update my profile",
+      description: "Update the authenticated user's profile. Only the fields you pass are changed; other fields keep their current values (use clearFields to remove a value). Before calling, show the user the exact profile fields that will be changed and get explicit confirmation.",
+      inputSchema: {
+        name: z.string().min(2).max(100).optional(),
+        position: z.string().min(2).max(100).optional(),
+        scholarUrl: z.string().url().optional(),
+        website: z.string().url().optional(),
+        bio: z.string().min(1).max(500).optional(),
+        orcid: z.string().regex(/^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/).optional(),
+        twitterHandle: z.string().regex(/^@?[a-zA-Z0-9_]{1,15}$/).optional(),
+        clearFields: z
+          .array(z.enum(["position", "scholarUrl", "website", "bio", "orcid", "twitterHandle"]))
+          .optional()
+          .describe("Optional fields to clear. Fields that are not provided keep their current values."),
+      },
+      annotations: IDEMPOTENT_WRITE_ANNOTATIONS,
+    },
+    async ({ clearFields, ...changes }) => {
+      const me = await api<AuthMeResponse>("/api/auth/me", { requireAuth: true });
+      if (!me.ok) return me.result;
+      if (!me.data.user) return authRequiredResult(authHelp);
+      const userPath = `/api/users/${encodeURIComponent(me.data.user.id)}`;
+      // The API replaces the whole profile, so merge the requested changes over
+      // the current values to avoid wiping fields the user did not mention.
+      const current = await api<UserProfileResponse>(userPath, { requireAuth: true });
+      if (!current.ok) return current.result;
+      const u = current.data.data.user;
+      const merged: Record<string, string | null> = {
+        name: u.name,
+        position: u.position,
+        scholarUrl: u.scholarUrl,
+        website: u.website,
+        bio: u.bio,
+        orcid: u.orcid,
+        twitterHandle: u.twitterHandle,
+      };
+      for (const [key, value] of Object.entries(changes)) {
+        if (value !== undefined) merged[key] = value;
+      }
+      for (const key of clearFields ?? []) merged[key] = null;
+      const res = await api<{ ok: boolean }>(userPath, { method: "PATCH", body: merged, requireAuth: true });
+      if (!res.ok) return res.result;
+      const changed = [...Object.keys(changes).filter((k) => changes[k as keyof typeof changes] !== undefined), ...(clearFields ?? []).map((k) => `${k} (cleared)`)];
+      return textResult(`Profile updated${changed.length ? `: ${changed.join(", ")}` : ""}.\n${idLink(siteUrl, "profile", me.data.user.id)}`);
+    },
+  );
+
+  // Platform overview
+  server.registerTool(
+    "platform_overview",
+    {
+      title: "Platform overview",
+      description: "High-level overview of OpenExperiments: current stats, domains, hypothesis lifecycle, feature extractability philosophy, and workflow.",
+      inputSchema: {},
+      annotations: READ_ANNOTATIONS,
+    },
+    async () => {
+      const [hypRes, psRes, dsRes, expRes, arenaRes] = await Promise.all([
+        api<ApiList<Hypothesis>>("/api/hypotheses?limit=100"),
+        api<ApiList<ProblemStatement>>("/api/problem-statements?includeDatasets=true"),
+        api<ApiList<Dataset>>("/api/datasets"),
+        api<ApiList<Experiment>>("/api/experiments?limit=100"),
+        api<ApiList<ArenaRanking>>("/api/arena/rankings"),
+      ]);
+      const firstError = [hypRes, psRes, dsRes, expRes, arenaRes].find((r) => !r.ok);
+      if (firstError && !firstError.ok) return firstError.result;
+      if (!hypRes.ok || !psRes.ok || !dsRes.ok || !expRes.ok || !arenaRes.ok) return textResult("API unavailable", true);
+      const hyps = hypRes.data.data;
+      const statusCounts = {
+        proposed: hyps.filter((h) => h.status === "proposed").length,
+        arena_ranked: hyps.filter((h) => h.status === "arena_ranked").length,
+        data_tested: hyps.filter((h) => h.status === "data_tested").length,
+        field_validated: hyps.filter((h) => h.status === "field_validated").length,
+      };
+      let text = `# OpenExperiments Platform Overview\n\nWebsite: ${siteUrl}\n\n`;
+      text += `OpenExperiments is a platform where researchers propose hypotheses, rank them in pairwise arenas, test them on datasets, discuss evidence, and cite results.\n\n`;
+      text += `## Stats\n| Metric | Count |\n|---|---:|\n| Hypotheses | ${hypRes.data.total ?? hyps.length} |\n| Problem Statements | ${psRes.data.data.length} |\n| Datasets | ${dsRes.data.data.length} |\n| Experiments | ${expRes.data.data.length} |\n| Arena Ranked | ${arenaRes.data.data.length} |\n\n`;
+      text += `## Lifecycle\nproposed → arena_ranked → data_tested → field_validated\n\n`;
+      text += `- Proposed: ${statusCounts.proposed}\n- Arena ranked: ${statusCounts.arena_ranked}\n- Data tested: ${statusCounts.data_tested}\n- Field validated: ${statusCounts.field_validated}\n\n`;
+      text += `## ExperiGen Feature Extractability\nHypotheses should test features computable from available data: brightness/color from pixels, sentiment/readability from text, face/object counts via VLMs, and correlations from structured columns. Avoid claims requiring unobserved mood, intent, demographics, or cultural context unless new data will be collected.\n\n`;
+      text += `## Workflow\n1. Browse problem statements and datasets.\n2. Formulate a specific, falsifiable hypothesis with an extraction method.\n3. Submit or generate a review URL.\n4. Vote/comment in the arena.\n5. Design and submit experiments with versions/results.\n`;
+      return textResult(text);
+    },
+  );
+
+  // Prompts
+  server.registerPrompt(
+    "formulate-hypothesis",
+    {
+      title: "Formulate hypothesis",
+      description: "Load OpenExperiments context and help turn a rough idea into a testable hypothesis; after confirmation submit when authenticated or generate a URL.",
+      argsSchema: { idea: z.string().optional().describe("The user's rough idea or area of interest") },
     },
     async ({ idea }) => {
       const [psRes, dsRes, hypRes] = await Promise.all([
-        api<{ data: Array<Record<string, unknown>> }>(
-          "/api/problem-statements?includeDatasets=true",
-        ),
-        api<{ data: Array<Record<string, unknown>> }>("/api/datasets"),
-        api<{ data: Array<Record<string, unknown>> }>("/api/hypotheses?sort=top_rated&limit=30"),
+        api<ApiList<ProblemStatement>>("/api/problem-statements?includeDatasets=true"),
+        api<ApiList<Dataset>>("/api/datasets"),
+        api<ApiList<Hypothesis>>("/api/hypotheses?sort=top_rated&limit=30"),
       ]);
-
-      let ctx = "";
-      ctx += `You are helping a user formulate a testable scientific hypothesis `;
-      ctx += `for OpenExperiments, a platform where hypotheses are submitted, `;
-      ctx += `community-ranked in blind arenas, and tested against real-world `;
-      ctx += `data by AI agents.\n\n`;
-
-      ctx += `## What Makes a Good Hypothesis (ExperiGen Philosophy)\n\n`;
-      ctx += `**1. Feature Extractability** — Tests a feature COMPUTABLE from data:\n`;
-      ctx += `   "Warm colors increase image memorability"\n`;
-      ctx += `      -> Color extractable from RGB pixel values (code-based)\n`;
-      ctx += `   "Longer arguments are more persuasive"\n`;
-      ctx += `      -> Length extractable from text character count (code-based)\n`;
-      ctx += `   "Images with faces are more memorable"\n`;
-      ctx += `      -> Face presence extractable via VLM (computer vision)\n`;
-      ctx += `   "Positive sentiment increases persuasiveness"\n`;
-      ctx += `      -> Sentiment extractable from text via NLP/LLM\n`;
-      ctx += `   NOT: "Viewer's mood affects memory"\n`;
-      ctx += `      -> Mood NOT in dataset (would need surveys)\n`;
-      ctx += `   NOT: "Arguments posted at night are less persuasive"\n`;
-      ctx += `      -> Temporal feature needs timestamp field (check if exists!)\n\n`;
-      ctx += `**2. Specificity & Falsifiability** — Clear claim with expected direction\n\n`;
-      ctx += `**3. Grounded Rationale** — Based on theory, prior work, or observation\n\n`;
-      ctx += `**4. Novelty** — Distinct from existing hypotheses\n\n`;
-      ctx += `**5. Any Domain** — Persuasion, memorability, OR propose new domains:\n`;
-      ctx += `   attention, learning, memory, decision-making, perception, etc.\n`;
-      ctx += `   Problem statements can be proposed even without datasets initially.\n\n`;
-
-      ctx += `## Active Problem Statements\n\n`;
-      for (const ps of psRes.data) {
-        ctx += `### ${ps.question} (${ps.id})\n`;
-        ctx += `Domain: ${ps.domain} | ${ps.hypothesisCount} hypotheses submitted\n`;
-        ctx += `${ps.description}\n`;
-        const datasets = ps.datasets as Array<{ name: string }> | undefined;
-        if (datasets && datasets.length > 0) {
-          ctx += `Datasets: ${datasets.map((d) => d.name).join(", ")}\n`;
-        } else {
-          ctx += `Datasets: NONE — this area needs datasets before hypotheses can be tested\n`;
-        }
-        ctx += `\n`;
+      let ctx = "You are helping formulate a testable OpenExperiments hypothesis. After the user explicitly confirms the final content, call submit_hypothesis if authenticated; if not authenticated or the user wants browser review, call generate_submission_url.\n\n";
+      ctx += "A strong hypothesis is specific, falsifiable, grounded, novel, and tests features computable from available data. Explain how each predictor/outcome can be extracted.\n\n";
+      if (idea) ctx += `User idea: ${idea}\n\n`;
+      if (psRes.ok) {
+        ctx += "## Problem Statements\n";
+        for (const ps of psRes.data.data) ctx += `- ${ps.id}: ${ps.question} (${ps.domain}, ${ps.hypothesisCount} hypotheses)\n`;
       }
-
-      ctx += `## Available Datasets (What Can Be Extracted?)\n\n`;
-      ctx += `For each dataset, consider what features can be DERIVED using:\n`;
-      ctx += `- **Code**: brightness from pixels, length from text, counts, ratios\n`;
-      ctx += `- **NLP/LLM**: sentiment, readability, named entities, topics from text\n`;
-      ctx += `- **VLM**: object detection, face count, scene category from images\n`;
-      ctx += `- **Statistical**: correlations, aggregations from numerical data\n\n`;
-      ctx += `**Key Question**: "Can I compute this feature from the available columns?"\n\n`;
-
-      for (const d of dsRes.data) {
-        ctx += `### ${d.name} (${d.id})\n`;
-        ctx += `Domain: ${d.domain || "unspecified"}\n`;
-        ctx += `Task: ${d.taskDescription}\n`;
-        const cols = Array.isArray(d.dataColumnNames)
-          ? d.dataColumnNames.join(", ")
-          : d.dataColumnNames;
-        ctx += `Columns: ${cols}\n`;
-        ctx += `Target: ${d.targetColumnName}\n`;
-        if (d.description) ctx += `${d.description}\n`;
-
-        const extractabilityMap: Record<string, string> = {
-          "ds-1": "Text sentiment, length, readability; User karma; Temporal patterns",
-          "ds-2": "Brightness, color distribution; Face count, objects (VLM); Composition",
-          "ds-3": "Tweet sentiment, hashtags, length; Engagement metrics",
-          "ds-4": "Same as LaMem + attention gaze patterns",
-        };
-        ctx += `**-> Extractable**: ${extractabilityMap[d.id as string] || "Check columns for possibilities"}\n`;
-        ctx += `\n`;
+      if (dsRes.ok) {
+        ctx += "\n## Datasets\n";
+        for (const d of dsRes.data.data) ctx += `- ${d.id}: ${d.name}; extractable: ${extractability(d.id)}\n`;
       }
-
-      const domainCounts = new Map<string, number>();
-      const sampled = hypRes.data
-        .filter((h) => h.phase === "completed" && ((h.arenaElo as number) || 0) > 1400)
-        .filter((h) => {
-          const d = Array.isArray(h.domain) ? (h.domain[0] as string) : (h.domain as string);
-          const count = domainCounts.get(d) || 0;
-          if (count < 2) {
-            domainCounts.set(d, count + 1);
-            return true;
-          }
-          return false;
-        })
-        .slice(0, 8);
-
-      ctx += `## Example Hypotheses (top-rated, diverse domains)\n\n`;
-      if (sampled.length === 0) {
-        ctx += `(No completed hypotheses available yet — be the first!)\n\n`;
-      } else {
-        for (const h of sampled) {
-          ctx += `**${h.statement}**\n`;
-          ctx += `Rationale: ${h.rationale}\n`;
-          const domains = Array.isArray(h.domain) ? h.domain.join(", ") : h.domain;
-          ctx += `Domain: ${domains} | Problem: ${h.problemStatement}\n`;
-          ctx += `Status: ${h.status}`;
-          if (h.arenaElo) ctx += ` | ELO: ${h.arenaElo}`;
-          if (h.pValue != null) ctx += ` | p=${h.pValue}, d=${h.effectSize}`;
-          ctx += `\n\n`;
-        }
+      if (hypRes.ok) {
+        ctx += "\n## Example / duplicate-check hypotheses\n";
+        for (const h of hypRes.data.data.slice(0, 10)) ctx += `- ${h.id}: ${h.statement} (${domainsText(h.domain)}, ${h.status})\n`;
       }
-
-      ctx += `## Your Workflow\n\n`;
-      ctx += `1. **Understand the domain** — ANY domain, not just persuasion/memorability\n`;
-      ctx += `2. **Identify extractable features** from available datasets:\n`;
-      ctx += `   - What columns exist? (text, image_path, timestamp, etc.)\n`;
-      ctx += `   - What can be EXTRACTED? (sentiment, brightness, duration, etc.)\n`;
-      ctx += `   - What CANNOT be extracted? (mood, intent, external info)\n`;
-      ctx += `3. **Check for duplicates** with search_hypotheses tool across ALL domains\n`;
-      ctx += `4. **Match or propose problem statement**:\n`;
-      ctx += `   - Existing: pick from list\n`;
-      ctx += `   - New: propose it! (will have no dataset initially, can be added later)\n`;
-      ctx += `5. **Explain extraction method** — EXACTLY how the feature would be extracted:\n`;
-      ctx += `   "We'd extract brightness using code to read pixel RGB values"\n`;
-      ctx += `   "We'd extract sentiment using an LLM prompt on the text field"\n`;
-      ctx += `   "We'd count faces using a VLM on the image_path field"\n`;
-      ctx += `6. **If NO dataset exists**: State clearly, suggest user finds one on Hugging Face\n`;
-      ctx += `   and proposes it via GitHub PR (see /contribute page)\n`;
-      ctx += `7. **Generate submission URL** with generate_submission_url tool\n`;
-
-      if (idea) {
-        ctx += `\n## User's Idea\n\n`;
-        ctx += `The user is interested in: "${idea}"\n\n`;
-        ctx += `Help them develop this into a testable hypothesis for the platform.\n`;
-      } else {
-        ctx += `\n## Getting Started\n\n`;
-        ctx += `Ask the user what domain interests them (persuasion, memory, attention, `;
-        ctx += `learning, decision-making, etc.) and what they think might be true. `;
-        ctx += `ALL scientific domains welcome! If they have a vague idea, help them `;
-        ctx += `identify which features can be EXTRACTED from available data.\n`;
-      }
-
-      return {
-        messages: [
-          {
-            role: "user" as const,
-            content: { type: "text" as const, text: ctx },
-          },
-        ],
-      };
+      ctx += "\nWorkflow: ask clarifying questions if needed, check duplicates with search_hypotheses, draft statement/rationale/problem/domains/citations/anonymity, show exact content, get explicit confirmation, then submit_hypothesis or generate_submission_url.";
+      return { messages: [{ role: "user", content: { type: "text", text: ctx } }] };
     },
   );
 
-  server.prompt(
+  server.registerPrompt(
     "co-ideate",
-    "Brainstorm new hypothesis ideas. Loads existing hypotheses, results, " +
-      "and gaps to inspire new research directions.",
     {
-      domain: z.string().optional().describe("Focus on a specific domain (any string)"),
+      title: "Co-ideate",
+      description: "Brainstorm new hypothesis ideas from existing hypotheses, results, arena rankings, comments, and extractability gaps.",
+      argsSchema: { domain: z.string().optional().describe("Focus on a specific free-form domain") },
     },
     async ({ domain }) => {
-      const params = new URLSearchParams({ sort: "top_rated", limit: "20" });
-      if (domain) params.set("domain", domain);
-
       const [hypRes, psRes] = await Promise.all([
-        api<{ data: Array<Record<string, unknown>> }>(`/api/hypotheses?${params}`),
-        api<{ data: Array<Record<string, unknown>> }>(
-          "/api/problem-statements?includeDatasets=true",
-        ),
+        api<ApiList<Hypothesis>>(`/api/hypotheses${makeQuery({ sort: "top_rated", limit: 20, domain })}`),
+        api<ApiList<ProblemStatement>>("/api/problem-statements?includeDatasets=true"),
       ]);
-
-      let ctx = `You are co-ideating new research hypotheses with a user on OpenExperiments. `;
-      ctx += `Explore ANY domain—not just persuasion/memorability. Focus on features `;
-      ctx += `that can be EXTRACTED from available datasets:\n`;
-      ctx += `- Code-based: brightness, length, counts\n`;
-      ctx += `- LLM-based: sentiment, topics, named entities\n`;
-      ctx += `- VLM-based: faces, objects, scenes\n\n`;
-
-      ctx += `## Existing Hypotheses\n\n`;
-      for (const h of hypRes.data) {
-        const domains = Array.isArray(h.domain) ? h.domain.join(", ") : h.domain;
-        ctx += `- **${h.statement}**\n`;
-        ctx += `  ${h.status} | ${h.source}${h.agentName ? ` / ${h.agentName}` : ""} | ${domains}\n`;
-        ctx += `  Problem: ${h.problemStatement}\n`;
-        if (h.pValue != null) ctx += `  Result: p=${h.pValue}, d=${h.effectSize}\n`;
-        ctx += `\n`;
+      let ctx = "Co-ideate research hypotheses for OpenExperiments. Consider arena voting and commenting as ways to refine ideas. Prioritize computable features and identify data gaps.\n\n";
+      if (domain) ctx += `Focus domain: ${domain}\n\n`;
+      if (hypRes.ok) {
+        ctx += "## Existing hypotheses\n";
+        for (const h of hypRes.data.data) ctx += `- ${h.statement} (${h.status}, ${domainsText(h.domain)}, comments ${h.commentCount})\n`;
       }
-
-      ctx += `## Open Questions\n\n`;
-      for (const ps of psRes.data) {
-        ctx += `- **${ps.question}** (${ps.domain}, ${ps.hypothesisCount} hypotheses)`;
-        const datasets = ps.datasets as Array<{ name: string }> | undefined;
-        if (datasets && datasets.length > 0) {
-          ctx += ` — Datasets: ${datasets.map((d) => d.name).join(", ")}`;
-        }
-        ctx += `\n`;
+      if (psRes.ok) {
+        ctx += "\n## Open questions\n";
+        for (const ps of psRes.data.data) ctx += `- ${ps.question} (${ps.domain})\n`;
       }
+      ctx += "\nSuggest 2-3 directions, note extraction method, then when the user picks one follow formulate-hypothesis workflow.";
+      return { messages: [{ role: "user", content: { type: "text", text: ctx } }] };
+    },
+  );
 
-      ctx += `\n## How to Brainstorm\n\n`;
-      ctx += `1. **Identify gaps** — What features haven't been tested?\n`;
-      ctx += `   Consider: texture, motion, temporal patterns, cross-modal effects\n`;
-      ctx += `2. **Find contradictions** — Which results conflict? Why?\n`;
-      ctx += `3. **Suggest extensions** — Combine existing ideas or test new domains\n`;
-      ctx += `4. **Check extractability** — Can the feature be computed from existing data?\n`;
-      ctx += `5. **Propose new domains** — Beyond persuasion/memorability:\n`;
-      ctx += `   attention, learning, memory consolidation, decision-making, perception\n`;
-      ctx += `6. When the user likes an idea, use generate_submission_url\n\n`;
+  server.registerPrompt(
+    "review-arena",
+    {
+      title: "Review arena",
+      description: "Guide the user through judging arena matchups using get_arena_matchup and vote_arena.",
+      argsSchema: {},
+    },
+    async () => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: "Guide the user through OpenExperiments arena judging. Call get_arena_matchup, present both hypotheses neutrally, ask for A/B/tie/both_weak, then show the exact matchup and selected vote and get explicit confirmation before vote_arena. After voting, offer another matchup or get_arena_rankings.",
+          },
+        },
+      ],
+    }),
+  );
 
-      if (domain) ctx += `Focus area: **${domain}** (but feel free to explore adjacent domains)\n`;
+  server.registerPrompt(
+    "design-experiment",
+    {
+      title: "Design experiment",
+      description: "Plan an experiment for a hypothesis on a dataset, then submit_experiment after confirmation.",
+      argsSchema: {
+        hypothesisId: z.string().optional(),
+        datasetId: z.string().optional(),
+      },
+    },
+    async ({ hypothesisId, datasetId }) => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: `Design an OpenExperiments experiment${hypothesisId ? ` for hypothesis ${hypothesisId}` : ""}${datasetId ? ` using dataset ${datasetId}` : ""}. Gather/inspect hypothesis and dataset details, specify type, dataset, methodology, analysis plan, OSF link if available, and optional results. Show exact payload and get explicit confirmation before submit_experiment. If updating an existing experiment, use update_experiment after confirmation.`,
+          },
+        },
+      ],
+    }),
+  );
 
-      ctx += `\nStart by summarizing what's been explored, identify extractability `;
-      ctx += `constraints, and suggest 2-3 testable directions.\n`;
+  // Resources
+  server.registerResource(
+    "platform-guide",
+    "openexperiments://guide",
+    {
+      title: "OpenExperiments guide",
+      description: "Guide to OpenExperiments workflows, tools, prompts, resources, lifecycle, datasets, arena, and auth.",
+      mimeType: "text/markdown",
+    },
+    (uri) => ({
+      contents: [
+        {
+          uri: uri.href,
+          mimeType: "text/markdown",
+          text: `# OpenExperiments MCP Guide
 
+OpenExperiments supports hypothesis submission/discovery, arena voting, experiments with versions/results, datasets with OSF-style characterization, comments, stars, citations, and profiles.
+
+## Tools
+
+### Read-only
+- whoami
+- platform_overview
+- list_problem_statements
+- list_datasets / get_dataset
+- browse_hypotheses / search_hypotheses / get_hypothesis / get_my_hypotheses
+- list_comments
+- get_star_status
+- get_arena_rankings / get_arena_matchup
+- list_experiments / get_experiment
+- get_user_profile
+- generate_submission_url
+
+### Writes (auth required unless noted)
+- submit_hypothesis, add_citation
+- post_comment
+- star_hypothesis, unstar_hypothesis
+- vote_arena (public API may accept anonymous votes)
+- submit_experiment, update_experiment
+- submit_dataset
+- update_my_profile
+
+Write tools require the assistant to show exact content and obtain explicit user confirmation before calling.
+
+## Prompts
+- formulate-hypothesis
+- co-ideate
+- review-arena
+- design-experiment
+
+## Resources
+- openexperiments://guide
+- openexperiments://hypothesis/{id}
+
+## Feature extractability
+A good hypothesis tests computable features: color/brightness from pixels, sentiment/readability from text, faces/objects via VLMs, or statistics from structured columns. Avoid claims requiring unobserved data unless proposing new data collection.
+
+## Auth
+Create a personal access token at ${siteUrl}/settings/mcp and set OPENEXPERIMENTS_TOKEN. Remote OAuth connectors provide a token automatically.
+`,
+        },
+      ],
+    }),
+  );
+
+  server.registerResource(
+    "hypothesis-template",
+    new ResourceTemplate("openexperiments://hypothesis/{id}", { list: undefined }),
+    {
+      title: "Hypothesis resource",
+      description: "Fetch a hypothesis detail resource by ID.",
+      mimeType: "text/markdown",
+    },
+    async (uri, variables) => {
+      const idValue = variables.id;
+      const id = Array.isArray(idValue) ? idValue[0] : idValue;
+      if (!id) {
+        return { contents: [{ uri: uri.href, mimeType: "text/markdown", text: "# Missing hypothesis ID" }] };
+      }
+      const res = await api<HypothesisDetailResponse>(`/api/hypotheses/${encodeURIComponent(id)}`);
+      if (!res.ok) {
+        return { contents: [{ uri: uri.href, mimeType: "text/markdown", text: res.result.content.map((c) => (c.type === "text" ? c.text : "")).join("\n") }] };
+      }
+      const h = res.data.data;
       return {
-        messages: [
+        contents: [
           {
-            role: "user" as const,
-            content: { type: "text" as const, text: ctx },
+            uri: uri.href,
+            mimeType: "text/markdown",
+            text: `# ${h.statement}\n\n${idLink(siteUrl, "hypothesis", h.id)}\n\n${h.rationale}\n\nStatus: ${h.status}; phase: ${h.phase}; domain: ${domainsText(h.domain)}.`,
           },
         ],
       };
     },
   );
-
-  // ===================================================================
-  // RESOURCES
-  // ===================================================================
-
-  server.resource("platform-guide", "openexperiments://guide", async (uri) => ({
-    contents: [
-      {
-        uri: uri.href,
-        mimeType: "text/markdown",
-        text: `# OpenExperiments Platform Guide
-
-## What Is It?
-
-An open platform where anyone — humans and AI — can submit a scientific
-hypothesis, have the community vote on it, and see AI agents test it
-against real-world data. Democratising science, one hypothesis at a time.
-
-## ExperiGen Philosophy: Feature Extractability
-
-**Core principle**: Hypotheses test features COMPUTABLE from existing data.
-
-**EXTRACTABLE (You can test this)**:
-- Brightness, color, contrast -> from image pixel RGB values
-- Sentiment, tone, complexity -> from text using NLP/LLMs
-- Face count, object types, scene category -> from images using VLMs
-- Duration, frequency, patterns -> from timestamps/structured data
-- Post history, engagement -> from user metadata (if not anonymized)
-
-**NOT EXTRACTABLE (Need new data collection)**:
-- Viewer's mood or emotions -> not stored in any field
-- Author's true underlying intent -> can't measure from text alone
-- Cultural significance -> requires external cultural knowledge
-- Temporal patterns -> need timestamp field (check if available!)
-- User demographics -> need user data (check if anonymized!)
-
-**Think**: "Can I compute this using the available columns + AI/code?"
-
-## Domains
-
-- **Persuasion**: What makes arguments persuasive (Reddit CMV, Twitter)
-- **Memorability**: What makes images memorable (LaMem, Visual Attention)
-- **[Propose New]**: Attention, learning, memory, decision-making, perception...
-
-Any scientific domain is welcome! Problem statements can be proposed even
-without initial datasets—find or suggest datasets later via GitHub PR.
-
-## Hypothesis Lifecycle
-
-1. **Proposed** — submitted, not yet evaluated
-2. **Arena Ranked** — community has voted in pairwise comparisons
-3. **Data Tested** — AI agents ran experiments against datasets
-4. **Field Validated** — confirmed via pre-registered field experiments
-
-Phase: **live** (accepting input) or **completed** (results published)
-
-## Submitting a Hypothesis
-
-A good hypothesis:
-- Makes a specific, falsifiable claim
-- Can be tested with available datasets
-- Has a clear expected direction of effect
-- Includes a rationale (why you believe this)
-- Cites prior work when possible (DOIs)
-
-## Datasets
-
-Curated Hugging Face datasets. Each has:
-- Column schema (available features)
-- Target column (what we predict)
-- Task description (what hypotheses it can test)
-- Linked problem statements
-
-## Arena
-
-Blind pairwise comparisons. Source and scores are hidden.
-Vote options: A is better, B is better, Tie, Both weak.
-Produces ELO-based rankings.
-
-## Contributing
-
-- Submit hypotheses at /submit
-- Vote in arena at /arena
-- Suggest datasets via GitHub PR
-- Conduct experiments
-- Help develop the platform
-
-Contact: experimentsopen@gmail.com
-Paper: https://arxiv.org/abs/2602.07983`,
-      },
-    ],
-  }));
 }

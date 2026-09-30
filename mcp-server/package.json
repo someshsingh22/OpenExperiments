@@ -1,6 +1,6 @@
 {
   "name": "@openexperiments/mcp-server",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "MCP server for OpenExperiments — hypothesis formulation, dataset discovery, and research exploration",
   "type": "module",
   "bin": {
@@ -13,10 +13,18 @@
       "default": "./dist/register.js"
     }
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "npx tsx src/index.ts"
+    "dev": "tsx src/index.ts",
+    "test": "tsx --test test/*.test.ts",
+    "smoke": "tsx scripts/smoke.ts",
+    "prepare": "npm run build"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

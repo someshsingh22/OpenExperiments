@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # Quick setup script for Claude Code
-# Run with: bash configure-claude-code.sh
+# Optional env before running:
+#   OPENEXPERIMENTS_API_URL=http://localhost:3000 OPENEXPERIMENTS_SITE_URL=http://localhost:3000 OPENEXPERIMENTS_TOKEN=oe_pat_... bash configure-claude-code.sh
 
 set -e
 
@@ -14,25 +15,30 @@ if [ ! -f "$DIST_PATH" ]; then
   exit 1
 fi
 
-echo "📦 Adding OpenExperiments MCP server to Claude Code..."
-echo "   Path: $DIST_PATH"
-echo ""
-
-# Check if claude CLI is available
 if ! command -v claude &> /dev/null; then
   echo "❌ Error: 'claude' command not found"
   echo "Make sure Claude Code is installed and in your PATH"
   exit 1
 fi
 
-# Add the MCP server
-claude mcp add openexperiments node "$DIST_PATH"
+API_URL="${OPENEXPERIMENTS_API_URL:-https://openexperiments.pages.dev}"
+SITE_URL="${OPENEXPERIMENTS_SITE_URL:-$API_URL}"
+
+if [ -n "${OPENEXPERIMENTS_TOKEN:-}" ]; then
+  echo "📦 Adding OpenExperiments MCP server to Claude Code with OPENEXPERIMENTS_TOKEN..."
+  claude mcp add openexperiments env \
+    "OPENEXPERIMENTS_API_URL=$API_URL" \
+    "OPENEXPERIMENTS_SITE_URL=$SITE_URL" \
+    "OPENEXPERIMENTS_TOKEN=$OPENEXPERIMENTS_TOKEN" \
+    node "$DIST_PATH"
+else
+  echo "📦 Adding OpenExperiments MCP server to Claude Code (read-only unless token is added later)..."
+  claude mcp add openexperiments env \
+    "OPENEXPERIMENTS_API_URL=$API_URL" \
+    "OPENEXPERIMENTS_SITE_URL=$SITE_URL" \
+    node "$DIST_PATH"
+fi
 
 echo ""
-echo "✅ Done! The MCP server is now configured."
-echo ""
-echo "To verify:"
-echo "  claude mcp list"
-echo ""
-echo "To test in a conversation:"
-echo "  Ask Claude to 'use platform_overview to show stats'"
+echo "✅ Done! Verify with: claude mcp list"
+echo "Token setup: create one at $SITE_URL/settings/mcp and rerun with OPENEXPERIMENTS_TOKEN=..."

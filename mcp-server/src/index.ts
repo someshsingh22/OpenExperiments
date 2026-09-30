@@ -12,13 +12,14 @@ const SITE_URL = process.env.OPENEXPERIMENTS_SITE_URL || API_URL;
 
 const server = new McpServer({
   name: "openexperiments",
-  version: "1.0.0",
+  version: "1.2.0",
 });
 
 registerOpenExperiments(server, {
   apiUrl: API_URL,
   siteUrl: SITE_URL,
   getAuthToken: () => process.env.OPENEXPERIMENTS_TOKEN || undefined,
+  authHelp: `Create a personal access token at ${SITE_URL}/settings/mcp and set OPENEXPERIMENTS_TOKEN.`,
 });
 
 async function main() {
