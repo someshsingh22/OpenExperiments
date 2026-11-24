@@ -5,21 +5,46 @@ import { arenaVotes, arenaMatchups } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { updateWinRatesForMatchup } from "@/lib/arena-stats";
 import { invalidateCached } from "@/lib/edge-cache";
+import { enforceRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
-  const { getSession } = await import("@/lib/auth");
-  const user = await getSession(request);
-  const db = getDB();
-  const body = await request.json();
-  const { matchupId, vote } = body as { matchupId: string; vote: string };
+  const limited = await enforceRateLimit(request, RATE_LIMITS.vote);
+  if (limited) return limited;
+  const mediaType = request.headers.get("content-type")?.split(";")[0].trim().toLowerCase();
+  if (mediaType !== "application/json") {
+    return Response.json({ error: "Content-Type must be application/json" }, { status: 415 });
+  }
 
-  if (!matchupId || !vote) {
+  const origin = request.headers.get("origin");
+  if (
+    (origin !== null && origin !== new URL(request.url).origin) ||
+    request.headers.get("sec-fetch-site")?.trim().toLowerCase() === "cross-site"
+  ) {
+    return Response.json({ error: "Cross-site requests are not allowed" }, { status: 403 });
+  }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+  if (body === null || typeof body !== "object" || Array.isArray(body)) {
+    return Response.json({ error: "Body must be a JSON object" }, { status: 400 });
+  }
+  const { matchupId, vote } = body as Record<string, unknown>;
+
+  if (typeof matchupId !== "string" || typeof vote !== "string" || !matchupId || !vote) {
     return Response.json({ error: "matchupId and vote are required" }, { status: 400 });
   }
 
   if (!["a", "b", "tie", "both_weak"].includes(vote)) {
     return Response.json({ error: "vote must be a, b, tie, or both_weak" }, { status: 400 });
   }
+
+  const { getSession } = await import("@/lib/auth");
+  const user = await getSession(request);
+  const db = getDB();
 
   // Dedup: use userId if logged in, otherwise hash IP
   let ipHash: string | null = null;

@@ -3,6 +3,8 @@ export const runtime = "edge";
 import { getDB } from "@/db";
 import { hypotheses, experiments, experimentResults, comments } from "@/db/schema";
 import { eq, inArray } from "drizzle-orm";
+import { readHypothesisDetailChunks } from "@/lib/hypothesis-detail-chunks";
+import { enforceRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -14,23 +16,21 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return Response.json({ error: "Not found" }, { status: 404 });
   }
 
-  // Fetch related experiments with results
-  const exps = await db.select().from(experiments).where(eq(experiments.hypothesisId, id));
-
-  const expIds = exps.map((e) => e.id);
+  const [{ exps, allResults }, comms] = await Promise.all([
+    (async () => {
+      const exps = await db.select().from(experiments).where(eq(experiments.hypothesisId, id));
+      const expIds = exps.map((e) => e.id);
+      const allResults = await readHypothesisDetailChunks(expIds, (chunk) =>
+        db.select().from(experimentResults).where(inArray(experimentResults.experimentId, chunk)),
+      );
+      return { exps, allResults };
+    })(),
+    db.select().from(comments).where(eq(comments.hypothesisId, id)),
+  ]);
   const results: Record<string, typeof experimentResults.$inferSelect> = {};
-  if (expIds.length > 0) {
-    const allResults = await db
-      .select()
-      .from(experimentResults)
-      .where(inArray(experimentResults.experimentId, expIds));
-    for (const r of allResults) {
-      results[r.experimentId] = r;
-    }
+  for (const r of allResults) {
+    results[r.experimentId] = r;
   }
-
-  // Fetch comments with author info
-  const comms = await db.select().from(comments).where(eq(comments.hypothesisId, id));
 
   // Win rate: use the denormalized column only (kept current by
   // updateWinRatesForMatchup on every vote). null means "no votes yet".
@@ -112,6 +112,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const limited = await enforceRateLimit(request, RATE_LIMITS.write);
+  if (limited) return limited;
   const { id } = await params;
 
   // Editing citations is a write: require an authenticated owner. Without this
@@ -165,8 +167,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .set({ citationDois: updated, updatedAt: now })
     .where(eq(hypotheses.id, id));
 
-  const { invalidateCached } = await import("@/lib/edge-cache");
-  await invalidateCached(`hypothesis:${id}`);
+  const { invalidateHypothesisCaches } = await import("@/lib/edge-cache");
+  await invalidateHypothesisCaches(id);
 
   return Response.json({ data: { citationDois: updated } });
 }

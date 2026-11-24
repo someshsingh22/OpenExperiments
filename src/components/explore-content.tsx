@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Search, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { getHypotheses, toggleStar, getStarsBatch } from "@/lib/api";
@@ -9,6 +9,7 @@ import { useAuth } from "@/components/auth-provider";
 import type { Hypothesis, ProblemStatement } from "@/lib/types";
 
 const BASE_DOMAINS = ["persuasion", "memorability"];
+const PAGE_SIZE = 50;
 
 const STATUS_OPTIONS = [
   { value: "all", label: "All phases" },
@@ -29,12 +30,14 @@ type SortOption = (typeof SORT_OPTIONS)[number]["value"];
 interface ExploreContentProps {
   initialHypotheses: Hypothesis[];
   initialProblemStatements: ProblemStatement[];
+  initialTotal: number;
   initialPsId?: string;
 }
 
 function ExploreContentInner({
   initialHypotheses,
   initialProblemStatements,
+  initialTotal,
   initialPsId,
 }: ExploreContentProps) {
   const { user, setShowAuthModal } = useAuth();
@@ -42,41 +45,80 @@ function ExploreContentInner({
   const [domain, setDomain] = useState<DomainFilter>("all");
   const [phase, setPhase] = useState<PhaseFilter>("all");
   const [sortBy, setSortBy] = useState<SortOption>("newest");
-  const [selectedPS, setSelectedPS] = useState<string | null>(null);
+  const [selectedPS, setSelectedPS] = useState<string | null>(initialPsId || null);
   const [hypothesesData, setHypothesesData] = useState<Hypothesis[]>(initialHypotheses);
+  const [total, setTotal] = useState(initialTotal);
+  const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [psInitialized, setPsInitialized] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
   const [starredIds, setStarredIds] = useState<Set<string>>(new Set());
   const [starCounts, setStarCounts] = useState<Map<string, number>>(new Map());
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [hasUserFiltered, setHasUserFiltered] = useState(false);
+  const normalizedSearch = search.trim();
+  const params = useMemo(
+    () => ({
+      sort: sortBy,
+      domain: domain === "all" ? undefined : domain,
+      phase: phase === "all" ? undefined : phase,
+      search: debouncedSearch || undefined,
+      problemStatementId: selectedPS || undefined,
+      limit: PAGE_SIZE,
+      offset: page * PAGE_SIZE,
+    }),
+    [sortBy, domain, phase, debouncedSearch, selectedPS, page],
+  );
+  const queryKey = JSON.stringify(params);
+  const loadedKey = useRef(queryKey);
 
-  // Debounce search input (300ms)
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    if (normalizedSearch === debouncedSearch) return;
+    const timer = setTimeout(() => {
+      setDebouncedSearch(normalizedSearch);
+      setPage(0);
+    }, 300);
     return () => clearTimeout(timer);
-  }, [search]);
+  }, [normalizedSearch, debouncedSearch]);
 
-  // Re-fetch when filters change (skip initial load since we have server data)
   useEffect(() => {
-    if (!hasUserFiltered) return;
+    if (queryKey === loadedKey.current) {
+      setLoading(false);
+      setError(null);
+      return;
+    }
+    let active = true;
     setLoading(true);
-    const params: Record<string, string> = { sort: sortBy };
-    if (domain !== "all") params.domain = domain;
-    if (phase !== "all") params.phase = phase;
-    if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
-
+    setError(null);
     getHypotheses(params)
-      .then((res) => setHypothesesData(res.data))
-      .finally(() => setLoading(false));
-  }, [domain, phase, sortBy, debouncedSearch, hasUserFiltered]);
+      .then((res) => {
+        if (!active) return;
+        setHypothesesData(res.data);
+        setTotal(res.total);
+        loadedKey.current = queryKey;
+      })
+      .catch(() => {
+        if (active) setError("Unable to load hypotheses. Please try again.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [params, queryKey, retry]);
 
   // Load star status for visible hypotheses (batch)
   useEffect(() => {
-    if (!user || hypothesesData.length === 0) return;
+    let active = true;
+    if (!user || hypothesesData.length === 0) {
+      setStarredIds(new Set());
+      setStarCounts(new Map());
+      return;
+    }
     const ids = hypothesesData.map((h) => h.id);
     getStarsBatch(ids)
       .then((res) => {
+        if (!active) return;
         const newStarred = new Set<string>();
         const newCounts = new Map<string, number>();
         for (const [id, status] of Object.entries(res.data)) {
@@ -87,22 +129,10 @@ function ExploreContentInner({
         setStarCounts(newCounts);
       })
       .catch(() => {});
+    return () => {
+      active = false;
+    };
   }, [user, hypothesesData]);
-
-  // Read PS from initial prop once problem statements are loaded
-  useEffect(() => {
-    if (psInitialized || initialProblemStatements.length === 0) return;
-    if (initialPsId) {
-      const match = initialProblemStatements.find((p) => p.id === initialPsId);
-      if (match) setSelectedPS(match.question);
-    }
-    setPsInitialized(true);
-  }, [initialPsId, initialProblemStatements, psInitialized]);
-
-  const psQuestions = useMemo(
-    () => initialProblemStatements.map((ps) => ps.question),
-    [initialProblemStatements],
-  );
 
   const domainOptions = useMemo(() => {
     const fromPS = initialProblemStatements.map((ps) => ps.domain);
@@ -112,11 +142,6 @@ function ExploreContentInner({
       ...all.map((d) => ({ value: d, label: d.charAt(0).toUpperCase() + d.slice(1) })),
     ];
   }, [initialProblemStatements]);
-
-  const filtered = useMemo(() => {
-    if (!selectedPS) return hypothesesData;
-    return hypothesesData.filter((h) => h.problemStatement === selectedPS);
-  }, [hypothesesData, selectedPS]);
 
   const handleStar = useCallback(
     async (id: string) => {
@@ -172,30 +197,40 @@ function ExploreContentInner({
 
   const triggerFilter = (setter: () => void) => {
     setter();
-    setHasUserFiltered(true);
+    setPage(0);
+  };
+
+  const selectProblemStatement = (id: string | null) => {
+    triggerFilter(() => setSelectedPS(id));
+    const url = new URL(window.location.href);
+    if (id) url.searchParams.set("ps", id);
+    else url.searchParams.delete("ps");
+    window.history.replaceState(null, "", url);
   };
 
   const selectClass =
-    "rounded-md border border-stone-200 bg-white px-2.5 py-2 text-sm text-stone-700 focus:border-stone-400 focus:outline-none focus:ring-1 focus:ring-stone-300";
+    "rounded-md border border-stone-200 bg-white px-2.5 py-2 text-sm text-stone-700 focus:border-stone-600 focus:outline-none focus:ring-1 focus:ring-stone-600";
 
   return (
     <div className="min-h-screen">
       <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-        <h1 className="mb-6 text-xl font-semibold text-stone-900">Explore Hypotheses</h1>
+        <h1 className="type-title mb-6 text-stone-900">Explore Hypotheses</h1>
 
         {/* Filters */}
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
           <div className="relative flex-1 sm:max-w-xs">
-            <Search className="absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-stone-300" />
+            <label htmlFor="explore-search" className="sr-only">
+              Search hypotheses
+            </label>
+            <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-stone-600" />
             <input
-              type="text"
-              placeholder="Search..."
+              id="explore-search"
+              type="search"
+              autoComplete="off"
+              placeholder="Search hypotheses"
               value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setHasUserFiltered(true);
-              }}
-              className="w-full rounded-md border border-stone-200 bg-white py-2 pr-3 pl-8 text-sm text-stone-700 placeholder-stone-400 focus:border-stone-400 focus:ring-1 focus:ring-stone-300 focus:outline-none"
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full rounded-md border border-stone-200 bg-white py-2 pr-3 pl-8 text-sm text-stone-700 placeholder-stone-500 focus:border-stone-600 focus:ring-1 focus:ring-stone-600 focus:outline-none"
             />
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -249,9 +284,11 @@ function ExploreContentInner({
 
         {/* Problem statement chips */}
         <div className="mb-8 overflow-x-auto">
-          <div className="flex gap-1.5 pb-1">
+          <div role="group" aria-label="Filter by problem statement" className="flex gap-1.5 pb-1">
             <button
-              onClick={() => setSelectedPS(null)}
+              type="button"
+              onClick={() => selectProblemStatement(null)}
+              aria-pressed={selectedPS === null}
               className={`shrink-0 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
                 selectedPS === null
                   ? "bg-stone-900 text-white"
@@ -260,17 +297,19 @@ function ExploreContentInner({
             >
               All
             </button>
-            {psQuestions.map((ps) => (
+            {initialProblemStatements.map((ps) => (
               <button
-                key={ps}
-                onClick={() => setSelectedPS(ps)}
+                key={ps.id}
+                type="button"
+                onClick={() => selectProblemStatement(ps.id)}
+                aria-pressed={selectedPS === ps.id}
                 className={`shrink-0 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
-                  selectedPS === ps
+                  selectedPS === ps.id
                     ? "bg-stone-900 text-white"
                     : "bg-white text-stone-600 ring-1 ring-stone-300 hover:text-stone-900 hover:ring-stone-400"
                 }`}
               >
-                {ps}
+                {ps.question}
               </button>
             ))}
           </div>
@@ -278,12 +317,24 @@ function ExploreContentInner({
 
         {/* Grid */}
         {loading ? (
-          <div className="flex justify-center py-16">
+          <div role="status" className="flex justify-center py-16">
+            <span className="sr-only">Loading hypotheses</span>
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-stone-300 border-t-stone-600" />
           </div>
-        ) : filtered.length > 0 ? (
+        ) : error ? (
+          <div role="alert" className="py-8 text-center">
+            <p>{error}</p>
+            <button
+              type="button"
+              onClick={() => setRetry((value) => value + 1)}
+              className={selectClass}
+            >
+              Retry
+            </button>
+          </div>
+        ) : hypothesesData.length > 0 ? (
           <div className="columns-1 gap-4 sm:columns-2 lg:columns-3">
-            {filtered.map((hypothesis) => (
+            {hypothesesData.map((hypothesis) => (
               <div key={hypothesis.id} className="mb-4 break-inside-avoid">
                 <HypothesisCard
                   hypothesis={hypothesis}
@@ -299,8 +350,41 @@ function ExploreContentInner({
             <p className="mb-1 text-base font-semibold text-stone-700">
               No hypotheses match your filters.
             </p>
-            <p className="text-sm text-stone-500">Be the first &mdash; submit one.</p>
+            <p className="text-sm text-stone-600">Be the first &mdash; submit one.</p>
           </div>
+        )}
+        {!error && (
+          <nav
+            aria-label="Hypothesis pagination"
+            className="mt-6 flex items-center justify-center gap-4"
+          >
+            <button
+              type="button"
+              disabled={loading || page === 0}
+              onClick={() => setPage((value) => value - 1)}
+              className={`${selectClass} disabled:cursor-not-allowed disabled:opacity-50`}
+            >
+              Previous page
+            </button>
+            <p
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+              className="text-sm text-stone-600"
+            >
+              {loading
+                ? "Loading…"
+                : `Page ${page + 1} of ${Math.max(1, Math.ceil(total / PAGE_SIZE))} · ${total} hypotheses`}
+            </p>
+            <button
+              type="button"
+              disabled={loading || (page + 1) * PAGE_SIZE >= total}
+              onClick={() => setPage((value) => value + 1)}
+              className={`${selectClass} disabled:cursor-not-allowed disabled:opacity-50`}
+            >
+              Next page
+            </button>
+          </nav>
         )}
       </div>
     </div>

@@ -25,6 +25,7 @@ import { EvidenceBadge } from "@/components/evidence-badge";
 import { DomainTag } from "@/components/domain-tag";
 import { updateProfile } from "@/lib/api";
 import type { Domain, HypothesisStatus, Phase } from "@/lib/types";
+import { formatDate } from "@/lib/format";
 
 interface ProfileData {
   user: {
@@ -66,6 +67,11 @@ interface ProfileData {
   };
   isOwner: boolean;
 }
+
+type EditableProfile = Pick<
+  ProfileData["user"],
+  "name" | "position" | "scholarUrl" | "website" | "bio" | "orcid" | "twitterHandle"
+>;
 
 export default function ProfilePage() {
   const params = useParams();
@@ -120,11 +126,11 @@ export default function ProfilePage() {
   };
 
   const saveProfile = async () => {
-    if (!data) return;
+    if (!data?.isOwner) return;
     setSaving(true);
     setEditError("");
     try {
-      await updateProfile(id, {
+      const result = (await updateProfile(id, {
         name: editName,
         position: editPosition,
         scholarUrl: editScholarUrl,
@@ -132,11 +138,26 @@ export default function ProfilePage() {
         bio: editBio,
         orcid: editOrcid,
         twitterHandle: editTwitter,
-      });
+      })) as { ok: boolean; data: EditableProfile };
+      const { name, position, scholarUrl, website, bio, orcid, twitterHandle } = result.data;
+      setData((current) =>
+        current?.isOwner && current.user.id === id
+          ? {
+              ...current,
+              user: {
+                ...current.user,
+                name,
+                position,
+                scholarUrl,
+                website,
+                bio,
+                orcid,
+                twitterHandle,
+              },
+            }
+          : current,
+      );
       setEditing(false);
-      // Reload profile data
-      setLoading(true);
-      loadProfile();
     } catch (err) {
       setEditError(err instanceof Error ? err.message : "Failed to save");
     } finally {
@@ -155,8 +176,8 @@ export default function ProfilePage() {
   if (notFound || !data) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-16 text-center">
-        <h1 className="mb-1 text-lg font-semibold text-stone-800">User not found</h1>
-        <p className="text-sm text-stone-400">This profile does not exist.</p>
+        <h1 className="type-heading mb-1 text-stone-800">User not found</h1>
+        <p className="text-sm text-stone-600">This profile does not exist.</p>
       </div>
     );
   }
@@ -164,7 +185,7 @@ export default function ProfilePage() {
   const { user, hypotheses, starredHypotheses, stats, isOwner } = data;
 
   const inputClass =
-    "w-full rounded-md border border-stone-200 px-3 py-2 text-sm text-stone-800 placeholder-stone-400 focus:border-stone-300 focus:outline-none focus:ring-1 focus:ring-stone-300";
+    "w-full rounded-md border border-stone-200 px-3 py-2 text-sm text-stone-800 placeholder-stone-500 focus:border-stone-600 focus:outline-none focus:ring-1 focus:ring-stone-600";
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
@@ -178,17 +199,17 @@ export default function ProfilePage() {
             referrerPolicy="no-referrer"
           />
         ) : (
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-stone-200 text-xl font-semibold text-stone-500">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-stone-200 text-xl font-semibold text-stone-600">
             {(user.name || "U")[0]}
           </div>
         )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-semibold text-stone-900">{user.name || "Anonymous"}</h1>
+            <h1 className="type-title text-stone-900">{user.name || "Anonymous"}</h1>
             {isOwner && !editing && (
               <button
                 onClick={startEditing}
-                className="inline-flex items-center gap-1 rounded-md border border-stone-200 px-2 py-1 text-xs font-medium text-stone-500 transition-colors hover:border-stone-300 hover:text-stone-700"
+                className="inline-flex items-center gap-1 rounded-md border border-stone-200 px-2 py-1 text-xs font-medium text-stone-600 transition-colors hover:border-stone-300 hover:text-stone-700"
               >
                 <Pencil className="h-3 w-3" />
                 Edit
@@ -196,16 +217,19 @@ export default function ProfilePage() {
             )}
           </div>
           {user.position && (
-            <p className="mt-0.5 flex items-center gap-1 text-sm text-stone-500">
+            <p className="mt-0.5 flex items-center gap-1 text-sm text-stone-600">
               <Briefcase className="h-3.5 w-3.5 shrink-0" />
               {user.position}
             </p>
           )}
-          {user.affiliation && <p className="mt-0.5 text-xs text-stone-400">{user.affiliation}</p>}
-          <div className="mt-1 flex items-center gap-3 text-sm text-stone-400">
+          {user.affiliation && <p className="mt-0.5 text-xs text-stone-600">{user.affiliation}</p>}
+          <div className="mt-1 flex items-center gap-3 text-sm text-stone-600">
             <span className="flex items-center gap-1">
               <Calendar className="h-3.5 w-3.5" />
-              Joined {user.joinedAt}
+              Joined{" "}
+              <time dateTime={user.joinedAt} className="type-data">
+                {formatDate(user.joinedAt)}
+              </time>
             </span>
           </div>
         </div>
@@ -216,13 +240,13 @@ export default function ProfilePage() {
         <div className="mb-8 space-y-4 rounded-lg border border-stone-200 bg-white p-5">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-stone-700">Edit Profile</h2>
-            <button onClick={cancelEditing} className="text-stone-400 hover:text-stone-600">
+            <button onClick={cancelEditing} className="text-stone-600 hover:text-stone-900">
               <X className="h-4 w-4" />
             </button>
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-stone-500">Name</label>
+            <label className="mb-1 block text-xs font-medium text-stone-600">Name</label>
             <input
               type="text"
               value={editName}
@@ -232,7 +256,7 @@ export default function ProfilePage() {
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-stone-500">Position</label>
+            <label className="mb-1 block text-xs font-medium text-stone-600">Position</label>
             <input
               type="text"
               value={editPosition}
@@ -243,7 +267,7 @@ export default function ProfilePage() {
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-stone-500">
+            <label className="mb-1 block text-xs font-medium text-stone-600">
               Google Scholar Profile
             </label>
             <input
@@ -256,7 +280,7 @@ export default function ProfilePage() {
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-stone-500">
+            <label className="mb-1 block text-xs font-medium text-stone-600">
               Personal Website
             </label>
             <input
@@ -269,7 +293,7 @@ export default function ProfilePage() {
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-stone-500">Bio</label>
+            <label className="mb-1 block text-xs font-medium text-stone-600">Bio</label>
             <textarea
               value={editBio}
               onChange={(e) => setEditBio(e.target.value)}
@@ -278,11 +302,11 @@ export default function ProfilePage() {
               className={inputClass}
               maxLength={500}
             />
-            <p className="mt-1 text-right text-[11px] text-stone-400">{editBio.length}/500</p>
+            <p className="mt-1 text-right text-xs text-stone-600">{editBio.length}/500</p>
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-stone-500">ORCID</label>
+            <label className="mb-1 block text-xs font-medium text-stone-600">ORCID</label>
             <input
               type="text"
               value={editOrcid}
@@ -293,7 +317,7 @@ export default function ProfilePage() {
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-stone-500">
+            <label className="mb-1 block text-xs font-medium text-stone-600">
               X / Twitter Handle
             </label>
             <input
@@ -306,7 +330,7 @@ export default function ProfilePage() {
           </div>
 
           {editError && (
-            <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+            <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               {editError}
             </p>
           )}
@@ -336,7 +360,7 @@ export default function ProfilePage() {
           {user.bio ? (
             <p className="text-sm leading-relaxed text-stone-600">{user.bio}</p>
           ) : isOwner ? (
-            <p className="text-sm text-stone-300 italic">No bio set. Click Edit to add one.</p>
+            <p className="text-sm text-stone-500 italic">No bio set. Click Edit to add one.</p>
           ) : null}
         </div>
       )}
@@ -349,12 +373,12 @@ export default function ProfilePage() {
               href={user.scholarUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-xs font-medium text-stone-500 hover:text-stone-800"
+              className="inline-flex items-center gap-1 text-xs font-medium text-stone-600 hover:text-stone-800"
             >
               <GraduationCap className="h-3.5 w-3.5" /> Scholar
             </a>
           ) : isOwner ? (
-            <span className="inline-flex items-center gap-1 text-xs text-stone-300">
+            <span className="inline-flex items-center gap-1 text-xs text-stone-500">
               <GraduationCap className="h-3.5 w-3.5" /> Not set
             </span>
           ) : null}
@@ -363,12 +387,12 @@ export default function ProfilePage() {
               href={user.website}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-xs font-medium text-stone-500 hover:text-stone-800"
+              className="inline-flex items-center gap-1 text-xs font-medium text-stone-600 hover:text-stone-800"
             >
               <Globe className="h-3.5 w-3.5" /> Website
             </a>
           ) : isOwner ? (
-            <span className="inline-flex items-center gap-1 text-xs text-stone-300">
+            <span className="inline-flex items-center gap-1 text-xs text-stone-500">
               <Globe className="h-3.5 w-3.5" /> Not set
             </span>
           ) : null}
@@ -377,12 +401,12 @@ export default function ProfilePage() {
               href={`https://orcid.org/${user.orcid}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-xs font-medium text-stone-500 hover:text-stone-800"
+              className="inline-flex items-center gap-1 text-xs font-medium text-stone-600 hover:text-stone-800"
             >
               <ExternalLink className="h-3.5 w-3.5" /> ORCID
             </a>
           ) : isOwner ? (
-            <span className="inline-flex items-center gap-1 text-xs text-stone-300">
+            <span className="inline-flex items-center gap-1 text-xs text-stone-500">
               <ExternalLink className="h-3.5 w-3.5" /> ORCID not set
             </span>
           ) : null}
@@ -391,12 +415,12 @@ export default function ProfilePage() {
               href={`https://x.com/${user.twitterHandle.replace(/^@/, "")}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-xs font-medium text-stone-500 hover:text-stone-800"
+              className="inline-flex items-center gap-1 text-xs font-medium text-stone-600 hover:text-stone-800"
             >
               <ExternalLink className="h-3.5 w-3.5" /> @{user.twitterHandle.replace(/^@/, "")}
             </a>
           ) : isOwner ? (
-            <span className="inline-flex items-center gap-1 text-xs text-stone-300">
+            <span className="inline-flex items-center gap-1 text-xs text-stone-500">
               <ExternalLink className="h-3.5 w-3.5" /> X not set
             </span>
           ) : null}
@@ -408,20 +432,20 @@ export default function ProfilePage() {
         <div className="mb-3 grid grid-cols-2 gap-3">
           <div className="rounded-lg border border-stone-200 bg-white p-4 text-center">
             <p className="text-2xl font-semibold text-stone-800">{stats.hypothesisCount}</p>
-            <p className="text-xs text-stone-400">
+            <p className="text-xs text-stone-600">
               <Lightbulb className="mr-1 inline h-3 w-3" />
               Hypotheses
             </p>
           </div>
           <div className="rounded-lg border border-stone-200 bg-white p-4 text-center">
             <p className="text-2xl font-semibold text-stone-800">{stats.experimentCount}</p>
-            <p className="text-xs text-stone-400">
+            <p className="text-xs text-stone-600">
               <FlaskConical className="mr-1 inline h-3 w-3" />
               Experiments
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-4 text-[13px] text-stone-400">
+        <div className="flex items-center gap-4 text-[13px] text-stone-600">
           <span className="flex items-center gap-1">
             <MessageSquare className="h-3 w-3" />
             {stats.commentCount} comments
@@ -436,7 +460,7 @@ export default function ProfilePage() {
       {/* Starred Hypotheses */}
       {starredHypotheses.length > 0 && (
         <section className="mb-8">
-          <h2 className="mb-4 text-sm font-semibold tracking-wider text-stone-500 uppercase">
+          <h2 className="mb-4 text-sm font-semibold tracking-wider text-stone-600 uppercase">
             <Star className="mr-1 inline h-3.5 w-3.5" />
             Starred Hypotheses
           </h2>
@@ -454,8 +478,14 @@ export default function ProfilePage() {
                   ))}
                   <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
                 </div>
-                <p className="text-[13px] leading-relaxed text-stone-700">{h.statement}</p>
-                <p className="mt-1.5 text-[11px] text-stone-400">{h.submittedAt}</p>
+                <p className="type-statement max-w-prose text-base leading-snug text-stone-900">
+                  {h.statement}
+                </p>
+                <p className="mt-1.5 text-xs text-stone-600">
+                  <time dateTime={h.submittedAt} className="type-data">
+                    {formatDate(h.submittedAt)}
+                  </time>
+                </p>
               </Link>
             ))}
           </div>
@@ -464,7 +494,7 @@ export default function ProfilePage() {
 
       {/* Hypotheses */}
       <section>
-        <h2 className="mb-4 text-sm font-semibold tracking-wider text-stone-500 uppercase">
+        <h2 className="mb-4 text-sm font-semibold tracking-wider text-stone-600 uppercase">
           Hypotheses
         </h2>
         {hypotheses.length > 0 ? (
@@ -481,18 +511,24 @@ export default function ProfilePage() {
                     <DomainTag key={d} domain={d as Domain} />
                   ))}
                   {h.isAnonymous && isOwner && (
-                    <span className="inline-flex items-center gap-0.5 rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-medium text-stone-500">
+                    <span className="inline-flex items-center gap-0.5 rounded bg-stone-100 px-1.5 py-0.5 text-xs font-medium text-stone-600">
                       <EyeOff className="h-3 w-3" /> Private
                     </span>
                   )}
                 </div>
-                <p className="text-[13px] leading-relaxed text-stone-700">{h.statement}</p>
-                <p className="mt-1.5 text-[11px] text-stone-400">{h.submittedAt}</p>
+                <p className="type-statement max-w-prose text-base leading-snug text-stone-900">
+                  {h.statement}
+                </p>
+                <p className="mt-1.5 text-xs text-stone-600">
+                  <time dateTime={h.submittedAt} className="type-data">
+                    {formatDate(h.submittedAt)}
+                  </time>
+                </p>
               </Link>
             ))}
           </div>
         ) : (
-          <p className="text-sm text-stone-400">No hypotheses submitted yet.</p>
+          <p className="text-sm text-stone-600">No hypotheses submitted yet.</p>
         )}
       </section>
     </div>

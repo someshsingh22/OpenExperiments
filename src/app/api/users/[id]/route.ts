@@ -2,7 +2,28 @@ export const runtime = "edge";
 
 import { getDB } from "@/db";
 import { users, hypotheses, comments, stars, experiments, arenaVotes } from "@/db/schema";
-import { eq, sql, desc, inArray } from "drizzle-orm";
+import { and, eq, ne, desc } from "drizzle-orm";
+import { enforceRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+
+const hypothesisFields = {
+  id: hypotheses.id,
+  statement: hypotheses.statement,
+  status: hypotheses.status,
+  phase: hypotheses.phase,
+  domains: hypotheses.domains,
+  isAnonymous: hypotheses.isAnonymous,
+  submittedAt: hypotheses.submittedAt,
+};
+
+const editableProfileFields = {
+  name: users.name,
+  position: users.position,
+  scholarUrl: users.scholarUrl,
+  website: users.website,
+  bio: users.bio,
+  orcid: users.orcid,
+  twitterHandle: users.twitterHandle,
+};
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { getSession } = await import("@/lib/auth");
@@ -34,48 +55,35 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return Response.json({ error: "User not found" }, { status: 404 });
   }
 
-  const allHypotheses = await db
-    .select()
-    .from(hypotheses)
-    .where(eq(hypotheses.submittedBy, id))
-    .orderBy(desc(hypotheses.createdAt))
-    .limit(50);
-
-  const [{ commentCount }] = await db
-    .select({ commentCount: sql<number>`count(*)` })
-    .from(comments)
-    .where(eq(comments.userId, id));
-
-  const [{ experimentCount }] = await db
-    .select({ experimentCount: sql<number>`count(*)` })
-    .from(experiments)
-    .where(eq(experiments.submittedBy, id));
-
-  const [{ voteCount }] = await db
-    .select({ voteCount: sql<number>`count(*)` })
-    .from(arenaVotes)
-    .where(eq(arenaVotes.userId, id));
-
-  // Fetch starred hypotheses for this user
-  const userStars = await db
-    .select({ hypothesisId: stars.hypothesisId })
-    .from(stars)
-    .where(eq(stars.userId, id));
-
-  let starredHypotheses: typeof allHypotheses = [];
-  if (userStars.length > 0) {
-    const starredIds = userStars.map((s) => s.hypothesisId);
-    starredHypotheses = await db
-      .select()
+  const visibility = and(
+    eq(hypotheses.submittedBy, id),
+    isOwner ? undefined : ne(hypotheses.isAnonymous, 1),
+  );
+  const [visibleHypotheses, [stats], starredHypotheses] = await Promise.all([
+    db
+      .select(hypothesisFields)
       .from(hypotheses)
-      .where(inArray(hypotheses.id, starredIds))
-      .orderBy(desc(hypotheses.createdAt));
-  }
-
-  // Filter hypotheses based on viewer: owner sees all, others only non-anonymous
-  const visibleHypotheses = isOwner
-    ? allHypotheses
-    : allHypotheses.filter((h) => h.isAnonymous !== 1);
+      .where(visibility)
+      .orderBy(desc(hypotheses.createdAt), desc(hypotheses.id))
+      .limit(50),
+    db
+      .select({
+        hypothesisCount: db.$count(hypotheses, visibility),
+        commentCount: db.$count(comments, eq(comments.userId, id)),
+        experimentCount: db.$count(experiments, eq(experiments.submittedBy, id)),
+        voteCount: db.$count(arenaVotes, eq(arenaVotes.userId, id)),
+      })
+      .from(users)
+      .where(eq(users.id, id))
+      .limit(1),
+    // Keep full collection access until the UI supports paginated stars.
+    db
+      .select(hypothesisFields)
+      .from(stars)
+      .innerJoin(hypotheses, eq(stars.hypothesisId, hypotheses.id))
+      .where(eq(stars.userId, id))
+      .orderBy(desc(hypotheses.createdAt), desc(hypotheses.id)),
+  ]);
 
   // Derive affiliation from email domain
   const emailAffiliation = user.email ? extractAffiliation(user.email) : null;
@@ -114,12 +122,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
           domain: h.domains,
           submittedAt: new Date(h.submittedAt * 1000).toISOString().split("T")[0],
         })),
-        stats: {
-          hypothesisCount: allHypotheses.length,
-          experimentCount,
-          commentCount,
-          voteCount,
-        },
+        stats,
         isOwner,
       },
     },
@@ -130,6 +133,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const limited = await enforceRateLimit(request, RATE_LIMITS.write);
+  if (limited) return limited;
   const { getSession, requireSession } = await import("@/lib/auth");
   const viewer = await getSession(request);
   const unauthorized = requireSession(viewer);
@@ -153,7 +158,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const { name, position, scholarUrl, website, bio, orcid, twitterHandle } = result.data;
   const now = Math.floor(Date.now() / 1000);
 
-  await db
+  const [updatedProfile] = await db
     .update(users)
     .set({
       name,
@@ -165,9 +170,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       twitterHandle: twitterHandle || null,
       updatedAt: now,
     })
-    .where(eq(users.id, id));
+    .where(eq(users.id, id))
+    .returning(editableProfileFields);
 
-  return Response.json({ ok: true });
+  if (!updatedProfile) {
+    return Response.json(
+      { error: "User not found" },
+      { status: 404, headers: { "Cache-Control": "private, no-store" } },
+    );
+  }
+  return Response.json(
+    { ok: true, data: updatedProfile },
+    { headers: { "Cache-Control": "private, no-store" } },
+  );
 }
 
 function extractAffiliation(email: string): string | null {

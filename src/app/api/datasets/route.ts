@@ -5,6 +5,7 @@ import { datasets, datasetProblemStatements, experiments } from "@/db/schema";
 import { eq, sql, inArray } from "drizzle-orm";
 import { validateDataset } from "@/lib/validation";
 import { invalidateCached } from "@/lib/edge-cache";
+import { enforceRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
 export async function GET(request: Request) {
   const db = getDB();
@@ -16,33 +17,48 @@ export async function GET(request: Request) {
     conditions.push(eq(datasets.domain, domain));
   }
 
-  const rows = conditions.length
-    ? await db.select().from(datasets).where(conditions[0])
-    : await db.select().from(datasets);
+  const query = db
+    .select({
+      id: datasets.id,
+      name: datasets.name,
+      huggingfaceUrl: datasets.huggingfaceUrl,
+      taskDescription: datasets.taskDescription,
+      dataColumnNames: datasets.dataColumnNames,
+      targetColumnName: datasets.targetColumnName,
+      description: datasets.description,
+      domain: datasets.domain,
+      license: datasets.license,
+      foreknowledgeStatus: datasets.foreknowledgeStatus,
+      unitOfAnalysis: datasets.unitOfAnalysis,
+      createdAt: datasets.createdAt,
+    })
+    .from(datasets);
+  const rows = conditions.length ? await query.where(conditions[0]) : await query;
 
   // Aggregate counts in two grouped queries instead of 2 per row (N+1).
   const ids = rows.map((d) => d.id);
   const psCounts = new Map<string, number>();
   const expCounts = new Map<string, number>();
   if (ids.length) {
-    const psRows = await db
-      .select({
-        datasetId: datasetProblemStatements.datasetId,
-        count: sql<number>`count(*)`,
-      })
-      .from(datasetProblemStatements)
-      .where(inArray(datasetProblemStatements.datasetId, ids))
-      .groupBy(datasetProblemStatements.datasetId);
+    const [psRows, expRows] = await Promise.all([
+      db
+        .select({
+          datasetId: datasetProblemStatements.datasetId,
+          count: sql<number>`count(*)`,
+        })
+        .from(datasetProblemStatements)
+        .where(inArray(datasetProblemStatements.datasetId, ids))
+        .groupBy(datasetProblemStatements.datasetId),
+      db
+        .select({
+          datasetId: experiments.datasetId,
+          count: sql<number>`count(*)`,
+        })
+        .from(experiments)
+        .where(inArray(experiments.datasetId, ids))
+        .groupBy(experiments.datasetId),
+    ]);
     for (const r of psRows) psCounts.set(r.datasetId, r.count);
-
-    const expRows = await db
-      .select({
-        datasetId: experiments.datasetId,
-        count: sql<number>`count(*)`,
-      })
-      .from(experiments)
-      .where(inArray(experiments.datasetId, ids))
-      .groupBy(experiments.datasetId);
     for (const r of expRows) if (r.datasetId) expCounts.set(r.datasetId, r.count);
   }
 
@@ -79,6 +95,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const limited = await enforceRateLimit(request, RATE_LIMITS.write);
+  if (limited) return limited;
   const { getSession, requireSession } = await import("@/lib/auth");
   const user = await getSession(request);
   const unauthorized = requireSession(user);

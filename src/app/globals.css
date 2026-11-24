@@ -7,7 +7,8 @@
   --accent-muted: #e0e7ff;
   --surface: #ffffff;
   --border: #e7e5e4;
-  --muted: #78716c;
+  /* stone-600: 7:1 on white, the floor for any secondary text */
+  --muted: #57534e;
 }
 
 @theme inline {
@@ -15,6 +16,7 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-serif: var(--font-stix), Georgia, "Times New Roman", serif;
 }
 
 body {
@@ -25,4 +27,73 @@ body {
     system-ui,
     -apple-system,
     sans-serif;
+}
+
+/*
+ * Type roles. Serif (STIX Two, the journal face) carries titles and
+ * hypothesis statements; Geist carries the interface; Geist Mono carries
+ * measurements only.
+ */
+@utility type-display {
+  font-family: var(--font-stix), Georgia, "Times New Roman", serif;
+  font-weight: 500;
+  font-size: clamp(2.5rem, 1.6rem + 3.6vw, 3.75rem);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+@utility type-title {
+  font-family: var(--font-stix), Georgia, "Times New Roman", serif;
+  font-weight: 500;
+  font-size: 2rem;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+  @media (width >= 40rem) {
+    font-size: 2.5rem;
+    line-height: 1.1;
+  }
+}
+
+@utility type-heading {
+  font-family: var(--font-stix), Georgia, "Times New Roman", serif;
+  font-weight: 500;
+  font-size: 1.375rem;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+@utility type-statement {
+  font-family: var(--font-stix), Georgia, "Times New Roman", serif;
+  font-weight: 400;
+  letter-spacing: -0.005em;
+  text-wrap: pretty;
+}
+
+@utility type-data {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+::placeholder {
+  color: #78716c;
+  opacity: 1;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

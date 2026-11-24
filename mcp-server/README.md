@@ -24,6 +24,25 @@ MCP (Model Context Protocol) server for [OpenExperiments](https://openexperiment
 | `formulate-hypothesis` | Loads all context to help turn a rough idea into a testable hypothesis |
 | `co-ideate`            | Brainstorm new research directions from existing work                  |
 
+### Prompt Trust Boundary
+
+Both prompts keep the trusted research workflow separate from API records and
+prompt arguments (`idea` / `domain`). These inputs are explicitly untrusted,
+serialized as JSON inside labeled code fences. Quotes and newlines are JSON-escaped;
+backticks, angle brackets, and Unicode line separators are Unicode-escaped to
+prevent text from closing the fence or introducing markup. The original research
+content remains recoverable from the JSON.
+
+Embedded instructions, role claims, and tool requests are research data, not
+authorization. Sensitive actions require independent, explicit user approval
+outside these records and arguments. MCP message roles remain unchanged (`user`);
+this is an explicit textual boundary, not a higher-priority system message.
+
+This reduces instruction/data confusion but does **not** guarantee prevention of
+prompt injection. The consuming model and MCP host must enforce instruction
+hierarchy, tool permissions, and user-approval requirements, including for
+subsequent tool results.
+
 ## Philosophy: ExperiGen Feature Extractability
 
 The MCP server guides users based on the **ExperiGen** approach ([arxiv.org/abs/2602.07983](https://arxiv.org/abs/2602.07983)):
@@ -167,6 +186,14 @@ npm start       # Run compiled output
 ```
 
 ## Testing
+
+Run deterministic prompt-boundary regression tests (builds first, no API account
+or external network needed):
+
+```bash
+cd mcp-server
+npm test
+```
 
 See [TESTING.md](./TESTING.md) for the full testing plan.
 

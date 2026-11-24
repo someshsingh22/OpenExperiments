@@ -18,9 +18,7 @@ export default function ContributePage() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-14 sm:px-6">
       <header className="mb-12">
-        <h1 className="text-3xl font-semibold tracking-tight text-stone-900 sm:text-4xl">
-          Contribute to {SITE_CONFIG.name}
-        </h1>
+        <h1 className="type-title text-stone-900">Contribute to {SITE_CONFIG.name}</h1>
         <p className="mt-4 text-base leading-relaxed text-stone-600">
           {SITE_CONFIG.name} thrives on community involvement. Whether you are a researcher, a
           developer, or just curious, there are many ways you can help democratise science.
@@ -33,7 +31,7 @@ export default function ContributePage() {
           <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-stone-100 text-stone-700">
             <Users className="h-5 w-5" />
           </div>
-          <h2 className="mb-2 text-lg font-semibold text-stone-900">Core Participation</h2>
+          <h2 className="mb-2 font-serif text-xl font-medium text-stone-900">Core Participation</h2>
           <p className="mb-4 text-sm leading-relaxed text-stone-600">
             The easiest way to contribute is to use the platform. Submit your ideas, evaluate
             hypotheses in the arena, or conduct your own field experiments.
@@ -65,7 +63,7 @@ export default function ContributePage() {
           <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-stone-100 text-stone-700">
             <Cpu className="h-5 w-5" />
           </div>
-          <h2 className="mb-2 text-lg font-semibold text-stone-900">Compute Support</h2>
+          <h2 className="mb-2 font-serif text-xl font-medium text-stone-900">Compute Support</h2>
           <p className="mb-4 text-sm leading-relaxed text-stone-600">
             Do you want to help us with compute for running more hypothesis tests or pre-registered
             studies? We are always looking for computing partners.
@@ -83,7 +81,7 @@ export default function ContributePage() {
           <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-stone-100 text-stone-700">
             <Database className="h-5 w-5" />
           </div>
-          <h2 className="mb-2 text-lg font-semibold text-stone-900">Suggest Datasets</h2>
+          <h2 className="mb-2 font-serif text-xl font-medium text-stone-900">Suggest Datasets</h2>
           <p className="mb-4 text-sm leading-relaxed text-stone-600">
             Have a great Hugging Face dataset we should add? Datasets and problem statements are
             reviewed weekly. Open a PR with the HF link, task description, and column schema.
@@ -111,7 +109,9 @@ export default function ContributePage() {
           <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-stone-100 text-stone-700">
             <FileText className="h-5 w-5" />
           </div>
-          <h2 className="mb-2 text-lg font-semibold text-stone-900">Algorithmic Development</h2>
+          <h2 className="mb-2 font-serif text-xl font-medium text-stone-900">
+            Algorithmic Development
+          </h2>
           <p className="mb-4 text-sm leading-relaxed text-stone-600">
             Help improve ExperiGen. Suggest better prompts, new AI agents, improved testing
             pipelines, or featurization methods.
@@ -133,7 +133,9 @@ export default function ContributePage() {
               <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-white text-stone-700 shadow-sm">
                 <Code2 className="h-5 w-5" />
               </div>
-              <h2 className="mb-2 text-lg font-semibold text-stone-900">Website Development</h2>
+              <h2 className="mb-2 font-serif text-xl font-medium text-stone-900">
+                Website Development
+              </h2>
               <p className="text-sm leading-relaxed text-stone-600">
                 Have any issues or suggestions for the website? Please raise a request at our
                 GitHub.

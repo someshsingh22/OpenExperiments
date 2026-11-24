@@ -48,10 +48,19 @@ const db = getDB();
 
 Dataset IDs are stable:
 
-- `ds-1` = Reddit ChangeMyView (text / persuasion)
-- `ds-2` = LaMem (images / memorability)
-- `ds-3` = Twitter Persuasion Pairs (text / persuasion)
-- `ds-4` = Visual Attention & Memorability (images / memorability)
+- `ds-1` = `Harini/changemyview_data` (text / persuasion), linked to `ps-1`
+- `ds-iclr` = `Harini/iclr_reviews` (text / peer-review persuasion), linked to `ps-iclr`
+
+`src/lib/data/research-catalog.json` is the source of truth for curated dataset
+metadata and problem statements. Run `node scripts/research-catalog.mjs` after
+editing it to regenerate `scripts/catalog.sql` and `scripts/seed.sql`. Apply
+`catalog.sql` to update an existing database; it is idempotent and only retires
+the exact original mock problem statements. Do not re-run `seed-demo.sql`.
+The published datasets are historical; describe prospective OSF collection plans
+separately rather than treating those plans as properties of the released files.
+In particular, ICLR's `label=changed` includes decreases and is not the planned
+confirmatory `improved` outcome. Neither HF card specifies a dataset-wide license;
+source content remains subject to applicable OpenReview, ICLR, or Reddit terms.
 
 ## Hypothesis Lifecycle
 

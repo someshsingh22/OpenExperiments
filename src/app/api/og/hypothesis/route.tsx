@@ -17,18 +17,30 @@ export async function GET(request: Request) {
   let domains: string[] = [];
   let status = "proposed";
   let source = "human";
+  let cacheControl = "public, max-age=60, s-maxage=60";
 
   try {
     const db = getDB();
-    const [h] = await db.select().from(hypotheses).where(eq(hypotheses.id, id)).limit(1);
+    const [h] = await db
+      .select({
+        statement: hypotheses.statement,
+        domains: hypotheses.domains,
+        status: hypotheses.status,
+        source: hypotheses.source,
+      })
+      .from(hypotheses)
+      .where(eq(hypotheses.id, id))
+      .limit(1);
     if (h) {
       statement = h.statement;
       domains = h.domains as string[];
       status = h.status;
       source = h.source;
+      cacheControl = "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800";
     }
   } catch {
-    // Fallback to generic image
+    console.error("[og/hypothesis] Failed to load hypothesis; returning fallback image.");
+    cacheControl = "no-store";
   }
 
   const statusLabel =
@@ -192,9 +204,7 @@ export async function GET(request: Request) {
       width: 1200,
       height: 630,
       headers: {
-        // Rasterizing this image + the D1 read are expensive; cache hard at the
-        // edge/CDN and in social-crawler caches. Keyed by id, changes rarely.
-        "Cache-Control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800",
+        "Cache-Control": cacheControl,
       },
     },
   );

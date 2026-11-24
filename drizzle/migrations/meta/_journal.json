@@ -57,6 +57,20 @@
       "when": 1789721606850,
       "tag": "0007_first_morlocks",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1790811763330,
+      "tag": "0008_amusing_katie_power",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1795562035185,
+      "tag": "0009_rate_limits",
+      "breakpoints": true
     }
   ]
 }

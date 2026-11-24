@@ -82,7 +82,15 @@ export const hypotheses = sqliteTable(
   (table) => [
     index("idx_hypotheses_status").on(table.status),
     index("idx_hypotheses_phase").on(table.phase),
-    index("idx_hypotheses_submitted_at").on(table.submittedAt),
+    index("idx_hypotheses_submitted_at_id").on(table.submittedAt, table.id),
+    index("idx_hypotheses_submitted_by_created_at_id").on(
+      table.submittedBy,
+      table.createdAt,
+      table.id,
+    ),
+    index("idx_hypotheses_phase_submitted_at_id").on(table.phase, table.submittedAt, table.id),
+    index("idx_hypotheses_win_rate_id").on(table.winRate, table.id),
+    index("idx_hypotheses_phase_win_rate_id").on(table.phase, table.winRate, table.id),
     index("idx_hypotheses_arena_elo").on(table.arenaElo),
   ],
 );
@@ -178,7 +186,13 @@ export const experiments = sqliteTable(
     updatedAt: integer("updated_at").notNull(),
   },
   (table) => [
-    index("idx_experiments_hypothesis_id").on(table.hypothesisId),
+    index("idx_experiments_hypothesis_started_at_id").on(
+      table.hypothesisId,
+      table.startedAt,
+      table.id,
+    ),
+    index("idx_experiments_started_at_id").on(table.startedAt, table.id),
+    index("idx_experiments_submitted_by").on(table.submittedBy),
     index("idx_experiments_status").on(table.status),
     index("idx_experiments_dataset_id").on(table.datasetId),
   ],
@@ -286,6 +300,7 @@ export const arenaVotes = sqliteTable(
   },
   (table) => [
     index("idx_arena_votes_matchup_id").on(table.matchupId),
+    index("idx_arena_votes_user_id").on(table.userId),
     uniqueIndex("idx_arena_votes_ip_matchup").on(table.matchupId, table.voterIpHash),
     // Enforce one vote per authenticated user per matchup at the DB level.
     // Partial (user_id IS NOT NULL) so anonymous rows — deduped by the IP
@@ -312,4 +327,15 @@ export const stars = sqliteTable(
     index("idx_stars_user_id").on(table.userId),
     index("idx_stars_hypothesis_id").on(table.hypothesisId),
   ],
+);
+
+// Fixed-window request counters keyed by bucket + SHA-256 of the client IP.
+export const rateLimits = sqliteTable(
+  "rate_limits",
+  {
+    key: text("key").primaryKey(),
+    windowStart: integer("window_start").notNull(),
+    count: integer("count").notNull(),
+  },
+  (table) => [index("idx_rate_limits_window_start").on(table.windowStart)],
 );

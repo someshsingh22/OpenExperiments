@@ -4,13 +4,16 @@ import { getDB } from "@/db";
 import { users, sessions } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { verifyPassword } from "@/lib/password";
+import { enforceRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
+  const limited = await enforceRateLimit(request, RATE_LIMITS.auth);
+  if (limited) return limited;
   const db = getDB();
-  const body = (await request.json()) as { email: string; password: string };
-  const { email, password } = body;
+  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+  const { email, password } = body ?? {};
 
-  if (!email || !password) {
+  if (typeof email !== "string" || typeof password !== "string" || !email || !password) {
     return Response.json({ error: "Email and password are required" }, { status: 400 });
   }
 

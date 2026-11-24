@@ -56,8 +56,9 @@ export const DATASET_LICENSES: string[] = [
 // The dataset-level OSF characterization, stored as a JSON blob on the dataset.
 // All fields are free-text prose (mirroring OSF textareas) except `tags`.
 export interface OsfCharacterization {
-  // Overview — where the data comes from and why prior observation can't bias it.
-  provenance: string;
+  // Curated datasets can omit provenance while submissions still require it.
+  provenance?: string;
+  foreknowledgeSummary?: string;
   foreknowledgeExplanation?: string;
   // Sampling — how observations are gathered, and the collection window.
   collectionProcedure: string;
@@ -75,7 +76,7 @@ export interface OsfCharacterization {
 // Ordered section metadata that drives the submission form and the detail page,
 // so the two never drift. `key` maps to a field on OsfCharacterization.
 export interface OsfSection {
-  key: keyof Omit<OsfCharacterization, "tags">;
+  key: keyof Omit<OsfCharacterization, "tags" | "foreknowledgeSummary">;
   title: string;
   help: string;
   placeholder: string;
@@ -123,7 +124,7 @@ export const OSF_SECTIONS: OsfSection[] = [
   {
     key: "variables",
     title: "Variable dictionary",
-    help: "For each column: its name, what it means, how it is computed, and its type / role (id, predictor, outcome, covariate).",
+    help: "Enter one variable per line, with its name, meaning, type, and role (ID, predictor, outcome, or covariate).",
     placeholder:
       "comment_id — root comment identifier; the unit of analysis.\ndelta — binary outcome (1 if the OP awarded a confirmed view-change, else 0).\npost_score — score of the original post (covariate).",
     required: true,

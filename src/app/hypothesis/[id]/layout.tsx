@@ -4,9 +4,7 @@ import { cache } from "react";
 import type { Metadata } from "next";
 import { SITE_CONFIG } from "@/lib/constants";
 import { serializeJsonLd } from "@/lib/json-ld";
-import { getDB } from "@/db";
-import { hypotheses } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { getHypothesisDetailRow } from "@/lib/hypothesis-detail-row";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -15,9 +13,7 @@ interface Props {
 
 const getHypothesisData = cache(async (id: string) => {
   try {
-    const db = getDB();
-    const [h] = await db.select().from(hypotheses).where(eq(hypotheses.id, id)).limit(1);
-    return h ?? null;
+    return await getHypothesisDetailRow(id);
   } catch {
     return null;
   }

@@ -18,6 +18,10 @@ import {
   FileText,
 } from "lucide-react";
 
+// Expands the touch target to >=44px without changing the visual size of compact buttons.
+const hitArea =
+  "relative before:absolute before:-inset-x-1 before:-inset-y-2.5 before:content-['']";
+
 interface HypothesisCardProps {
   hypothesis: Hypothesis;
   onStar?: (id: string) => void;
@@ -30,8 +34,12 @@ export function HypothesisCard({ hypothesis, onStar, starred, starCount }: Hypot
   const [showShare, setShowShare] = useState(false);
   const [copied, setCopied] = useState(false);
   const shareRef = useRef<HTMLDivElement>(null);
+  const shareButtonRef = useRef<HTMLButtonElement>(null);
+  const shareMenuId = `share-menu-${hypothesis.id}`;
 
   useEffect(() => {
+    if (!showShare) return;
+
     function handleClickOutside(event: MouseEvent) {
       if (shareRef.current && !shareRef.current.contains(event.target as Node)) {
         setShowShare(false);
@@ -39,7 +47,7 @@ export function HypothesisCard({ hypothesis, onStar, starred, starCount }: Hypot
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [showShare]);
 
   return (
     <div className="group relative rounded-lg border border-stone-200 bg-white p-4 transition-all duration-300 hover:-translate-y-1 hover:border-stone-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
@@ -51,17 +59,17 @@ export function HypothesisCard({ hypothesis, onStar, starred, starCount }: Hypot
           ))}
         </div>
 
-        <p className="mb-2.5 line-clamp-3 text-[13px] leading-relaxed text-stone-700 group-hover:text-stone-900">
+        <p className="type-statement mb-3 line-clamp-3 text-base leading-snug text-stone-900">
           {hypothesis.statement}
         </p>
 
-        <div className="flex items-center justify-between text-[11px] text-stone-500">
+        <div className="flex items-center justify-between text-xs text-stone-600">
           <div className="flex items-center gap-1">
             {revealed ? (
               hypothesis.source === "ai_agent" ? (
                 <>
-                  <Cpu className="h-3 w-3 text-indigo-400" />
-                  <span className="font-medium text-indigo-500">{hypothesis.agentName}</span>
+                  <Cpu className="h-3 w-3 text-indigo-700" />
+                  <span className="font-medium text-indigo-700">{hypothesis.agentName}</span>
                 </>
               ) : (
                 <>
@@ -76,7 +84,7 @@ export function HypothesisCard({ hypothesis, onStar, starred, starCount }: Hypot
 
           <div className="flex items-center gap-2">
             {revealed && hypothesis.winRate != null && (
-              <span className="font-mono tabular-nums">{hypothesis.winRate}%</span>
+              <span className="type-data">{hypothesis.winRate}%</span>
             )}
             <span className="flex items-center gap-0.5">
               <MessageSquare className="h-3 w-3" />
@@ -94,31 +102,52 @@ export function HypothesisCard({ hypothesis, onStar, starred, starCount }: Hypot
             e.stopPropagation();
             if (onStar) onStar(hypothesis.id);
           }}
-          aria-label={starred ? "Unstar hypothesis" : "Star hypothesis"}
-          className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
+          type="button"
+          aria-label={
+            starCount != null ? `Star hypothesis (${starCount} stars)` : "Star hypothesis"
+          }
+          aria-pressed={!!starred}
+          className={`${hitArea} inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
             starred
-              ? "bg-amber-50 text-amber-600 hover:bg-amber-100"
-              : "text-stone-500 hover:bg-stone-50 hover:text-stone-700"
+              ? "bg-amber-50 text-amber-700 hover:bg-amber-100"
+              : "text-stone-600 hover:bg-stone-50 hover:text-stone-700"
           }`}
         >
           <Star className={`h-3 w-3 ${starred ? "fill-amber-400" : ""}`} />
           {starCount != null ? starCount : "Star"}
         </button>
-        <div className="relative" ref={shareRef}>
+        <div
+          className="relative"
+          ref={shareRef}
+          onKeyDown={(e) => {
+            if (e.key === "Escape" && showShare) {
+              e.stopPropagation();
+              setShowShare(false);
+              shareButtonRef.current?.focus();
+            }
+          }}
+        >
           <button
+            ref={shareButtonRef}
+            type="button"
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
               setShowShare(!showShare);
             }}
             aria-label="Share hypothesis"
-            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-stone-500 transition-colors hover:bg-stone-50 hover:text-stone-700"
+            aria-expanded={showShare}
+            aria-controls={showShare ? shareMenuId : undefined}
+            className={`${hitArea} inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-50 hover:text-stone-700`}
           >
             <Share2 className="h-3 w-3" />
             Share
           </button>
           {showShare && (
-            <div className="animate-in fade-in slide-in-from-bottom-2 absolute bottom-full left-0 z-50 mb-1.5 w-44 rounded-lg border border-stone-200 bg-white p-1.5 shadow-xl">
+            <div
+              id={shareMenuId}
+              className="animate-in fade-in slide-in-from-bottom-2 absolute bottom-full left-0 z-50 mb-1.5 w-44 rounded-lg border border-stone-200 bg-white p-1.5 shadow-xl"
+            >
               <button
                 onClick={(e) => {
                   e.preventDefault();
@@ -129,7 +158,7 @@ export function HypothesisCard({ hypothesis, onStar, starred, starCount }: Hypot
                   setTimeout(() => setCopied(false), 2000);
                   setShowShare(false);
                 }}
-                className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[11px] font-medium text-stone-600 transition-colors hover:bg-stone-50 hover:text-stone-900"
+                className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs font-medium text-stone-600 transition-colors hover:bg-stone-50 hover:text-stone-900"
               >
                 <Copy className="h-3 w-3" />
                 {copied ? "Copied!" : "Copy Link"}
@@ -150,7 +179,7 @@ export function HypothesisCard({ hypothesis, onStar, starred, starCount }: Hypot
                   setTimeout(() => setCopied(false), 2000);
                   setShowShare(false);
                 }}
-                className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[11px] font-medium text-stone-600 transition-colors hover:bg-stone-50 hover:text-stone-900"
+                className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs font-medium text-stone-600 transition-colors hover:bg-stone-50 hover:text-stone-900"
               >
                 <FileText className="h-3 w-3" />
                 Copy BibTeX
@@ -163,7 +192,7 @@ export function HypothesisCard({ hypothesis, onStar, starred, starCount }: Hypot
                   e.stopPropagation();
                   setShowShare(false);
                 }}
-                className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[11px] font-medium text-stone-600 transition-colors hover:bg-stone-50 hover:text-stone-900"
+                className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-50 hover:text-stone-900"
               >
                 <Twitter className="h-3 w-3 text-[#1DA1F2]" />
                 Share on Twitter
@@ -176,7 +205,7 @@ export function HypothesisCard({ hypothesis, onStar, starred, starCount }: Hypot
                   e.stopPropagation();
                   setShowShare(false);
                 }}
-                className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[11px] font-medium text-stone-600 transition-colors hover:bg-stone-50 hover:text-stone-900"
+                className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-50 hover:text-stone-900"
               >
                 <Linkedin className="h-3 w-3 text-[#0077b5]" />
                 Share on LinkedIn

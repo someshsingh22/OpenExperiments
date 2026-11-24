@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { ArrowRight } from "lucide-react";
 
 export default function CompleteProfilePage() {
-  const { user, loading, refresh } = useAuth();
+  const { user, loading, refresh, setShowAuthModal } = useAuth();
   const router = useRouter();
   const [name, setName] = useState("");
   const [position, setPosition] = useState("");
@@ -19,13 +20,10 @@ export default function CompleteProfilePage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push("/");
-    }
     if (user) {
       setName(user.name || "");
     }
-  }, [user, loading, router]);
+  }, [user]);
 
   if (loading) {
     return (
@@ -35,7 +33,32 @@ export default function CompleteProfilePage() {
     );
   }
 
-  if (!user) return null;
+  if (!user) {
+    return (
+      <div className="mx-auto max-w-lg px-4 py-16 sm:px-6">
+        <h1 className="type-title text-stone-900">Complete your profile</h1>
+        <p className="mt-3 text-base leading-relaxed text-stone-700">
+          This page finishes setting up your OpenExperiments profile once you have signed in, so the
+          community can see who is behind your hypotheses and comments.
+        </p>
+        <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
+          <button
+            type="button"
+            onClick={() => setShowAuthModal(true)}
+            className="inline-flex min-h-11 items-center justify-center rounded-lg border border-stone-900 bg-stone-900 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-stone-800"
+          >
+            Sign in
+          </button>
+          <Link
+            href="/"
+            className="inline-flex min-h-11 items-center text-sm font-medium text-stone-700 underline underline-offset-4 hover:text-stone-900"
+          >
+            Back to home
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,15 +107,13 @@ export default function CompleteProfilePage() {
   };
 
   const inputClass =
-    "w-full rounded-md border border-stone-200 px-3 py-2.5 text-sm text-stone-800 placeholder-stone-400 transition-colors focus:border-stone-300 focus:outline-none focus:ring-1 focus:ring-stone-300";
+    "w-full rounded-md border border-stone-200 px-3 py-2.5 text-sm text-stone-800 placeholder-stone-500 transition-colors focus:border-stone-600 focus:outline-none focus:ring-1 focus:ring-stone-600";
 
   return (
     <div className="mx-auto max-w-lg px-4 py-12 sm:px-6">
       <header className="mb-8 text-center">
-        <h1 className="text-2xl font-semibold tracking-tight text-stone-900">
-          Complete your profile
-        </h1>
-        <p className="mt-2 text-sm text-stone-500">
+        <h1 className="type-title text-stone-900">Complete your profile</h1>
+        <p className="mt-2 text-sm text-stone-600">
           Tell us a bit about yourself so the community knows who you are.
         </p>
       </header>
@@ -101,7 +122,7 @@ export default function CompleteProfilePage() {
         {/* Name */}
         <div>
           <label className="mb-1.5 block text-sm font-semibold text-stone-700">
-            Name <span className="text-red-400">*</span>
+            Name <span className="text-red-700">*</span>
           </label>
           <input
             type="text"
@@ -111,7 +132,7 @@ export default function CompleteProfilePage() {
             className={inputClass}
             required
           />
-          <p className="mt-1 text-xs text-stone-400">Displayed on your comments and hypotheses.</p>
+          <p className="mt-1 text-xs text-stone-600">Displayed on your comments and hypotheses.</p>
         </div>
 
         {/* Contact email — shown but read-only */}
@@ -121,9 +142,9 @@ export default function CompleteProfilePage() {
             type="email"
             value={user.email || ""}
             readOnly
-            className={`${inputClass} bg-stone-50 text-stone-500`}
+            className={`${inputClass} bg-stone-50 text-stone-600`}
           />
-          <p className="mt-1 text-xs text-stone-400">
+          <p className="mt-1 text-xs text-stone-600">
             From your sign-in. Your affiliation is derived from your email domain.
           </p>
         </div>
@@ -138,7 +159,7 @@ export default function CompleteProfilePage() {
             placeholder="e.g., Research Scientist, Engineer, PhD Student, Professor"
             className={inputClass}
           />
-          <p className="mt-1 text-xs text-stone-400">
+          <p className="mt-1 text-xs text-stone-600">
             Your role or title. This helps the community understand your background.
           </p>
         </div>
@@ -182,7 +203,7 @@ export default function CompleteProfilePage() {
             className={inputClass}
             maxLength={500}
           />
-          <p className="mt-1 text-right text-[11px] text-stone-400">{bio.length}/500</p>
+          <p className="mt-1 text-right text-xs text-stone-600">{bio.length}/500</p>
         </div>
 
         {/* ORCID */}
@@ -212,7 +233,7 @@ export default function CompleteProfilePage() {
         </div>
 
         {error && (
-          <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+          <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
             {error}
           </p>
         )}
@@ -229,7 +250,7 @@ export default function CompleteProfilePage() {
           <button
             type="button"
             onClick={() => router.push("/")}
-            className="text-sm text-stone-400 hover:text-stone-600"
+            className="text-sm text-stone-600 hover:text-stone-900"
           >
             Skip for now
           </button>

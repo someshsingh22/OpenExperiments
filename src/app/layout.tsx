@@ -14,11 +14,22 @@ const geistSans = localFont({
   display: "swap",
 });
 
+const stixTwo = localFont({
+  src: [
+    { path: "./fonts/STIXTwoTextVF.woff2", style: "normal", weight: "400 700" },
+    { path: "./fonts/STIXTwoTextItalicVF.woff2", style: "italic", weight: "400 700" },
+  ],
+  variable: "--font-stix",
+  display: "swap",
+  fallback: ["Georgia", "Times New Roman", "serif"],
+});
+
 const geistMono = localFont({
   src: "./fonts/GeistMonoVF.woff2",
   variable: "--font-geist-mono",
   weight: "100 900",
   display: "swap",
+  preload: false,
 });
 
 export const metadata: Metadata = {
@@ -134,10 +145,20 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} ${stixTwo.variable} antialiased`}
+      >
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:rounded-md focus:bg-stone-900 focus:px-4 focus:py-2.5 focus:text-sm focus:font-medium focus:text-white"
+        >
+          Skip to content
+        </a>
         <AuthProvider>
           <Navbar />
-          <main className="min-h-screen">{children}</main>
+          <main id="main" tabIndex={-1} className="min-h-screen focus:outline-none">
+            {children}
+          </main>
           <Footer />
           <AuthModal />
         </AuthProvider>

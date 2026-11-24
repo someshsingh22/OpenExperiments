@@ -4,11 +4,36 @@ import { getDB } from "@/db";
 import { hypotheses, comments, experiments, problemStatements } from "@/db/schema";
 import { eq, and, or, like, desc, sql, inArray, type SQL } from "drizzle-orm";
 import { validateHypothesis } from "@/lib/validation";
-import { invalidateCached } from "@/lib/edge-cache";
+import { invalidateHypothesisCaches } from "@/lib/edge-cache";
+import { enforceRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
 export async function GET(request: Request) {
-  const db = getDB();
   const url = new URL(request.url);
+  const limitParam = url.searchParams.get("limit");
+  const offsetParam = url.searchParams.get("offset");
+  const limit = limitParam === null ? 50 : Number(limitParam);
+  const offset = offsetParam === null ? 0 : Number(offsetParam);
+  const errors: { field: string; message: string }[] = [];
+  if (
+    (limitParam !== null && !/^\d+$/.test(limitParam)) ||
+    !Number.isSafeInteger(limit) ||
+    limit < 1 ||
+    limit > 100
+  ) {
+    errors.push({ field: "limit", message: "limit must be an integer between 1 and 100." });
+  }
+  if (
+    (offsetParam !== null && !/^\d+$/.test(offsetParam)) ||
+    !Number.isSafeInteger(offset) ||
+    offset < 0
+  ) {
+    errors.push({ field: "offset", message: "offset must be a nonnegative safe integer." });
+  }
+  if (errors.length > 0) {
+    return Response.json({ error: "Invalid pagination parameters", errors }, { status: 400 });
+  }
+
+  const db = getDB();
 
   // Fast path: fetch by specific IDs (for related hypotheses)
   const idsParam = url.searchParams.get("ids");
@@ -38,9 +63,8 @@ export async function GET(request: Request) {
   const phase = url.searchParams.get("phase");
   const status = url.searchParams.get("status");
   const search = url.searchParams.get("search");
+  const problemStatementId = url.searchParams.get("problemStatementId");
   const sort = url.searchParams.get("sort") || "newest";
-  const limit = Math.min(parseInt(url.searchParams.get("limit") || "50"), 100);
-  const offset = parseInt(url.searchParams.get("offset") || "0");
 
   const conditions: SQL[] = [];
   if (phase) conditions.push(eq(hypotheses.phase, phase));
@@ -57,6 +81,17 @@ export async function GET(request: Request) {
   }
   if (domain) {
     conditions.push(like(hypotheses.domains, `%"${domain}"%`));
+  }
+  if (problemStatementId) {
+    conditions.push(
+      inArray(
+        hypotheses.problemStatement,
+        db
+          .select({ question: problemStatements.question })
+          .from(problemStatements)
+          .where(eq(problemStatements.id, problemStatementId)),
+      ),
+    );
   }
 
   let orderBy;
@@ -80,44 +115,47 @@ export async function GET(request: Request) {
   }
 
   const where = conditions.length > 0 ? and(...conditions) : undefined;
-  const rows = await db
-    .select()
-    .from(hypotheses)
-    .where(where)
-    .orderBy(orderBy)
-    .limit(limit)
-    .offset(offset);
-
-  const [{ count }] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(hypotheses)
-    .where(where);
+  const [rows, [{ count }]] = await db.batch([
+    db
+      .select()
+      .from(hypotheses)
+      .where(where)
+      .orderBy(orderBy, desc(hypotheses.id))
+      .limit(limit)
+      .offset(offset),
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(hypotheses)
+      .where(where),
+  ]);
 
   // Compute actual comment counts from comments table
   const hypothesisIds = rows.map((r) => r.id);
   const commentCounts = new Map<string, number>();
   const experimentCounts = new Map<string, number>();
   if (hypothesisIds.length > 0) {
-    const ccRows = await db
-      .select({
-        hypothesisId: comments.hypothesisId,
-        count: sql<number>`count(*)`,
-      })
-      .from(comments)
-      .where(inArray(comments.hypothesisId, hypothesisIds))
-      .groupBy(comments.hypothesisId);
+    const [ccRows, ecRows] = await db.batch([
+      db
+        .select({
+          hypothesisId: comments.hypothesisId,
+          count: sql<number>`count(*)`,
+        })
+        .from(comments)
+        .where(inArray(comments.hypothesisId, hypothesisIds))
+        .groupBy(comments.hypothesisId),
+      db
+        .select({
+          hypothesisId: experiments.hypothesisId,
+          count: sql<number>`count(*)`,
+        })
+        .from(experiments)
+        .where(inArray(experiments.hypothesisId, hypothesisIds))
+        .groupBy(experiments.hypothesisId),
+    ]);
     for (const r of ccRows) {
       commentCounts.set(r.hypothesisId, r.count);
     }
 
-    const ecRows = await db
-      .select({
-        hypothesisId: experiments.hypothesisId,
-        count: sql<number>`count(*)`,
-      })
-      .from(experiments)
-      .where(inArray(experiments.hypothesisId, hypothesisIds))
-      .groupBy(experiments.hypothesisId);
     for (const r of ecRows) {
       experimentCounts.set(r.hypothesisId, r.count);
     }
@@ -135,6 +173,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const limited = await enforceRateLimit(request, RATE_LIMITS.write);
+  if (limited) return limited;
   const { getSession, requireSession } = await import("@/lib/auth");
   const user = await getSession(request);
   const unauthorized = requireSession(user);
@@ -235,8 +275,8 @@ export async function POST(request: Request) {
     await insertHypothesis;
   }
 
-  // A new hypothesis appears on the home and explore listings.
-  await Promise.all([invalidateCached("home:data"), invalidateCached("explore:data")]);
+  // A new hypothesis appears on the home, explore, and sitemap listings.
+  await invalidateHypothesisCaches();
 
   return Response.json({ data: { id } }, { status: 201 });
 }

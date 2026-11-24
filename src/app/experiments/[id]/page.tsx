@@ -2,7 +2,7 @@
 
 export const runtime = "edge";
 
-import { useState, useEffect } from "react";
+import { memo, useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -19,7 +19,10 @@ import {
 import { getExperiment, updateExperiment } from "@/lib/api";
 import { useAuth } from "@/components/auth-provider";
 import { DomainTag } from "@/components/domain-tag";
+import { createLatestRequest } from "@/components/experiment-ui-requests";
 import type { Experiment, ExperimentVersion, Domain } from "@/lib/types";
+import { formatDate, formatPValue } from "@/lib/format";
+import { ResearchPlanText } from "@/components/research-plan-text";
 
 const EXP_TYPE_LABELS: Record<string, { label: string; cls: string }> = {
   observational: { label: "Observational", cls: "bg-stone-100 text-stone-600" },
@@ -41,12 +44,80 @@ const STATUS_OPTIONS = [
 ] as const;
 
 function fmtDate(d: string) {
-  return new Date(d).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  return formatDate(d);
 }
+
+const VersionHistory = memo(function VersionHistory({
+  id,
+  versions,
+  totalVersions,
+  viewingVersion,
+}: {
+  id: string;
+  versions: ExperimentVersion[];
+  totalVersions: number;
+  viewingVersion: number | null;
+}) {
+  const router = useRouter();
+  const rows = useMemo(
+    () => [...versions].reverse().map((v) => ({ ...v, dateLabel: fmtDate(v.createdAt) })),
+    [versions],
+  );
+  if (totalVersions <= 1 || rows.length === 0) return null;
+  return (
+    <section className="mb-10">
+      <h2 className="mb-3 flex items-center gap-1.5 text-sm font-semibold tracking-wider text-stone-600 uppercase">
+        <History className="h-3.5 w-3.5" />
+        Version History
+      </h2>
+      <div className="space-y-2">
+        {rows.map((v) => {
+          const isCurrent = v.version === totalVersions;
+          const isViewing = viewingVersion === v.version || (!viewingVersion && isCurrent);
+          return (
+            <button
+              key={v.version}
+              onClick={() =>
+                router.push(
+                  isCurrent ? `/experiments/${id}` : `/experiments/${id}?version=${v.version}`,
+                )
+              }
+              className={`flex w-full items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors ${
+                isViewing
+                  ? "border-stone-400 bg-stone-50"
+                  : "border-stone-200 bg-white hover:border-stone-300"
+              }`}
+            >
+              <span
+                className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
+                  isViewing ? "bg-stone-800 text-white" : "bg-stone-100 text-stone-600"
+                }`}
+              >
+                {v.version}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${
+                      STATUS_LABELS[v.status]?.cls || ""
+                    }`}
+                  >
+                    {STATUS_LABELS[v.status]?.label || v.status}
+                  </span>
+                  {isCurrent && <span className="text-xs font-medium text-stone-600">latest</span>}
+                </div>
+                {v.changeSummary && (
+                  <p className="mt-0.5 truncate text-xs text-stone-600">{v.changeSummary}</p>
+                )}
+              </div>
+              <span className="shrink-0 text-xs text-stone-600">{v.dateLabel}</span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+});
 
 export default function ExperimentDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -66,6 +137,9 @@ export default function ExperimentDetailPage() {
   const [versions, setVersions] = useState<ExperimentVersion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [refresh, setRefresh] = useState(0);
+  const [loadedKey, setLoadedKey] = useState("");
+  const requests = useRef(createLatestRequest());
 
   // Edit mode
   const [editing, setEditing] = useState(false);
@@ -84,21 +158,48 @@ export default function ExperimentDetailPage() {
   const [saveError, setSaveError] = useState("");
 
   const viewingVersion = versionParam ? parseInt(versionParam, 10) : null;
+  const requestKey = JSON.stringify([id, viewingVersion]);
 
-  function loadExperiment() {
-    if (!id) return;
+  useEffect(() => {
+    const tracker = requests.current;
+    const isCurrent = tracker.start();
     setLoading(true);
+    setError("");
+    setExperiment(null);
+    setHypothesis(null);
+    setVersions([]);
+    setEditing(false);
+    setSaveError("");
+    setSaving(false);
+    setEditStatus("");
+    setEditMethodology("");
+    setEditAnalysis("");
+    setEditOsfLink("");
+    setEditSummary("");
+    setEditPValue("");
+    setEditEffectSize("");
+    setEditSampleSize("");
+    setEditCILow("");
+    setEditCIHigh("");
+    setEditChangeSummary("");
     getExperiment(id, viewingVersion ?? undefined)
       .then((res) => {
+        if (!isCurrent()) return;
         setExperiment(res.data);
         setHypothesis(res.hypothesis ?? null);
         setVersions(res.versions ?? []);
+        setLoadedKey(requestKey);
       })
-      .catch(() => setError("Experiment not found"))
-      .finally(() => setLoading(false));
-  }
-
-  useEffect(loadExperiment, [id, viewingVersion]);
+      .catch(() => {
+        if (!isCurrent()) return;
+        setError("Unable to load experiment. Please try again.");
+        setLoadedKey(requestKey);
+      })
+      .finally(() => {
+        if (isCurrent()) setLoading(false);
+      });
+    return () => tracker.invalidate();
+  }, [id, viewingVersion, requestKey, refresh]);
 
   function startEditing() {
     if (!experiment) return;
@@ -131,6 +232,7 @@ export default function ExperimentDetailPage() {
 
   async function handleSave() {
     if (!experiment) return;
+    const isCurrent = requests.current.capture();
     setSaving(true);
     setSaveError("");
     try {
@@ -152,18 +254,19 @@ export default function ExperimentDetailPage() {
           : undefined,
         changeSummary: editChangeSummary || undefined,
       });
+      if (!isCurrent()) return;
       setEditing(false);
-      loadExperiment();
+      setRefresh((n) => n + 1);
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "Failed to save");
+      if (isCurrent()) setSaveError(err instanceof Error ? err.message : "Failed to save");
     } finally {
-      setSaving(false);
+      if (isCurrent()) setSaving(false);
     }
   }
 
-  if (loading) {
+  if (loading || loadedKey !== requestKey) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-20 text-center text-sm text-stone-400">
+      <div className="mx-auto max-w-4xl px-4 py-20 text-center text-sm text-stone-600">
         Loading experiment...
       </div>
     );
@@ -172,7 +275,13 @@ export default function ExperimentDetailPage() {
   if (error || !experiment) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-20 text-center">
-        <p className="text-sm text-stone-500">{error || "Experiment not found"}</p>
+        <p className="text-sm text-stone-600">{error || "Experiment not found"}</p>
+        <button
+          onClick={() => setRefresh((n) => n + 1)}
+          className="mt-4 block w-full text-sm font-medium text-stone-600"
+        >
+          Retry
+        </button>
         <Link
           href="/experiments"
           className="mt-4 inline-block text-sm font-medium text-stone-600 hover:text-stone-900"
@@ -190,9 +299,9 @@ export default function ExperimentDetailPage() {
     viewingVersion != null && viewingVersion < (experiment.totalVersions ?? experiment.version);
 
   const inputClass =
-    "w-full rounded-md border border-stone-200 px-3 py-2.5 text-sm text-stone-800 placeholder-stone-400 transition-colors focus:border-stone-300 focus:outline-none focus:ring-1 focus:ring-stone-300";
+    "w-full rounded-md border border-stone-200 px-3 py-2.5 text-sm text-stone-800 placeholder-stone-500 transition-colors focus:border-stone-600 focus:outline-none focus:ring-1 focus:ring-stone-600";
   const metricInputClass =
-    "w-full rounded-md border border-stone-200 px-3 py-2 text-sm font-mono text-stone-800 placeholder-stone-400 transition-colors focus:border-stone-300 focus:outline-none focus:ring-1 focus:ring-stone-300";
+    "w-full rounded-md border border-stone-200 px-3 py-2 text-sm font-mono text-stone-800 placeholder-stone-500 transition-colors focus:border-stone-600 focus:outline-none focus:ring-1 focus:ring-stone-600";
 
   const editMethodologyRequired = editStatus === "running" || editStatus === "completed";
   const editAnalysisRequired = editStatus === "completed";
@@ -203,7 +312,7 @@ export default function ExperimentDetailPage() {
     <div className="mx-auto max-w-4xl px-4 py-14 sm:px-6">
       <Link
         href="/experiments"
-        className="mb-6 inline-flex items-center gap-1.5 text-sm font-medium text-stone-500 hover:text-stone-700"
+        className="mb-6 inline-flex items-center gap-1.5 text-sm font-medium text-stone-600 hover:text-stone-700"
       >
         <ArrowLeft className="h-3.5 w-3.5" />
         All Experiments
@@ -227,19 +336,19 @@ export default function ExperimentDetailPage() {
       {/* Header */}
       <header className="mb-10">
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <FlaskConical className="h-5 w-5 text-stone-400" />
+          <FlaskConical className="h-5 w-5 text-stone-600" />
           <span
-            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${typeMeta.cls}`}
+            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${typeMeta.cls}`}
           >
             {typeMeta.label}
           </span>
           <span
-            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${statusMeta.cls}`}
+            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${statusMeta.cls}`}
           >
             {statusMeta.label}
           </span>
           {(experiment.totalVersions ?? 1) > 1 && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-medium text-stone-500">
+            <span className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
               <History className="h-3 w-3" />v{experiment.version}
             </span>
           )}
@@ -254,19 +363,23 @@ export default function ExperimentDetailPage() {
           )}
         </div>
 
-        <h1 className="text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
-          {experiment.datasetName}
-        </h1>
+        <h1 className="type-title text-stone-900">{experiment.datasetName}</h1>
 
-        <div className="mt-3 flex flex-wrap items-center gap-4 text-[13px] text-stone-500">
+        <div className="mt-3 flex flex-wrap items-center gap-4 text-[13px] text-stone-600">
           <span className="flex items-center gap-1.5">
             <Calendar className="h-3.5 w-3.5" />
-            Started {experiment.startedAt}
+            Started{" "}
+            <time dateTime={experiment.startedAt} className="type-data">
+              {formatDate(experiment.startedAt)}
+            </time>
           </span>
           {experiment.completedAt && (
             <span className="flex items-center gap-1.5">
               <Calendar className="h-3.5 w-3.5" />
-              Completed {experiment.completedAt}
+              Completed{" "}
+              <time dateTime={experiment.completedAt} className="type-data">
+                {formatDate(experiment.completedAt)}
+              </time>
             </span>
           )}
           {experiment.submitter && (
@@ -304,7 +417,7 @@ export default function ExperimentDetailPage() {
       {/* Hypothesis */}
       {hypothesis && (
         <section className="mb-10">
-          <h2 className="mb-3 text-sm font-semibold tracking-wider text-stone-400 uppercase">
+          <h2 className="mb-3 text-sm font-semibold tracking-wider text-stone-600 uppercase">
             Hypothesis Being Tested
           </h2>
           <Link
@@ -316,7 +429,9 @@ export default function ExperimentDetailPage() {
                 <DomainTag key={d} domain={d as Domain} />
               ))}
             </div>
-            <p className="text-[13px] leading-relaxed text-stone-700">{hypothesis.statement}</p>
+            <p className="type-statement text-base leading-snug text-stone-900">
+              {hypothesis.statement}
+            </p>
           </Link>
         </section>
       )}
@@ -325,12 +440,12 @@ export default function ExperimentDetailPage() {
       {editing && (
         <section className="mb-10 rounded-xl border border-stone-300 bg-stone-50/50 p-6">
           <div className="mb-5 flex items-center justify-between">
-            <h2 className="text-sm font-semibold tracking-wider text-stone-500 uppercase">
+            <h2 className="text-sm font-semibold tracking-wider text-stone-600 uppercase">
               Edit Experiment
             </h2>
             <button
               onClick={() => setEditing(false)}
-              className="rounded-md p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-600"
+              className="rounded-md p-1 text-stone-600 hover:bg-stone-100 hover:text-stone-900"
             >
               <X className="h-4 w-4" />
             </button>
@@ -371,9 +486,9 @@ export default function ExperimentDetailPage() {
               <label className="mb-1.5 block text-sm font-semibold text-stone-700">
                 Methodology
                 {editMethodologyRequired ? (
-                  <span className="ml-1 text-red-400">*</span>
+                  <span className="ml-1 text-red-700">*</span>
                 ) : (
-                  <span className="ml-1 font-normal text-stone-400">(optional)</span>
+                  <span className="ml-1 font-normal text-stone-600">(optional)</span>
                 )}
               </label>
               <textarea
@@ -391,9 +506,9 @@ export default function ExperimentDetailPage() {
                 <label className="mb-1.5 block text-sm font-semibold text-stone-700">
                   Analysis Plan
                   {editAnalysisRequired ? (
-                    <span className="ml-1 text-red-400">*</span>
+                    <span className="ml-1 text-red-700">*</span>
                   ) : (
-                    <span className="ml-1 font-normal text-stone-400">(optional)</span>
+                    <span className="ml-1 font-normal text-stone-600">(optional)</span>
                   )}
                 </label>
                 <textarea
@@ -411,7 +526,7 @@ export default function ExperimentDetailPage() {
               <div className="space-y-4">
                 <div>
                   <label className="mb-1.5 block text-sm font-semibold text-stone-700">
-                    Results Summary <span className="ml-1 text-red-400">*</span>
+                    Results Summary <span className="ml-1 text-red-700">*</span>
                   </label>
                   <textarea
                     value={editSummary}
@@ -423,11 +538,11 @@ export default function ExperimentDetailPage() {
                 </div>
                 <div>
                   <label className="mb-2 block text-sm font-semibold text-stone-700">
-                    Key Metrics <span className="font-normal text-stone-400">(optional)</span>
+                    Key Metrics <span className="font-normal text-stone-600">(optional)</span>
                   </label>
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                     <div>
-                      <label className="mb-1 block text-[11px] font-medium tracking-wider text-stone-400 uppercase">
+                      <label className="mb-1 block text-xs font-medium tracking-wider text-stone-600 uppercase">
                         p-value
                       </label>
                       <input
@@ -440,7 +555,7 @@ export default function ExperimentDetailPage() {
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block text-[11px] font-medium tracking-wider text-stone-400 uppercase">
+                      <label className="mb-1 block text-xs font-medium tracking-wider text-stone-600 uppercase">
                         Effect Size
                       </label>
                       <input
@@ -453,7 +568,7 @@ export default function ExperimentDetailPage() {
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block text-[11px] font-medium tracking-wider text-stone-400 uppercase">
+                      <label className="mb-1 block text-xs font-medium tracking-wider text-stone-600 uppercase">
                         Sample Size
                       </label>
                       <input
@@ -466,7 +581,7 @@ export default function ExperimentDetailPage() {
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block text-[11px] font-medium tracking-wider text-stone-400 uppercase">
+                      <label className="mb-1 block text-xs font-medium tracking-wider text-stone-600 uppercase">
                         95% CI
                       </label>
                       <div className="flex items-center gap-1">
@@ -478,7 +593,7 @@ export default function ExperimentDetailPage() {
                           placeholder="0.18"
                           className={metricInputClass}
                         />
-                        <span className="text-stone-300">&ndash;</span>
+                        <span className="text-stone-500">&ndash;</span>
                         <input
                           type="number"
                           step="any"
@@ -497,7 +612,7 @@ export default function ExperimentDetailPage() {
             {/* OSF Link */}
             <div>
               <label className="mb-1.5 block text-sm font-semibold text-stone-700">
-                OSF Link <span className="font-normal text-stone-400">(optional)</span>
+                OSF Link <span className="font-normal text-stone-600">(optional)</span>
               </label>
               <input
                 type="url"
@@ -511,7 +626,7 @@ export default function ExperimentDetailPage() {
             {/* Change summary */}
             <div>
               <label className="mb-1.5 block text-sm font-semibold text-stone-700">
-                Change Summary <span className="font-normal text-stone-400">(optional)</span>
+                Change Summary <span className="font-normal text-stone-600">(optional)</span>
               </label>
               <input
                 type="text"
@@ -523,7 +638,7 @@ export default function ExperimentDetailPage() {
             </div>
 
             {saveError && (
-              <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+              <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                 {saveError}
               </p>
             )}
@@ -550,13 +665,11 @@ export default function ExperimentDetailPage() {
       {/* Methodology */}
       {!editing && experiment.methodology && (
         <section className="mb-10">
-          <h2 className="mb-3 text-sm font-semibold tracking-wider text-stone-400 uppercase">
+          <h2 className="mb-3 text-sm font-semibold tracking-wider text-stone-600 uppercase">
             Methodology
           </h2>
           <div className="rounded-lg border border-stone-200 bg-stone-50/50 p-5">
-            <p className="text-sm leading-relaxed whitespace-pre-wrap text-stone-700">
-              {experiment.methodology}
-            </p>
+            <ResearchPlanText text={experiment.methodology} />
           </div>
         </section>
       )}
@@ -564,13 +677,11 @@ export default function ExperimentDetailPage() {
       {/* Analysis Plan */}
       {!editing && experiment.analysisPlan && (
         <section className="mb-10">
-          <h2 className="mb-3 text-sm font-semibold tracking-wider text-stone-400 uppercase">
+          <h2 className="mb-3 text-sm font-semibold tracking-wider text-stone-600 uppercase">
             Analysis Plan
           </h2>
           <div className="rounded-lg border border-stone-200 bg-stone-50/50 p-5">
-            <p className="text-sm leading-relaxed whitespace-pre-wrap text-stone-700">
-              {experiment.analysisPlan}
-            </p>
+            <ResearchPlanText text={experiment.analysisPlan} />
           </div>
         </section>
       )}
@@ -578,7 +689,7 @@ export default function ExperimentDetailPage() {
       {/* Results */}
       {!editing && experiment.results && (
         <section className="mb-10">
-          <h2 className="mb-3 text-sm font-semibold tracking-wider text-stone-400 uppercase">
+          <h2 className="mb-3 text-sm font-semibold tracking-wider text-stone-600 uppercase">
             Results
           </h2>
           <div className="rounded-lg border border-stone-200 bg-white p-5">
@@ -590,42 +701,42 @@ export default function ExperimentDetailPage() {
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
               {experiment.results.pValue != null && (
                 <div>
-                  <span className="text-[10px] font-medium tracking-wider text-stone-400 uppercase">
+                  <span className="text-xs font-medium tracking-wider text-stone-600 uppercase">
                     p-value
                   </span>
-                  <p className="mt-0.5 font-mono text-sm font-semibold text-stone-800">
-                    {experiment.results.pValue}
+                  <p className="type-data mt-0.5 text-sm font-semibold text-stone-800">
+                    {formatPValue(experiment.results.pValue)}
                   </p>
                 </div>
               )}
               {experiment.results.effectSize != null && (
                 <div>
-                  <span className="text-[10px] font-medium tracking-wider text-stone-400 uppercase">
+                  <span className="text-xs font-medium tracking-wider text-stone-600 uppercase">
                     Effect Size
                   </span>
-                  <p className="mt-0.5 font-mono text-sm font-semibold text-stone-800">
+                  <p className="type-data mt-0.5 text-sm font-semibold text-stone-800">
                     {experiment.results.effectSize}
                   </p>
                 </div>
               )}
               {experiment.results.sampleSize != null && (
                 <div>
-                  <span className="text-[10px] font-medium tracking-wider text-stone-400 uppercase">
+                  <span className="text-xs font-medium tracking-wider text-stone-600 uppercase">
                     Sample Size
                   </span>
-                  <p className="mt-0.5 font-mono text-sm font-semibold text-stone-800">
+                  <p className="type-data mt-0.5 text-sm font-semibold text-stone-800">
                     {experiment.results.sampleSize.toLocaleString()}
                   </p>
                 </div>
               )}
               {experiment.results.confidenceInterval && (
                 <div>
-                  <span className="text-[10px] font-medium tracking-wider text-stone-400 uppercase">
+                  <span className="text-xs font-medium tracking-wider text-stone-600 uppercase">
                     95% CI
                   </span>
-                  <p className="mt-0.5 font-mono text-sm font-semibold text-stone-800">
-                    [{experiment.results.confidenceInterval[0]},{" "}
-                    {experiment.results.confidenceInterval[1]}]
+                  <p className="type-data mt-0.5 text-sm font-semibold text-stone-800">
+                    [{experiment.results.confidenceInterval[0].toFixed(2)},{" "}
+                    {experiment.results.confidenceInterval[1].toFixed(2)}]
                   </p>
                 </div>
               )}
@@ -642,65 +753,12 @@ export default function ExperimentDetailPage() {
       )}
 
       {/* Version History */}
-      {(experiment.totalVersions ?? 1) > 1 && versions.length > 0 && (
-        <section className="mb-10">
-          <h2 className="mb-3 flex items-center gap-1.5 text-sm font-semibold tracking-wider text-stone-400 uppercase">
-            <History className="h-3.5 w-3.5" />
-            Version History
-          </h2>
-          <div className="space-y-2">
-            {[...versions].reverse().map((v) => {
-              const isCurrent = v.version === (experiment.totalVersions ?? experiment.version);
-              const isViewing = viewingVersion === v.version || (!viewingVersion && isCurrent);
-              return (
-                <button
-                  key={v.version}
-                  onClick={() =>
-                    isCurrent
-                      ? router.push(`/experiments/${id}`)
-                      : router.push(`/experiments/${id}?version=${v.version}`)
-                  }
-                  className={`flex w-full items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors ${
-                    isViewing
-                      ? "border-stone-400 bg-stone-50"
-                      : "border-stone-200 bg-white hover:border-stone-300"
-                  }`}
-                >
-                  <span
-                    className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold ${
-                      isViewing ? "bg-stone-800 text-white" : "bg-stone-100 text-stone-500"
-                    }`}
-                  >
-                    {v.version}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold ring-1 ring-inset ${
-                          STATUS_LABELS[v.status]?.cls || ""
-                        }`}
-                      >
-                        {STATUS_LABELS[v.status]?.label || v.status}
-                      </span>
-                      {isCurrent && (
-                        <span className="text-[10px] font-medium text-stone-400">latest</span>
-                      )}
-                    </div>
-                    {v.changeSummary && (
-                      <p className="mt-0.5 truncate text-[12px] text-stone-500">
-                        {v.changeSummary}
-                      </p>
-                    )}
-                  </div>
-                  <span className="shrink-0 text-[11px] text-stone-400">
-                    {fmtDate(v.createdAt)}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      )}
+      <VersionHistory
+        id={id}
+        versions={versions}
+        totalVersions={experiment.totalVersions ?? 1}
+        viewingVersion={viewingVersion}
+      />
     </div>
   );
 }

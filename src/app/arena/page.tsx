@@ -13,12 +13,14 @@ function ArenaCard({
   label,
   starred,
   starCount,
+  starPending,
   onStar,
 }: {
   hypothesis: { id: string; statement: string; domain: string[] };
   label: string;
   starred?: boolean;
   starCount?: number;
+  starPending?: boolean;
   onStar?: (id: string) => void;
 }) {
   const [showShare, setShowShare] = useState(false);
@@ -38,7 +40,7 @@ function ArenaCard({
   return (
     <div className="flex flex-col rounded-lg border border-stone-200 bg-white transition-all duration-300 hover:border-stone-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
       <Link href={`/hypothesis/${hypothesis.id}`} className="block p-5">
-        <span className="mb-2 block text-[11px] font-medium tracking-wider text-stone-500 uppercase">
+        <span className="mb-2 block text-xs font-medium tracking-wider text-stone-600 uppercase">
           {label}
         </span>
         <div className="mb-2 flex flex-wrap gap-1.5">
@@ -46,16 +48,18 @@ function ArenaCard({
             <DomainTag key={d} domain={d as Domain} />
           ))}
         </div>
-        <p className="text-sm leading-relaxed font-medium text-stone-800">{hypothesis.statement}</p>
+        <p className="type-statement text-lg leading-snug text-stone-900">{hypothesis.statement}</p>
       </Link>
 
       <div className="flex items-center gap-2 border-t border-stone-100 px-5 py-2.5">
         <button
           onClick={() => onStar?.(hypothesis.id)}
-          className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
+          disabled={starPending}
+          aria-busy={starPending}
+          className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
             starred
-              ? "bg-amber-50 text-amber-600 hover:bg-amber-100"
-              : "text-stone-500 hover:bg-stone-50 hover:text-stone-700"
+              ? "bg-amber-50 text-amber-700 hover:bg-amber-100"
+              : "text-stone-600 hover:bg-stone-50 hover:text-stone-700"
           }`}
         >
           <Star className={`h-3 w-3 ${starred ? "fill-amber-400" : ""}`} />
@@ -64,7 +68,7 @@ function ArenaCard({
         <div className="relative" ref={shareRef}>
           <button
             onClick={() => setShowShare(!showShare)}
-            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-stone-500 transition-colors hover:bg-stone-50 hover:text-stone-700"
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-50 hover:text-stone-700"
           >
             <Share2 className="h-3 w-3" />
             Share
@@ -79,7 +83,7 @@ function ArenaCard({
                   setTimeout(() => setCopied(false), 2000);
                   setShowShare(false);
                 }}
-                className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[11px] font-medium text-stone-600 transition-colors hover:bg-stone-50 hover:text-stone-900"
+                className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs font-medium text-stone-600 transition-colors hover:bg-stone-50 hover:text-stone-900"
               >
                 <Copy className="h-3 w-3" />
                 {copied ? "Copied!" : "Copy Link"}
@@ -89,7 +93,7 @@ function ArenaCard({
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => setShowShare(false)}
-                className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[11px] font-medium text-stone-600 transition-colors hover:bg-stone-50 hover:text-stone-900"
+                className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-50 hover:text-stone-900"
               >
                 <Twitter className="h-3 w-3 text-[#1DA1F2]" />
                 Share on Twitter
@@ -99,7 +103,7 @@ function ArenaCard({
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => setShowShare(false)}
-                className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[11px] font-medium text-stone-600 transition-colors hover:bg-stone-50 hover:text-stone-900"
+                className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-50 hover:text-stone-900"
               >
                 <Linkedin className="h-3 w-3 text-[#0077b5]" />
                 Share on LinkedIn
@@ -144,51 +148,175 @@ export default function ArenaPage() {
   >([]);
   const [starredIds, setStarredIds] = useState<Set<string>>(new Set());
   const [starCounts, setStarCounts] = useState<Map<string, number>>(new Map());
-
-  const loadMatchup = () => {
-    setLoading(true);
-    setHasVoted(false);
-    setVoteError("");
-    getMatchup()
-      .then((res) => setMatchup(res.data))
-      .finally(() => setLoading(false));
-  };
+  const userId = user?.id;
+  const hypothesisAId = matchup?.hypothesisA?.id;
+  const hypothesisBId = matchup?.hypothesisB?.id;
+  const [starsUserId, setStarsUserId] = useState(userId);
+  const [pendingStars, setPendingStars] = useState<Set<string>>(new Set());
+  const [matchupError, setMatchupError] = useState("");
+  const [rankingsError, setRankingsError] = useState("");
+  const [rankingsRefreshing, setRankingsRefreshing] = useState(false);
+  const mounted = useRef(false);
+  const matchupRequest = useRef(0);
+  const rankingsRequest = useRef(0);
+  const starsRequest = useRef(0);
+  const voteRequest = useRef(0);
+  const accountGeneration = useRef(0);
+  const starAccount = useRef(userId);
+  const starVersions = useRef(new Map<string, number>());
+  const starLocks = useRef(new Set<string>());
+  const matchupLock = useRef(false);
+  const voteLock = useRef(false);
+  const currentMatchupId = useRef<string | null>(null);
+  const voted = useRef(false);
+  const starsForCurrentUser = starsUserId === userId;
 
   useEffect(() => {
-    loadMatchup();
-    getArenaRankings().then((res) => setLeaderboard(res.data));
+    mounted.current = true;
+    const requests = [
+      matchupRequest,
+      rankingsRequest,
+      starsRequest,
+      voteRequest,
+      accountGeneration,
+    ];
+    const locks = starLocks.current;
+    return () => {
+      mounted.current = false;
+      for (const request of requests) request.current++;
+      matchupLock.current = false;
+      voteLock.current = false;
+      locks.clear();
+    };
   }, []);
+
+  const loadMatchup = useCallback(async () => {
+    if (matchupLock.current || voteLock.current) return;
+    matchupLock.current = true;
+    const request = ++matchupRequest.current;
+    const isCurrent = () => mounted.current && request === matchupRequest.current;
+    setLoading(true);
+    setMatchupError("");
+    try {
+      const res = await getMatchup();
+      if (!isCurrent()) return;
+      currentMatchupId.current = res.data?.id ?? null;
+      voted.current = false;
+      setMatchup(res.data);
+      setHasVoted(false);
+      setVoteError("");
+    } catch (err) {
+      if (isCurrent()) {
+        setMatchupError(err instanceof Error ? err.message : "Failed to load matchup");
+      }
+    } finally {
+      if (isCurrent()) {
+        matchupLock.current = false;
+        setLoading(false);
+      }
+    }
+  }, []);
+
+  const refreshRankings = useCallback(async () => {
+    const request = ++rankingsRequest.current;
+    const isCurrent = () => mounted.current && request === rankingsRequest.current;
+    setRankingsRefreshing(true);
+    setRankingsError("");
+    try {
+      const res = await getArenaRankings();
+      if (isCurrent()) setLeaderboard(res.data);
+    } catch (err) {
+      if (isCurrent()) {
+        setRankingsError(err instanceof Error ? err.message : "Failed to refresh rankings");
+      }
+    } finally {
+      if (isCurrent()) setRankingsRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadMatchup();
+    void refreshRankings();
+  }, [loadMatchup, refreshRankings]);
+
+  useEffect(() => {
+    starAccount.current = userId;
+    accountGeneration.current++;
+    starVersions.current.clear();
+    starLocks.current.clear();
+    setStarsUserId(userId);
+    setStarredIds(new Set());
+    setStarCounts(new Map());
+    setPendingStars(new Set());
+  }, [userId]);
 
   // Load star status for matchup hypotheses (batch)
   useEffect(() => {
-    if (!user || !matchup) return;
-    const ids = [matchup.hypothesisA?.id, matchup.hypothesisB?.id].filter(Boolean) as string[];
+    const request = ++starsRequest.current;
+    if (!userId) return;
+    const ids = [...new Set([hypothesisAId, hypothesisBId].filter((id) => id !== undefined))];
     if (ids.length === 0) return;
+    const generation = accountGeneration.current;
+    let active = true;
+    const versions = new Map(ids.map((id) => [id, starVersions.current.get(id) ?? 0]));
+    const pendingAtStart = new Set(starLocks.current);
+    const isCurrent = () =>
+      mounted.current &&
+      active &&
+      request === starsRequest.current &&
+      generation === accountGeneration.current;
+    const canApply = (id: string) =>
+      isCurrent() &&
+      versions.has(id) &&
+      !pendingAtStart.has(id) &&
+      !starLocks.current.has(id) &&
+      versions.get(id) === (starVersions.current.get(id) ?? 0);
     getStarsBatch(ids)
       .then((res) => {
-        const newStarred = new Set<string>(starredIds);
-        const newCounts = new Map<string, number>(starCounts);
-        for (const [id, status] of Object.entries(res.data)) {
-          if (status.starred) newStarred.add(id);
-          else newStarred.delete(id);
-          newCounts.set(id, status.count);
-        }
-        setStarredIds(newStarred);
-        setStarCounts(newCounts);
+        if (!isCurrent()) return;
+        setStarredIds((prev) => {
+          const next = new Set(prev);
+          for (const [id, status] of Object.entries(res.data)) {
+            if (!canApply(id)) continue;
+            if (status.starred) next.add(id);
+            else next.delete(id);
+          }
+          return next;
+        });
+        setStarCounts((prev) => {
+          const next = new Map(prev);
+          for (const [id, status] of Object.entries(res.data)) {
+            if (canApply(id)) next.set(id, status.count);
+          }
+          return next;
+        });
       })
       .catch(() => {});
-  }, [user, matchup]);
+    return () => {
+      active = false;
+    };
+  }, [userId, hypothesisAId, hypothesisBId]);
 
   const handleStar = useCallback(
     async (id: string) => {
-      if (!user) {
+      if (!userId) {
         setShowAuthModal(true);
         return;
       }
+      if (starAccount.current !== userId || starLocks.current.has(id)) return;
+      const generation = accountGeneration.current;
+      const version = (starVersions.current.get(id) ?? 0) + 1;
+      starVersions.current.set(id, version);
+      starLocks.current.add(id);
+      setPendingStars((prev) => new Set(prev).add(id));
+      const isCurrent = () =>
+        mounted.current &&
+        generation === accountGeneration.current &&
+        version === starVersions.current.get(id);
 
       // Optimistic update
       const wasStarred = starredIds.has(id);
-      const prevCount = starCounts.get(id) ?? 0;
+      const prevCount = starCounts.get(id);
 
       setStarredIds((prev) => {
         const next = new Set(prev);
@@ -198,57 +326,96 @@ export default function ArenaPage() {
       });
       setStarCounts((prev) => {
         const next = new Map(prev);
-        next.set(id, wasStarred ? prevCount - 1 : prevCount + 1);
+        next.set(id, wasStarred ? Math.max(0, (prevCount ?? 0) - 1) : (prevCount ?? 0) + 1);
         return next;
       });
 
       try {
         const res = await toggleStar(id);
+        if (!isCurrent()) return;
         setStarredIds((prev) => {
+          if (!isCurrent()) return prev;
           const next = new Set(prev);
           if (res.data.starred) next.add(id);
           else next.delete(id);
           return next;
         });
         setStarCounts((prev) => {
+          if (!isCurrent()) return prev;
           const next = new Map(prev);
           next.set(id, res.data.count);
           return next;
         });
       } catch {
+        if (!isCurrent()) return;
         // Revert on failure
         setStarredIds((prev) => {
+          if (!isCurrent()) return prev;
           const next = new Set(prev);
           if (wasStarred) next.add(id);
           else next.delete(id);
           return next;
         });
         setStarCounts((prev) => {
+          if (!isCurrent()) return prev;
           const next = new Map(prev);
-          next.set(id, prevCount);
+          if (prevCount === undefined) next.delete(id);
+          else next.set(id, prevCount);
           return next;
         });
+      } finally {
+        if (isCurrent()) {
+          starLocks.current.delete(id);
+          setPendingStars((prev) => {
+            if (!isCurrent()) return prev;
+            const next = new Set(prev);
+            next.delete(id);
+            return next;
+          });
+        }
       }
     },
-    [user, setShowAuthModal, starredIds, starCounts],
+    [userId, setShowAuthModal, starredIds, starCounts],
   );
 
   const handleVote = async (vote: "a" | "b" | "tie" | "both_weak") => {
-    if (!matchup) return;
+    if (
+      !matchup ||
+      voteLock.current ||
+      matchupLock.current ||
+      voted.current ||
+      matchup.id !== currentMatchupId.current
+    ) {
+      return;
+    }
+    voteLock.current = true;
+    const matchupId = matchup.id;
+    const request = ++voteRequest.current;
+    const isCurrent = () =>
+      mounted.current && request === voteRequest.current && matchupId === currentMatchupId.current;
     setVoting(true);
     setVoteError("");
     try {
-      const res = await castVote(matchup.id, vote);
-      setMatchup((prev) => (prev ? { ...prev, ...res.data } : prev));
+      const res = await castVote(matchupId, vote);
+      if (!isCurrent()) return;
+      voted.current = true;
+      setMatchup((prev) =>
+        prev?.id === matchupId ? { ...prev, ...res.data, id: matchupId } : prev,
+      );
       setHasVoted(true);
-      getArenaRankings().then((res) => setLeaderboard(res.data));
+      void refreshRankings();
     } catch (err) {
+      if (!isCurrent()) return;
       setVoteError(err instanceof Error ? err.message : "Failed to submit vote");
       if (err instanceof Error && err.message.includes("Already voted")) {
+        voted.current = true;
         setHasVoted(true);
       }
     } finally {
-      setVoting(false);
+      if (isCurrent()) {
+        voteLock.current = false;
+        setVoting(false);
+      }
     }
   };
 
@@ -268,8 +435,8 @@ export default function ArenaPage() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
       <div className="mb-8">
-        <h1 className="text-lg font-semibold text-stone-800">Which idea has more potential?</h1>
-        <p className="mt-1 text-[13px] text-stone-500">
+        <h1 className="type-heading text-stone-800">Which idea has more potential?</h1>
+        <p className="mt-1 max-w-prose text-sm text-stone-600">
           Read both hypotheses and their rationale, then vote. Source and scores are hidden to
           prevent bias.
         </p>
@@ -277,7 +444,22 @@ export default function ArenaPage() {
 
       {/* Matchup */}
       <section className="mb-10 min-h-[420px]">
-        {loading ? (
+        {matchupError && (
+          <div
+            role="alert"
+            className="mb-4 flex items-center justify-center gap-3 text-xs text-red-700"
+          >
+            <span>Could not load matchup: {matchupError}</span>
+            <button
+              onClick={() => void loadMatchup()}
+              disabled={loading || voting}
+              className="rounded-md border border-red-200 px-3 py-1 disabled:opacity-50"
+            >
+              Retry matchup
+            </button>
+          </div>
+        )}
+        {loading && !matchup ? (
           <div className="flex justify-center py-16">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-stone-300 border-t-stone-600" />
           </div>
@@ -289,19 +471,22 @@ export default function ArenaPage() {
                   <ArenaCard
                     hypothesis={matchup.hypothesisA}
                     label="Hypothesis A"
-                    starred={starredIds.has(matchup.hypothesisA.id)}
-                    starCount={starCounts.get(matchup.hypothesisA.id)}
+                    starred={starsForCurrentUser && starredIds.has(matchup.hypothesisA.id)}
+                    starCount={
+                      starsForCurrentUser ? starCounts.get(matchup.hypothesisA.id) : undefined
+                    }
+                    starPending={starsForCurrentUser && pendingStars.has(matchup.hypothesisA.id)}
                     onStar={handleStar}
                   />
                 ) : (
-                  <div className="rounded-lg border border-stone-200 p-5 text-stone-500">
+                  <div className="rounded-lg border border-stone-200 p-5 text-stone-600">
                     Not found
                   </div>
                 )}
               </div>
 
               <div className="flex items-center justify-center">
-                <span className="font-mono text-xs text-stone-500">vs</span>
+                <span className="font-serif text-sm text-stone-600 italic">vs</span>
               </div>
 
               <div className="flex flex-col">
@@ -309,12 +494,15 @@ export default function ArenaPage() {
                   <ArenaCard
                     hypothesis={matchup.hypothesisB}
                     label="Hypothesis B"
-                    starred={starredIds.has(matchup.hypothesisB.id)}
-                    starCount={starCounts.get(matchup.hypothesisB.id)}
+                    starred={starsForCurrentUser && starredIds.has(matchup.hypothesisB.id)}
+                    starCount={
+                      starsForCurrentUser ? starCounts.get(matchup.hypothesisB.id) : undefined
+                    }
+                    starPending={starsForCurrentUser && pendingStars.has(matchup.hypothesisB.id)}
                     onStar={handleStar}
                   />
                 ) : (
-                  <div className="rounded-lg border border-stone-200 p-5 text-stone-500">
+                  <div className="rounded-lg border border-stone-200 p-5 text-stone-600">
                     Not found
                   </div>
                 )}
@@ -333,7 +521,7 @@ export default function ArenaPage() {
                     {
                       key: "tie" as const,
                       label: "Tie",
-                      style: "border-stone-300 text-stone-500 hover:bg-stone-100",
+                      style: "border-stone-300 text-stone-600 hover:bg-stone-100",
                     },
                     {
                       key: "b" as const,
@@ -343,20 +531,20 @@ export default function ArenaPage() {
                     {
                       key: "both_weak" as const,
                       label: "Both weak",
-                      style: "border-stone-300 text-stone-500 hover:bg-stone-100",
+                      style: "border-stone-300 text-stone-600 hover:bg-stone-100",
                     },
                   ].map((btn) => (
                     <button
                       key={btn.key}
                       onClick={() => handleVote(btn.key)}
-                      disabled={voting}
+                      disabled={voting || loading}
                       className={`rounded-md border px-4 py-2 text-[13px] font-medium transition-colors disabled:opacity-50 ${btn.style}`}
                     >
                       {btn.label}
                     </button>
                   ))}
                 </div>
-                {voteError && <p className="text-xs text-red-500">{voteError}</p>}
+                {voteError && <p className="text-xs text-red-700">{voteError}</p>}
               </div>
             ) : (
               <div className="mt-6 space-y-4">
@@ -364,27 +552,27 @@ export default function ArenaPage() {
                 <div className="flex items-center justify-between gap-4 text-[13px]">
                   <div className="flex items-center gap-1.5">
                     {sourceIsAI(matchup.hypothesisA) ? (
-                      <Cpu className="h-3.5 w-3.5 text-indigo-400" />
+                      <Cpu className="h-3.5 w-3.5 text-indigo-700" />
                     ) : (
-                      <Brain className="h-3.5 w-3.5 text-stone-400" />
+                      <Brain className="h-3.5 w-3.5 text-stone-600" />
                     )}
                     <span
-                      className={`font-medium ${sourceIsAI(matchup.hypothesisA) ? "text-indigo-600" : "text-stone-700"}`}
+                      className={`font-medium ${sourceIsAI(matchup.hypothesisA) ? "text-indigo-700" : "text-stone-700"}`}
                     >
                       {sourceLabel(matchup.hypothesisA)}
                     </span>
                   </div>
-                  <span className="text-[11px] text-stone-500">vs</span>
+                  <span className="text-xs text-stone-600">vs</span>
                   <div className="flex items-center gap-1.5">
                     <span
-                      className={`font-medium ${sourceIsAI(matchup.hypothesisB) ? "text-indigo-600" : "text-stone-700"}`}
+                      className={`font-medium ${sourceIsAI(matchup.hypothesisB) ? "text-indigo-700" : "text-stone-700"}`}
                     >
                       {sourceLabel(matchup.hypothesisB)}
                     </span>
                     {sourceIsAI(matchup.hypothesisB) ? (
-                      <Cpu className="h-3.5 w-3.5 text-indigo-400" />
+                      <Cpu className="h-3.5 w-3.5 text-indigo-700" />
                     ) : (
-                      <Brain className="h-3.5 w-3.5 text-stone-400" />
+                      <Brain className="h-3.5 w-3.5 text-stone-600" />
                     )}
                   </div>
                 </div>
@@ -392,19 +580,19 @@ export default function ArenaPage() {
                 {/* Vote distribution bar */}
                 <div className="flex h-6 overflow-hidden rounded-md border border-stone-200">
                   <div
-                    className="flex items-center justify-center bg-stone-700 text-[10px] font-medium text-white"
+                    className="flex items-center justify-center bg-stone-700 text-xs font-medium text-white"
                     style={{ width: `${pctA}%` }}
                   >
                     {pctA > 12 ? `${Math.round(pctA)}%` : ""}
                   </div>
                   <div
-                    className="flex items-center justify-center bg-stone-300 text-[10px] font-medium text-stone-600"
+                    className="flex items-center justify-center bg-stone-300 text-xs font-medium text-stone-600"
                     style={{ width: `${pctTie}%` }}
                   >
                     {pctTie > 12 ? `${Math.round(pctTie)}%` : ""}
                   </div>
                   <div
-                    className="flex items-center justify-center bg-stone-500 text-[10px] font-medium text-white"
+                    className="flex items-center justify-center bg-stone-500 text-xs font-medium text-white"
                     style={{ width: `${pctB}%` }}
                   >
                     {pctB > 12 ? `${Math.round(pctB)}%` : ""}
@@ -413,37 +601,64 @@ export default function ArenaPage() {
 
                 <div className="flex justify-center">
                   <button
-                    onClick={loadMatchup}
-                    className="rounded-md border border-stone-300 px-4 py-2 text-[13px] font-medium text-stone-600 transition-colors hover:border-stone-400 hover:text-stone-800"
+                    onClick={() => void loadMatchup()}
+                    disabled={loading || voting}
+                    className="rounded-md border border-stone-300 px-4 py-2 text-[13px] font-medium text-stone-600 transition-colors hover:border-stone-400 hover:text-stone-800 disabled:opacity-50"
                   >
-                    Next matchup
+                    {loading ? "Loading matchup…" : "Next matchup"}
                   </button>
                 </div>
               </div>
             )}
           </>
-        ) : (
-          <p className="text-center text-sm text-stone-500">No matchups available.</p>
-        )}
+        ) : !matchupError ? (
+          <p className="text-center text-sm text-stone-600">No matchups available.</p>
+        ) : null}
       </section>
 
       {/* Arena Rankings */}
       <section>
         <h2 className="mb-4 text-sm font-semibold text-stone-700">
           Arena Rankings
-          <span className="ml-2 text-[11px] font-normal text-stone-500">completed only</span>
+          <span className="ml-2 text-xs font-normal text-stone-600">completed only</span>
         </h2>
-        <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+        {rankingsRefreshing && (
+          <p role="status" className="mb-3 text-xs text-stone-600">
+            Refreshing rankings…
+          </p>
+        )}
+        {rankingsError && (
+          <div role="alert" className="mb-3 flex items-center gap-3 text-xs text-red-700">
+            <span>Could not refresh rankings: {rankingsError}</span>
+            <button
+              onClick={() => void refreshRankings()}
+              disabled={rankingsRefreshing}
+              className="rounded-md border border-red-200 px-3 py-1 disabled:opacity-50"
+            >
+              Retry rankings
+            </button>
+          </div>
+        )}
+        <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
           <table className="w-full">
             <thead>
               <tr className="border-b border-stone-100">
-                <th className="px-3 py-2.5 text-left text-[11px] font-medium tracking-wider text-stone-500 uppercase">
+                <th
+                  scope="col"
+                  className="px-3 py-2.5 text-left text-xs font-medium tracking-wider text-stone-600 uppercase"
+                >
                   #
                 </th>
-                <th className="px-3 py-2.5 text-left text-[11px] font-medium tracking-wider text-stone-500 uppercase">
+                <th
+                  scope="col"
+                  className="px-3 py-2.5 text-left text-xs font-medium tracking-wider text-stone-600 uppercase"
+                >
                   Hypothesis
                 </th>
-                <th className="px-3 py-2.5 text-right text-[11px] font-medium tracking-wider text-stone-500 uppercase">
+                <th
+                  scope="col"
+                  className="px-3 py-2.5 text-right text-xs font-medium tracking-wider text-stone-600 uppercase"
+                >
                   Win Rate
                 </th>
               </tr>
@@ -454,18 +669,18 @@ export default function ArenaPage() {
                   key={h.id}
                   className="group border-b border-stone-50 transition-colors last:border-b-0 hover:bg-stone-50"
                 >
-                  <td className="px-3 py-2.5 align-top font-mono text-[12px] text-stone-500">
+                  <td className="type-data px-3 py-2.5 align-top text-xs text-stone-600">
                     {i + 1}
                   </td>
                   <td className="max-w-md px-3 py-2.5 align-top text-[13px] text-stone-700">
                     <Link
                       href={`/hypothesis/${h.id}`}
-                      className="block truncate transition-colors group-hover:whitespace-normal group-hover:text-stone-900"
+                      className="block transition-colors hover:text-stone-900 hover:underline"
                     >
                       {h.statement}
                     </Link>
                   </td>
-                  <td className="px-3 py-2.5 text-right align-top font-mono text-[12px] font-medium text-stone-600">
+                  <td className="type-data px-3 py-2.5 text-right align-top text-xs font-medium text-stone-700">
                     {h.winRate}%
                   </td>
                 </tr>

@@ -8,7 +8,7 @@ const knownDomains: Record<string, { bg: string; text: string; ring: string }> =
 
 const fallbackPalettes = [
   { bg: "bg-sky-50", text: "text-sky-700", ring: "ring-sky-200" },
-  { bg: "bg-amber-50", text: "text-amber-700", ring: "ring-amber-200" },
+  { bg: "bg-amber-50", text: "text-amber-800", ring: "ring-amber-200" },
   { bg: "bg-emerald-50", text: "text-emerald-700", ring: "ring-emerald-200" },
   { bg: "bg-indigo-50", text: "text-indigo-700", ring: "ring-indigo-200" },
   { bg: "bg-pink-50", text: "text-pink-700", ring: "ring-pink-200" },
@@ -36,7 +36,7 @@ export function DomainTag({ domain, size = "sm" }: DomainTagProps) {
         config.bg,
         config.text,
         config.ring,
-        size === "sm" && "px-1.5 py-0.5 text-[11px]",
+        size === "sm" && "px-1.5 py-0.5 text-xs",
         size === "md" && "px-2 py-0.5 text-xs",
       )}
     >

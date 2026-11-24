@@ -34,7 +34,7 @@ export const PRINCIPAL_SCIENTISTS = [
   {
     name: "Yaman K Singla",
     title: "Research Lead",
-    avatar: "https://ui-avatars.com/api/?name=Yaman+K+Singla&background=f5f5f4&color=78716c",
+    avatar: "/team/yaman.jpeg",
     scholar: "https://scholar.google.co.in/citations?user=Y7rIA24AAAAJ",
     website: "https://sites.google.com/view/yaman-kumar/",
     email: "yamankum@buffalo.edu",

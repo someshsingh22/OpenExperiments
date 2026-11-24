@@ -5,6 +5,8 @@ import { hypotheses, experiments, experimentResults, comments } from "@/db/schem
 import { eq, inArray } from "drizzle-orm";
 import { HypothesisDetailContent } from "@/components/hypothesis-detail-content";
 import { cachedQuery } from "@/lib/edge-cache";
+import { getHypothesisDetailRow } from "@/lib/hypothesis-detail-row";
+import { readHypothesisDetailChunks } from "@/lib/hypothesis-detail-chunks";
 import type { Hypothesis, Experiment, Comment } from "@/lib/types";
 import { notFound } from "next/navigation";
 
@@ -15,25 +17,28 @@ function getHypothesisDetail(id: string) {
 async function fetchHypothesisDetail(id: string) {
   const db = getDB();
 
-  const [row] = await db.select().from(hypotheses).where(eq(hypotheses.id, id)).limit(1);
+  const row = await getHypothesisDetailRow(id);
   if (!row) return null;
 
-  // Fetch experiments with results
-  const exps = await db.select().from(experiments).where(eq(experiments.hypothesisId, id));
-  const expIds = exps.map((e) => e.id);
+  const relatedIds = row.relatedHypothesisIds as string[];
+  const [{ exps, allResults }, comms, relRows] = await Promise.all([
+    (async () => {
+      const exps = await db.select().from(experiments).where(eq(experiments.hypothesisId, id));
+      const expIds = exps.map((e) => e.id);
+      const allResults = await readHypothesisDetailChunks(expIds, (chunk) =>
+        db.select().from(experimentResults).where(inArray(experimentResults.experimentId, chunk)),
+      );
+      return { exps, allResults };
+    })(),
+    db.select().from(comments).where(eq(comments.hypothesisId, id)),
+    readHypothesisDetailChunks(relatedIds, (chunk) =>
+      db.select().from(hypotheses).where(inArray(hypotheses.id, chunk)),
+    ),
+  ]);
   const results: Record<string, typeof experimentResults.$inferSelect> = {};
-  if (expIds.length > 0) {
-    const allResults = await db
-      .select()
-      .from(experimentResults)
-      .where(inArray(experimentResults.experimentId, expIds));
-    for (const r of allResults) {
-      results[r.experimentId] = r;
-    }
+  for (const r of allResults) {
+    results[r.experimentId] = r;
   }
-
-  // Fetch comments
-  const comms = await db.select().from(comments).where(eq(comments.hypothesisId, id));
 
   // Win rate: use the denormalized column only. It is kept current by
   // updateWinRatesForMatchup on every vote, so a null value means "no votes yet".
@@ -104,10 +109,8 @@ async function fetchHypothesisDetail(id: string) {
   }));
 
   // Fetch related hypotheses
-  const relatedIds = row.relatedHypothesisIds as string[];
   let related: Hypothesis[] = [];
   if (relatedIds.length > 0) {
-    const relRows = await db.select().from(hypotheses).where(inArray(hypotheses.id, relatedIds));
     related = relRows.map((r) => {
       const rAnon = r.isAnonymous === 1;
       return {

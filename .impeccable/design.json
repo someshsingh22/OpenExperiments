@@ -1,0 +1,259 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-05T05:41:55.246337Z",
+  "title": "Design System: OpenExperiments",
+  "extensions": {
+    "colorMeta": {
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "tonalRamp": [
+          "#1c1917",
+          "#292524",
+          "#44403c",
+          "#57534e",
+          "#78716c",
+          "#a8a29e",
+          "#e7e5e4",
+          "#fafaf9"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "tonalRamp": [
+          "#1c1917",
+          "#292524",
+          "#44403c",
+          "#57534e",
+          "#78716c",
+          "#a8a29e",
+          "#e7e5e4",
+          "#fafaf9"
+        ]
+      },
+      "sheet": {
+        "role": "neutral",
+        "displayName": "Sheet"
+      },
+      "graphite": {
+        "role": "neutral",
+        "displayName": "Graphite",
+        "tonalRamp": [
+          "#1c1917",
+          "#292524",
+          "#44403c",
+          "#57534e",
+          "#78716c",
+          "#a8a29e",
+          "#e7e5e4",
+          "#fafaf9"
+        ]
+      },
+      "pencil": {
+        "role": "neutral",
+        "displayName": "Pencil"
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "Rule"
+      },
+      "ink-indigo": {
+        "role": "primary",
+        "displayName": "Ink Indigo",
+        "tonalRamp": [
+          "#1e1b4b",
+          "#312e81",
+          "#3730a3",
+          "#4338ca",
+          "#4f46e5",
+          "#818cf8",
+          "#c7d2fe",
+          "#eef2ff"
+        ]
+      },
+      "ink-indigo-wash": {
+        "role": "primary",
+        "displayName": "Indigo Wash"
+      },
+      "error-red": {
+        "role": "error",
+        "displayName": "Error Red"
+      },
+      "status-sky": {
+        "role": "status",
+        "displayName": "Arena Sky"
+      },
+      "status-teal": {
+        "role": "status",
+        "displayName": "Tested Teal"
+      },
+      "status-amber": {
+        "role": "status",
+        "displayName": "Validated Amber"
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Home hero only."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "One page h1."
+      },
+      "heading": {
+        "displayName": "Heading",
+        "purpose": "Section h2s."
+      },
+      "statement": {
+        "displayName": "Statement",
+        "purpose": "Every rendering of a hypothesis statement."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Prose and descriptions, capped near 65ch."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Chips, metadata, table headers; 12px floor."
+      },
+      "data": {
+        "displayName": "Data",
+        "purpose": "P-values, effect sizes, win rates, counts, dates."
+      }
+    },
+    "shadows": [
+      {
+        "name": "card-hover",
+        "value": "0 8px 30px rgb(0 0 0 / 0.04)",
+        "purpose": "Soft lift on interactive hypothesis cards on hover only."
+      }
+    ],
+    "motion": [
+      {
+        "name": "card-lift",
+        "value": "300ms ease, translateY(-4px)",
+        "purpose": "Hover on interactive cards; disabled under prefers-reduced-motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Main action on a page; Ink fill.",
+      "html": "<button class=\"ds-btn-primary\">Submit a Hypothesis</button>",
+      "css": ".ds-btn-primary{background:#1c1917;color:#fff;font:600 14px/1 Geist,system-ui,sans-serif;padding:0 16px;min-height:44px;border:1px solid #1c1917;border-radius:6px;cursor:pointer;transition:background .2s}.ds-btn-primary:hover{background:#292524}.ds-btn-primary:focus-visible{outline:2px solid #4f46e5;outline-offset:2px}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Alternative action; white sheet with rule border.",
+      "html": "<button class=\"ds-btn-secondary\">Explore Ideas</button>",
+      "css": ".ds-btn-secondary{background:#fff;color:#1c1917;font:500 14px/1 Geist,system-ui,sans-serif;padding:0 16px;min-height:44px;border:1px solid #e7e5e4;border-radius:6px;cursor:pointer;transition:border-color .2s}.ds-btn-secondary:hover{border-color:#a8a29e}.ds-btn-secondary:focus-visible{outline:2px solid #4f46e5;outline-offset:2px}"
+    },
+    {
+      "name": "Labelled Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Visible label above every field; error text below.",
+      "html": "<label class=\"ds-field\"><span class=\"ds-field-label\">Hypothesis</span><input class=\"ds-input\" placeholder=\"e.g. Counterarguments that…\"></label>",
+      "css": ".ds-field{display:flex;flex-direction:column;gap:6px;font-family:Geist,system-ui,sans-serif}.ds-field-label{font-size:14px;font-weight:500;color:#44403c}.ds-input{background:#fff;color:#1c1917;border:1px solid #e7e5e4;border-radius:6px;padding:8px 12px;font-size:14px}.ds-input::placeholder{color:#78716c}.ds-input:focus-visible{outline:2px solid #4f46e5;outline-offset:2px;border-color:#57534e}"
+    },
+    {
+      "name": "Status Chip",
+      "kind": "chip",
+      "refersTo": "status-chip",
+      "description": "Lifecycle stage on a tonal wash.",
+      "html": "<span class=\"ds-chip ds-chip-teal\">Tested</span> <span class=\"ds-chip ds-chip-amber\">Field Validated</span>",
+      "css": ".ds-chip{display:inline-flex;align-items:center;font:500 12px/1.33 Geist,system-ui,sans-serif;padding:2px 8px;border-radius:6px}.ds-chip-teal{background:#f0fdfa;color:#0f766e;box-shadow:inset 0 0 0 1px #99f6e4}.ds-chip-amber{background:#fffbeb;color:#92400e;box-shadow:inset 0 0 0 1px #fde68a}"
+    },
+    {
+      "name": "Hypothesis Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Statement in serif, metadata in sans, numbers in mono.",
+      "html": "<article class=\"ds-card\"><p class=\"ds-card-statement\">Counterarguments that acknowledge the original poster's viewpoint are more persuasive.</p><div class=\"ds-card-meta\"><span>ExperiGen-GPT4o</span><span class=\"ds-data\">66%</span></div></article>",
+      "css": ".ds-card{background:#fff;border:1px solid #e7e5e4;border-radius:8px;padding:16px;max-width:360px;transition:transform .3s,box-shadow .3s}.ds-card:hover{transform:translateY(-4px);box-shadow:0 8px 30px rgb(0 0 0/.04)}.ds-card-statement{font:400 16px/1.375 'STIX Two Text',Georgia,serif;color:#1c1917;margin:0 0 12px}.ds-card-meta{display:flex;justify-content:space-between;font:400 12px Geist,system-ui,sans-serif;color:#57534e}.ds-data{font-family:'Geist Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}"
+    },
+    {
+      "name": "Navigation",
+      "kind": "nav",
+      "refersTo": "",
+      "description": "Solid white bar; current page in Ink.",
+      "html": "<nav class=\"ds-nav\"><a href=\"#\" aria-current=\"page\">Explore</a><a href=\"#\">Data</a><a href=\"#\">Arena</a></nav>",
+      "css": ".ds-nav{display:flex;gap:4px;background:#fff;border-bottom:1px solid #e7e5e4;padding:8px 16px;font:500 13px Geist,system-ui,sans-serif}.ds-nav a{color:#57534e;text-decoration:none;padding:6px 10px;border-radius:6px}.ds-nav a:hover{color:#1c1917}.ds-nav a[aria-current=page]{color:#1c1917;background:#f5f5f4}.ds-nav a:focus-visible{outline:2px solid #4f46e5;outline-offset:2px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Open Lab Notebook",
+    "overview": "OpenExperiments should read like a well-kept research notebook that anyone may open: quiet paper, dark ink, ruled lines, and claims written in the typeface of a scientific journal. The interface keeps out of the way, so hypotheses, evidence and numbers carry the page. It is calm without being bland. The serif signals that ideas here are treated as scholarship, and the rest of the UI stays plain enough that a first-time visitor never feels they need credentials to take part.\n\nThe system serves two audiences with equal weight: researchers, who scan for evidence, effect sizes and provenance, and the curious public, who need plain language and an obvious next step. Every page should work for both without a separate \"expert mode\".",
+    "keyCharacteristics": [
+      "Warm stone neutrals on near-white paper, one indigo ink for focus and selection.",
+      "Serif for ideas (titles, hypothesis statements), sans for interface, mono for measurements.",
+      "Flat surfaces separated by hairline rules rather than shadows.",
+      "Accessible by default: WCAG 2.2 AA everywhere, AAA for body and secondary text."
+    ],
+    "rules": [
+      {
+        "name": "The Graphite Floor Rule",
+        "body": "No text a reader needs is lighter than Graphite. Pencil exists for placeholders and icons only.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Ink Rule",
+        "body": "Indigo means \"you are here / this is selected\". If it appears anywhere else, remove it.",
+        "section": "colors"
+      },
+      {
+        "name": "The Ideas Wear Serif Rule",
+        "body": "If text is a hypothesis or a page title, it is STIX Two. If it is a control, it is Geist. There is no third option for prose.",
+        "section": "typography"
+      },
+      {
+        "name": "The Mono Means Measured Rule",
+        "body": "Monospace is for numbers and identifiers only. Never use it for labels, eyebrows or decoration.",
+        "section": "typography"
+      },
+      {
+        "name": "The 12px Floor Rule",
+        "body": "Nothing renders below 12px.",
+        "section": "typography"
+      },
+      {
+        "name": "The Solid Header Rule",
+        "body": "Nothing on this site is frosted. Translucent surfaces break contrast guarantees.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** set every hypothesis statement in STIX Two, wherever it appears.",
+      "**Do** keep secondary text at Graphite (#57534e) or darker.",
+      "**Do** format p-values in APA style and dates as `Jan 5, 2026` via the shared formatters in `src/lib/format.ts`.",
+      "**Do** give every icon-only control an accessible name and a 44px target.",
+      "**Do** show what a form will ask before asking someone to sign in.",
+      "**Do** cap prose at roughly 65 characters per line."
+    ],
+    "donts": [
+      "**Don't** use eyebrow or kicker labels above headings.",
+      "**Don't** use gradient text, decorative blurred blobs, glassmorphism or frosted headers.",
+      "**Don't** use monospace for anything that isn't a measurement or identifier.",
+      "**Don't** nest cards inside cards or number section headings with tiny \"01 / 02 / 03\" labels.",
+      "**Don't** convey state through colour alone; pair it with text or an icon.",
+      "**Don't** render any text below 12px or lighter than Graphite."
+    ]
+  }
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import {
   Brain,
   Cpu,
@@ -27,6 +27,9 @@ import { DomainTag } from "@/components/domain-tag";
 import { HypothesisCard } from "@/components/hypothesis-card";
 import type { Hypothesis, Experiment, Comment, Domain } from "@/lib/types";
 import { SITE_CONFIG } from "@/lib/constants";
+import { indexCommentThreads } from "@/lib/comment-threads";
+import { formatDate, formatPValue } from "@/lib/format";
+import { ResearchPlanText } from "@/components/research-plan-text";
 
 const EXP_TYPE_LABELS: Record<Experiment["type"], { label: string; cls: string }> = {
   observational: { label: "Observational", cls: "bg-stone-50 text-stone-600 ring-stone-200" },
@@ -36,17 +39,26 @@ const EXP_TYPE_LABELS: Record<Experiment["type"], { label: string; cls: string }
 };
 
 const EXP_STATUS_LABELS: Record<Experiment["status"], { label: string; cls: string }> = {
-  running: { label: "Running", cls: "bg-sky-50 text-sky-600 ring-sky-200" },
-  completed: { label: "Completed", cls: "bg-teal-50 text-teal-600 ring-teal-200" },
-  planned: { label: "Planned", cls: "bg-stone-50 text-stone-500 ring-stone-200" },
+  running: { label: "Running", cls: "bg-sky-50 text-sky-700 ring-sky-200" },
+  completed: { label: "Completed", cls: "bg-teal-50 text-teal-700 ring-teal-200" },
+  planned: { label: "Planned", cls: "bg-stone-50 text-stone-600 ring-stone-200" },
 };
 
 function fmtDate(d: string): string {
-  return new Date(d).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  return formatDate(d);
+}
+
+const DOI_PATTERN = /^10\.\d{4,9}\/\S+$/;
+const URL_PATTERN = /^https?:\/\/.+/;
+const CITATION_PATTERN =
+  /^(10\.\d{4,9}\/\S+|https?:\/\/(www\.)?arxiv\.org\/(abs|pdf)\/\d{4}\.\d{4,5}(v\d+)?)$/;
+const CITATION_FORMAT_MESSAGE =
+  "Enter an arXiv link (arxiv.org/abs/2401.01234) or a DOI (10.1234/abc).";
+const COMMENT_DOI_FORMAT_MESSAGE = "Enter a DOI such as 10.1234/abc, or a full https:// link.";
+
+function normalizeCitation(value: string): string {
+  const trimmed = value.trim();
+  return /^(www\.)?arxiv\.org\//i.test(trimmed) ? `https://${trimmed}` : trimmed;
 }
 
 function doiUrl(doi: string): string {
@@ -97,8 +109,10 @@ export function HypothesisDetailContent({
 
   const [hypothesis, setHypothesis] = useState(initialHypothesis);
   const [hComments, setComments] = useState(initialComments);
+  const { roots, childrenByParent } = useMemo(() => indexCommentThreads(hComments), [hComments]);
   const [commentText, setCommentText] = useState("");
   const [commentDoi, setCommentDoi] = useState("");
+  const [commentDoiError, setCommentDoiError] = useState("");
   const [postingComment, setPostingComment] = useState(false);
   const { user, setShowAuthModal } = useAuth();
 
@@ -120,7 +134,7 @@ export function HypothesisDetailContent({
     `pb-2.5 text-sm font-medium transition-colors ${
       activeTab === t
         ? "border-b-2 border-stone-800 text-stone-800"
-        : "text-stone-500 hover:text-stone-700"
+        : "text-stone-600 hover:text-stone-700"
     }`;
 
   return (
@@ -131,7 +145,7 @@ export function HypothesisDetailContent({
           <div className="mb-3">
             <EvidenceBadge status={hypothesis.status} phase={hypothesis.phase} size="lg" />
           </div>
-          <h1 className="mb-4 text-2xl leading-snug font-semibold text-stone-900 sm:text-3xl">
+          <h1 className="type-statement mb-4 text-2xl leading-snug text-stone-900 sm:text-3xl">
             {hypothesis.statement}
           </h1>
           <div className="flex flex-wrap items-center gap-1.5">
@@ -140,7 +154,9 @@ export function HypothesisDetailContent({
             ))}
             <div className="relative ml-auto" ref={shareRef}>
               <button
+                type="button"
                 onClick={() => setShowShare(!showShare)}
+                aria-expanded={showShare}
                 className="inline-flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-medium text-stone-600 transition-all hover:border-stone-400 hover:text-stone-900"
               >
                 <Share2 className="h-3.5 w-3.5" />
@@ -186,13 +202,13 @@ export function HypothesisDetailContent({
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 text-sm text-stone-500">
+          <div className="flex flex-wrap items-center gap-3 text-sm text-stone-600">
             {revealed ? (
               <span className="flex items-center gap-1">
                 {hypothesis.source === "ai_agent" ? (
                   <>
-                    <Cpu className="h-4 w-4 text-indigo-400" />
-                    <span className="font-medium text-indigo-500">
+                    <Cpu className="h-4 w-4 text-indigo-700" />
+                    <span className="font-medium text-indigo-700">
                       {hypothesis.agentName ?? "AI Agent"}
                     </span>
                   </>
@@ -204,7 +220,7 @@ export function HypothesisDetailContent({
                 )}
               </span>
             ) : (
-              <span className="flex items-center gap-1 text-stone-500 italic">
+              <span className="flex items-center gap-1 text-stone-600 italic">
                 <Lock className="h-3.5 w-3.5" /> Source hidden during evaluation
               </span>
             )}
@@ -214,7 +230,7 @@ export function HypothesisDetailContent({
             </span>
           </div>
           {hypothesis.problemStatement && (
-            <p className="mt-2 text-sm text-stone-500">Problem: {hypothesis.problemStatement}</p>
+            <p className="mt-2 text-sm text-stone-600">Problem: {hypothesis.problemStatement}</p>
           )}
           <div className="mt-6 flex flex-col gap-6">
             <div>
@@ -231,7 +247,7 @@ export function HypothesisDetailContent({
             </div>
             <div className="w-full">
               <div className="mb-2 flex items-center justify-between">
-                <span className="text-xs font-semibold tracking-wider text-stone-500 uppercase">
+                <span className="text-xs font-semibold tracking-wider text-stone-600 uppercase">
                   BibTeX Citation
                 </span>
                 <button
@@ -240,7 +256,7 @@ export function HypothesisDetailContent({
                     setCopying(true);
                     setTimeout(() => setCopying(false), 2000);
                   }}
-                  className="text-xs font-bold text-stone-500 hover:text-stone-700"
+                  className="text-xs font-bold text-stone-600 hover:text-stone-700"
                 >
                   {copying ? "COPIED" : "COPY"}
                 </button>
@@ -256,10 +272,10 @@ export function HypothesisDetailContent({
 
         {/* Rationale */}
         <section className="mb-8 rounded-lg border border-stone-200 bg-stone-50/50 p-5">
-          <h2 className="mb-2 text-xs font-medium tracking-wider text-stone-500 uppercase">
+          <h2 className="mb-2 text-xs font-medium tracking-wider text-stone-600 uppercase">
             Rationale
           </h2>
-          <p className="text-base leading-relaxed text-stone-700">{hypothesis.rationale}</p>
+          <ResearchPlanText text={hypothesis.rationale} />
         </section>
 
         {/* Live notice */}
@@ -305,10 +321,10 @@ export function HypothesisDetailContent({
                   <div className="rounded-lg border border-stone-200 bg-white p-5">
                     <h3 className="mb-2 text-sm font-medium text-stone-600">Arena Win Rate</h3>
                     <div className="mb-2 flex items-baseline gap-2">
-                      <span className="font-mono text-3xl font-semibold text-stone-800">
+                      <span className="type-data text-3xl font-semibold text-stone-800">
                         {hypothesis.winRate}%
                       </span>
-                      <span className="text-sm text-stone-500">win rate</span>
+                      <span className="text-sm text-stone-600">win rate</span>
                     </div>
                     <div className="h-1.5 overflow-hidden rounded-full bg-stone-100">
                       <div
@@ -323,43 +339,76 @@ export function HypothesisDetailContent({
                   <h3 className="mb-3 text-sm font-medium text-stone-600">Discussion</h3>
                   <div className="space-y-2">
                     {hComments.length > 0 ? (
-                      hComments
-                        .filter((c) => !c.parentId)
-                        .map((root) => (
-                          <CommentThread
-                            key={root.id}
-                            comment={root}
-                            allComments={hComments}
-                            hypothesisId={id}
-                            user={user}
-                            onReply={(c) => setComments((prev) => [...prev, c])}
-                            setShowAuthModal={setShowAuthModal}
-                          />
-                        ))
+                      roots.map((root) => (
+                        <CommentThread
+                          key={root.id}
+                          comment={root}
+                          childrenByParent={childrenByParent}
+                          hypothesisId={id}
+                          user={user}
+                          onReply={(c) => setComments((prev) => [...prev, c])}
+                          setShowAuthModal={setShowAuthModal}
+                        />
+                      ))
                     ) : (
-                      <p className="text-sm text-stone-500">No comments yet.</p>
+                      <p className="text-sm text-stone-600">No comments yet.</p>
                     )}
                   </div>
                   <div className="mt-4">
                     {user ? (
                       <div>
                         <textarea
+                          aria-label="Add a comment"
                           placeholder="Add a comment..."
                           rows={2}
                           value={commentText}
                           onChange={(e) => setCommentText(e.target.value)}
-                          className="mb-2 w-full rounded-md border border-stone-200 px-3 py-2 text-sm text-stone-700 placeholder-stone-300 focus:border-stone-400 focus:ring-1 focus:ring-stone-300 focus:outline-none"
+                          className="mb-2 w-full rounded-md border border-stone-200 px-3 py-2 text-sm text-stone-700 placeholder-stone-500 focus:border-stone-600 focus:ring-1 focus:ring-stone-600 focus:outline-none"
                         />
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-end gap-2">
+                          <div className="flex flex-col gap-1">
+                            <label
+                              htmlFor="comment-doi"
+                              className="text-sm font-medium text-stone-700"
+                            >
+                              DOI <span className="font-normal text-stone-600">(optional)</span>
+                            </label>
+                            <input
+                              id="comment-doi"
+                              type="text"
+                              inputMode="url"
+                              autoComplete="off"
+                              spellCheck={false}
+                              placeholder="10.1234/abc"
+                              value={commentDoi}
+                              onChange={(e) => {
+                                setCommentDoi(e.target.value);
+                                setCommentDoiError("");
+                              }}
+                              aria-invalid={commentDoiError ? true : undefined}
+                              aria-describedby={commentDoiError ? "comment-doi-error" : undefined}
+                              className={`rounded-md border px-2 py-1.5 text-xs text-stone-700 placeholder-stone-500 focus:outline-none ${
+                                commentDoiError
+                                  ? "border-red-700 focus:ring-1 focus:ring-red-700"
+                                  : "border-stone-200 focus:border-stone-600"
+                              }`}
+                            />
+                          </div>
                           <button
+                            type="button"
                             disabled={postingComment || !commentText.trim()}
                             onClick={async () => {
+                              const doi = commentDoi.trim();
+                              if (doi && !DOI_PATTERN.test(doi) && !URL_PATTERN.test(doi)) {
+                                setCommentDoiError(COMMENT_DOI_FORMAT_MESSAGE);
+                                return;
+                              }
                               setPostingComment(true);
                               try {
                                 const res = await postComment({
                                   hypothesisId: id,
                                   content: commentText.trim(),
-                                  doi: commentDoi || undefined,
+                                  doi: doi || undefined,
                                 });
                                 setComments((prev) => [...prev, res.data]);
                                 setCommentText("");
@@ -374,18 +423,20 @@ export function HypothesisDetailContent({
                           >
                             {postingComment ? "Posting..." : "Post"}
                           </button>
-                          <input
-                            type="text"
-                            placeholder="DOI (optional)"
-                            value={commentDoi}
-                            onChange={(e) => setCommentDoi(e.target.value)}
-                            className="rounded-md border border-stone-200 px-2 py-1.5 text-[12px] text-stone-600 placeholder-stone-300 focus:border-stone-400 focus:outline-none"
-                          />
                         </div>
+                        {commentDoiError && (
+                          <p
+                            id="comment-doi-error"
+                            role="alert"
+                            className="mt-1.5 text-xs text-red-700"
+                          >
+                            {commentDoiError}
+                          </p>
+                        )}
                       </div>
                     ) : (
                       <div className="rounded-md border border-stone-200 bg-stone-50 p-3">
-                        <p className="text-sm text-stone-500 italic">
+                        <p className="text-sm text-stone-600 italic">
                           <button
                             onClick={() => setShowAuthModal(true)}
                             className="font-medium text-stone-600 underline underline-offset-2 hover:text-stone-800"
@@ -411,7 +462,7 @@ export function HypothesisDetailContent({
                     {hypothesis.evidenceScore != null && (
                       <div>
                         <div className="mb-1.5 flex justify-between text-sm">
-                          <span className="text-stone-500">Evidence Score</span>
+                          <span className="text-stone-600">Evidence Score</span>
                           <span className="font-medium text-stone-700">
                             {hypothesis.evidenceScore}/100
                           </span>
@@ -427,24 +478,24 @@ export function HypothesisDetailContent({
                     <div className="grid gap-4 sm:grid-cols-3">
                       {completedExp.results.pValue != null && (
                         <div>
-                          <p className="text-xs text-stone-500">p-value</p>
-                          <p className="font-mono text-sm font-medium text-stone-700">
-                            {completedExp.results.pValue.toExponential(2)}
+                          <p className="text-xs text-stone-600">p-value</p>
+                          <p className="type-data text-sm font-medium text-stone-800">
+                            {formatPValue(completedExp.results.pValue)}
                           </p>
                         </div>
                       )}
                       {completedExp.results.effectSize != null && (
                         <div>
-                          <p className="text-xs text-stone-500">Effect Size</p>
-                          <p className="font-mono text-sm font-medium text-stone-700">
+                          <p className="text-xs text-stone-600">Effect Size</p>
+                          <p className="type-data text-sm font-medium text-stone-800">
                             {completedExp.results.effectSize}
                           </p>
                         </div>
                       )}
                       {completedExp.results.confidenceInterval && (
                         <div>
-                          <p className="text-xs text-stone-500">95% CI</p>
-                          <p className="font-mono text-sm font-medium text-stone-700">
+                          <p className="text-xs text-stone-600">95% CI</p>
+                          <p className="type-data text-sm font-medium text-stone-800">
                             [{completedExp.results.confidenceInterval[0].toFixed(2)},{" "}
                             {completedExp.results.confidenceInterval[1].toFixed(2)}]
                           </p>
@@ -452,7 +503,7 @@ export function HypothesisDetailContent({
                       )}
                     </div>
                     <div>
-                      <p className="mb-1 text-xs text-stone-500">Methodology</p>
+                      <p className="mb-1 text-xs text-stone-600">Methodology</p>
                       <p className="text-sm text-stone-600">{completedExp.methodology}</p>
                     </div>
                     <div className="mt-4 flex gap-3">
@@ -467,7 +518,7 @@ export function HypothesisDetailContent({
                   </div>
                 ) : (
                   <div className="rounded-lg border border-dashed border-stone-300 p-8 text-center">
-                    <p className="text-sm text-stone-500">
+                    <p className="text-sm text-stone-600">
                       Not yet tested against observational data.
                     </p>
                   </div>
@@ -482,12 +533,12 @@ export function HypothesisDetailContent({
                   <div className="rounded-md border border-teal-200 bg-teal-50/50 p-4">
                     <div className="mb-0.5 flex items-center gap-1.5 text-teal-700">
                       <TrendingUp className="h-4 w-4" />
-                      <span className="text-[12px] font-medium">Field Validation</span>
+                      <span className="text-xs font-medium">Field Validation</span>
                     </div>
                     <p className="text-2xl font-semibold text-teal-700">
                       {abWithUplift.results?.uplift}
                     </p>
-                    <p className="mt-0.5 text-[12px] text-teal-600">
+                    <p className="mt-0.5 text-xs text-teal-700">
                       uplift in {abWithUplift.datasetName}
                     </p>
                   </div>
@@ -495,7 +546,7 @@ export function HypothesisDetailContent({
                 {hExperiments.length > 0 ? (
                   hExperiments.map((exp) => <ExperimentCard key={exp.id} experiment={exp} />)
                 ) : (
-                  <p className="text-sm text-stone-500">No experiments yet.</p>
+                  <p className="text-sm text-stone-600">No experiments yet.</p>
                 )}
               </div>
             )}
@@ -504,7 +555,7 @@ export function HypothesisDetailContent({
 
         {/* Related & Bibliography */}
         <section className="mb-8">
-          <h2 className="mb-4 text-sm font-semibold tracking-[0.1em] text-stone-500 uppercase">
+          <h2 className="mb-4 text-sm font-semibold tracking-[0.1em] text-stone-600 uppercase">
             Related & Bibliography
           </h2>
 
@@ -518,7 +569,7 @@ export function HypothesisDetailContent({
                   </div>
                 ))
               ) : (
-                <p className="text-sm text-stone-500">No related hypotheses found.</p>
+                <p className="text-sm text-stone-600">No related hypotheses found.</p>
               )}
             </div>
           </div>
@@ -532,7 +583,7 @@ export function HypothesisDetailContent({
             <div className="mb-6 space-y-3">
               {hypothesis.citationDois.map((doi) => (
                 <div key={doi} className="flex items-start gap-2">
-                  <FileText className="mt-0.5 h-4 w-4 text-stone-500" />
+                  <FileText className="mt-0.5 h-4 w-4 text-stone-600" />
                   <a
                     href={doiUrl(doi)}
                     target="_blank"
@@ -544,56 +595,79 @@ export function HypothesisDetailContent({
                 </div>
               ))}
               {hypothesis.citationDois.length === 0 && (
-                <p className="text-sm text-stone-500 italic">No citations added yet.</p>
+                <p className="text-sm text-stone-600 italic">No citations added yet.</p>
               )}
             </div>
 
             <div className="mt-4 border-t border-stone-200 pt-4">
-              <p className="mb-1.5 text-sm font-medium text-stone-600">
-                If you see this idea in recent arXiv papers, add a link:
-              </p>
-              <p className="mb-3 text-xs text-stone-500">
+              <label
+                htmlFor="citation-link"
+                className="mb-1.5 block text-sm font-medium text-stone-700"
+              >
+                If you see this idea in recent arXiv papers, add a link
+              </label>
+              <p id="citation-help" className="mb-3 text-xs text-stone-600">
                 Only arXiv URLs (https://arxiv.org/abs/...) or DOIs (10.xxxx/...) are accepted.
               </p>
-              <div className="flex gap-2">
+              <form
+                noValidate
+                className="flex gap-2"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const citation = normalizeCitation(arxivLink);
+                  if (!citation) return;
+                  if (!CITATION_PATTERN.test(citation)) {
+                    setCitationError(CITATION_FORMAT_MESSAGE);
+                    return;
+                  }
+                  setCitationError("");
+                  try {
+                    const res = await addCitation(id, citation);
+                    setHypothesis((prev) => ({
+                      ...prev,
+                      citationDois: res.data.citationDois,
+                    }));
+                    setArxivLink("");
+                  } catch (err) {
+                    setCitationError(err instanceof Error ? err.message : "Failed to add citation");
+                  }
+                }}
+              >
                 <input
+                  id="citation-link"
                   type="text"
-                  placeholder="https://arxiv.org/abs/xxxx.xxxxx or 10.xxxx/..."
+                  inputMode="url"
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder="arxiv.org/abs/2401.01234 or 10.1234/abc"
                   value={arxivLink}
                   onChange={(e) => {
                     setArxivLink(e.target.value);
                     setCitationError("");
                   }}
-                  className={`flex-1 rounded-md border px-3 py-2 text-sm text-stone-700 placeholder-stone-300 focus:outline-none ${
+                  aria-invalid={citationError ? true : undefined}
+                  aria-describedby={
+                    citationError ? "citation-help citation-error" : "citation-help"
+                  }
+                  className={`min-w-0 flex-1 rounded-md border px-3 py-2 text-sm text-stone-700 placeholder-stone-500 focus:outline-none ${
                     citationError
-                      ? "border-red-300 focus:border-red-400 focus:ring-1 focus:ring-red-200"
-                      : "border-stone-200 focus:border-stone-400"
+                      ? "border-red-700 focus:ring-1 focus:ring-red-700"
+                      : "border-stone-200 focus:border-stone-600"
                   }`}
                 />
                 <button
-                  onClick={async () => {
-                    if (!arxivLink) return;
-                    setCitationError("");
-                    try {
-                      const res = await addCitation(id, arxivLink);
-                      setHypothesis((prev) => ({
-                        ...prev,
-                        citationDois: res.data.citationDois,
-                      }));
-                      setArxivLink("");
-                    } catch (err) {
-                      setCitationError(
-                        err instanceof Error ? err.message : "Failed to add citation",
-                      );
-                    }
-                  }}
+                  type="submit"
                   className="inline-flex items-center gap-1.5 rounded-md border border-stone-800 bg-stone-800 px-4 py-2 text-sm font-medium text-white hover:bg-stone-700"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   Add
                 </button>
-              </div>
-              {citationError && <p className="mt-2 text-sm text-red-600">{citationError}</p>}
+              </form>
+              {citationError && (
+                <p id="citation-error" role="alert" className="mt-2 text-xs text-red-700">
+                  {citationError}
+                </p>
+              )}
             </div>
           </div>
         </section>
@@ -604,7 +678,7 @@ export function HypothesisDetailContent({
 
 function CommentThread({
   comment,
-  allComments,
+  childrenByParent,
   hypothesisId,
   user,
   onReply,
@@ -613,9 +687,12 @@ function CommentThread({
   comment: Comment & {
     author?: { id: string; name: string | null; avatarUrl: string | null } | null;
   };
-  allComments: (Comment & {
-    author?: { id: string; name: string | null; avatarUrl: string | null } | null;
-  })[];
+  childrenByParent: ReadonlyMap<
+    string,
+    (Comment & {
+      author?: { id: string; name: string | null; avatarUrl: string | null } | null;
+    })[]
+  >;
   hypothesisId: string;
   user: { id: string; name: string | null; avatarUrl: string | null } | null;
   onReply: (
@@ -626,7 +703,7 @@ function CommentThread({
   const [replying, setReplying] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [posting, setPosting] = useState(false);
-  const replies = allComments.filter((c) => c.parentId === comment.id);
+  const replies = childrenByParent.get(comment.id) ?? [];
   const author = comment.author;
 
   const handleReply = async () => {
@@ -655,16 +732,16 @@ function CommentThread({
           <span className="text-xs font-semibold text-stone-700">
             {author?.name || "Anonymous"}
           </span>
-          <span className="text-[11px] text-stone-500">{fmtDate(comment.createdAt)}</span>
+          <span className="text-xs text-stone-600">{fmtDate(comment.createdAt)}</span>
         </div>
-        <p className="text-sm leading-relaxed text-stone-700">{comment.body}</p>
+        <p className="max-w-prose text-sm leading-relaxed text-stone-700">{comment.body}</p>
         <div className="mt-1 flex flex-wrap items-center gap-2">
           {comment.doi && (
             <a
               href={doiUrl(comment.doi)}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-0.5 rounded bg-stone-50 px-1.5 py-0.5 text-[10px] font-medium text-stone-500 hover:text-stone-700"
+              className="inline-flex items-center gap-0.5 rounded bg-stone-50 px-1.5 py-0.5 text-xs font-medium text-stone-600 hover:text-stone-700"
             >
               <ExternalLink className="h-2.5 w-2.5" />
               {comment.doi}
@@ -673,14 +750,14 @@ function CommentThread({
           {user ? (
             <button
               onClick={() => setReplying(!replying)}
-              className="text-[10px] font-medium text-stone-500 hover:text-stone-700"
+              className="text-xs font-medium text-stone-600 hover:text-stone-700"
             >
               Reply
             </button>
           ) : (
             <button
               onClick={() => setShowAuthModal(true)}
-              className="text-[10px] font-medium text-stone-500 hover:text-stone-700"
+              className="text-xs font-medium text-stone-600 hover:text-stone-700"
             >
               Reply
             </button>
@@ -690,17 +767,18 @@ function CommentThread({
       {replying && (
         <div className="mt-1.5 ml-4 space-y-1.5">
           <textarea
+            aria-label={`Reply to ${author?.name || "Anonymous"}`}
             placeholder="Write a reply..."
             rows={2}
             value={replyText}
             onChange={(e) => setReplyText(e.target.value)}
-            className="w-full rounded-md border border-stone-200 px-2.5 py-1.5 text-[12px] text-stone-700 placeholder-stone-300 focus:border-stone-400 focus:ring-1 focus:ring-stone-300 focus:outline-none"
+            className="w-full rounded-md border border-stone-200 px-2.5 py-1.5 text-xs text-stone-700 placeholder-stone-500 focus:border-stone-600 focus:ring-1 focus:ring-stone-600 focus:outline-none"
           />
           <div className="flex gap-1.5">
             <button
               disabled={posting || !replyText.trim()}
               onClick={handleReply}
-              className="rounded-md border border-stone-800 px-2.5 py-1 text-[11px] font-medium text-stone-800 hover:bg-stone-800 hover:text-white disabled:opacity-50"
+              className="rounded-md border border-stone-800 px-2.5 py-1 text-xs font-medium text-stone-800 hover:bg-stone-800 hover:text-white disabled:opacity-50"
             >
               {posting ? "Posting..." : "Post"}
             </button>
@@ -709,7 +787,7 @@ function CommentThread({
                 setReplying(false);
                 setReplyText("");
               }}
-              className="rounded-md px-2.5 py-1 text-[11px] text-stone-500 hover:text-stone-700"
+              className="rounded-md px-2.5 py-1 text-xs text-stone-600 hover:text-stone-700"
             >
               Cancel
             </button>
@@ -722,7 +800,7 @@ function CommentThread({
             <CommentThread
               key={r.id}
               comment={r}
-              allComments={allComments}
+              childrenByParent={childrenByParent}
               hypothesisId={hypothesisId}
               user={user}
               onReply={onReply}
@@ -749,11 +827,11 @@ function ExperimentCard({ experiment }: { experiment: Experiment }) {
         </span>
       </div>
       <p className="mb-1.5 text-sm font-medium text-stone-700">{experiment.datasetName}</p>
-      <div className="mb-1.5 flex gap-3 text-xs text-stone-500">
+      <div className="mb-1.5 flex gap-3 text-xs text-stone-600">
         <span>Started: {fmtDate(experiment.startedAt)}</span>
         {experiment.completedAt && <span>Completed: {fmtDate(experiment.completedAt)}</span>}
       </div>
-      {experiment.results && <p className="text-sm text-stone-500">{experiment.results.summary}</p>}
+      {experiment.results && <p className="text-sm text-stone-600">{experiment.results.summary}</p>}
       <div className="mt-4">
         <a
           href={experiment.osfLink ?? "https://osf.io/"}

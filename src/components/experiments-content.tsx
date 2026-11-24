@@ -3,15 +3,11 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { ExternalLink, FlaskConical, ChevronDown, Check, User } from "lucide-react";
-import {
-  getExperiments,
-  getProblemStatements,
-  getHypotheses,
-  getDatasets,
-  submitExperiment,
-} from "@/lib/api";
+import { getExperiments, getProblemStatements, getDatasets, submitExperiment } from "@/lib/api";
 import { useAuth } from "@/components/auth-provider";
+import { createHypothesisChoicesLoader, createLatestRequest } from "./experiment-ui-requests";
 import type { Experiment, ProblemStatement, Hypothesis, Dataset } from "@/lib/types";
+import { formatDate, formatPValueInline } from "@/lib/format";
 
 const EXP_TYPE_OPTIONS = [
   { value: "observational", label: "Observational" },
@@ -45,7 +41,26 @@ interface ExperimentsContentProps {
 
 export function ExperimentsContent({ initialExperiments }: ExperimentsContentProps) {
   const [experiments, setExperiments] = useState<Experiment[]>(initialExperiments);
+  const [refreshError, setRefreshError] = useState("");
+  const listRequests = useRef(createLatestRequest());
   const submitRef = useRef<HTMLDivElement>(null);
+
+  function refreshExperiments() {
+    const isCurrent = listRequests.current.start();
+    setRefreshError("");
+    getExperiments()
+      .then((res) => {
+        if (isCurrent()) setExperiments(res.data);
+      })
+      .catch(() => {
+        if (isCurrent()) setRefreshError("Experiment submitted, but the list could not refresh.");
+      });
+  }
+
+  useEffect(() => {
+    const requests = listRequests.current;
+    return () => requests.invalidate();
+  }, []);
 
   useEffect(() => {
     if (window.location.hash === "#submit" && submitRef.current) {
@@ -56,27 +71,26 @@ export function ExperimentsContent({ initialExperiments }: ExperimentsContentPro
   return (
     <div className="mx-auto max-w-5xl px-4 py-14 sm:px-6">
       <header className="mb-12">
-        <h1 className="text-3xl font-semibold tracking-tight text-stone-900 sm:text-4xl">
-          Experiments
-        </h1>
+        <h1 className="type-title text-stone-900">Experiments</h1>
         <p className="mt-4 text-base leading-relaxed text-stone-600">
-          Pre-registered field experiments run by our team and community based on
-          community-submitted hypotheses. OpenExperiments is committed to open science.
+          Study plans and experiments from our team and community. Preregistration records a plan,
+          not a completed result; each study shows its current status.
         </p>
       </header>
 
       <div ref={submitRef} id="submit" className="mb-16">
-        <ExperimentSubmitForm
-          onSubmitted={() => {
-            getExperiments().then((res) => setExperiments(res.data));
-          }}
-        />
+        <ExperimentSubmitForm onSubmitted={refreshExperiments} />
       </div>
 
       <section>
-        <h2 className="mb-6 text-xl font-semibold text-stone-900">All Experiments</h2>
+        <h2 className="type-heading mb-6 text-stone-900">All Experiments</h2>
+        {refreshError && (
+          <p role="alert" className="mb-4 text-sm text-red-700">
+            {refreshError} <button onClick={refreshExperiments}>Retry</button>
+          </p>
+        )}
         {experiments.length === 0 ? (
-          <div className="py-12 text-center text-sm text-stone-500">No experiments yet.</div>
+          <div className="py-12 text-center text-sm text-stone-600">No experiments yet.</div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {experiments.map((exp) => (
@@ -100,12 +114,12 @@ function ExperimentCard({ experiment }: { experiment: Experiment }) {
     >
       <div className="mb-2.5 flex flex-wrap items-center gap-1.5">
         <span
-          className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${typeMeta.cls}`}
+          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${typeMeta.cls}`}
         >
           {typeMeta.label}
         </span>
         <span
-          className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${statusMeta.cls}`}
+          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${statusMeta.cls}`}
         >
           {statusMeta.label}
         </span>
@@ -120,7 +134,7 @@ function ExperimentCard({ experiment }: { experiment: Experiment }) {
         </p>
       )}
 
-      <div className="flex items-center justify-between text-[11px] text-stone-500">
+      <div className="flex items-center justify-between text-xs text-stone-600">
         <div className="flex items-center gap-1">
           {experiment.submitter ? (
             <>
@@ -128,12 +142,14 @@ function ExperimentCard({ experiment }: { experiment: Experiment }) {
               <span className="font-medium">{experiment.submitter.name || "Anonymous"}</span>
             </>
           ) : (
-            <span>{experiment.startedAt}</span>
+            <time dateTime={experiment.startedAt} className="type-data">
+              {formatDate(experiment.startedAt)}
+            </time>
           )}
         </div>
         <div className="flex items-center gap-2">
           {experiment.results?.pValue != null && (
-            <span className="font-mono tabular-nums">p={experiment.results.pValue}</span>
+            <span className="type-data">{formatPValueInline(experiment.results.pValue)}</span>
           )}
           {experiment.osfLink && <ExternalLink className="h-3 w-3" />}
         </div>
@@ -171,30 +187,73 @@ function ExperimentSubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
   const [submitError, setSubmitError] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [submittedId, setSubmittedId] = useState("");
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogError, setCatalogError] = useState("");
+  const [catalogRetry, setCatalogRetry] = useState(0);
+  const [hypothesesLoading, setHypothesesLoading] = useState(false);
+  const [hypothesesError, setHypothesesError] = useState("");
+  const [hypothesesRetry, setHypothesesRetry] = useState(0);
+  const hypothesisRequests = useRef(createLatestRequest());
+  const hypothesisChoices = useRef(createHypothesisChoicesLoader());
+  const formAvailable = !authLoading && !!user && !submitted;
+  const userId = user?.id;
 
   useEffect(() => {
-    getProblemStatements().then((res) => setProblemStatements(res.data));
-    getDatasets().then((res) => setDatasets(res.data));
-  }, []);
+    let active = true;
+    setProblemStatements([]);
+    setDatasets([]);
+    setSelectedPS("");
+    setSelectedHypothesis("");
+    setSelectedDataset("");
+    setCatalogError("");
+    setCatalogLoading(formAvailable);
+    if (!formAvailable) return;
+    Promise.all([getProblemStatements(), getDatasets()])
+      .then(([ps, ds]) => {
+        if (!active) return;
+        setProblemStatements(ps.data);
+        setDatasets(ds.data);
+      })
+      .catch(() => {
+        if (active) setCatalogError("Unable to load problem statements and datasets.");
+      })
+      .finally(() => {
+        if (active) setCatalogLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [formAvailable, userId, catalogRetry]);
 
   useEffect(() => {
-    if (!selectedPS) {
-      setHypotheses([]);
-      setSelectedHypothesis("");
-      return;
-    }
+    const isCurrent = hypothesisRequests.current.start();
+    setHypotheses([]);
+    setSelectedHypothesis("");
+    setHypothesesError("");
+    setHypothesesLoading(false);
     const ps = problemStatements.find((p) => p.id === selectedPS);
-    if (!ps) return;
-    getHypotheses({ search: ps.question, limit: 50 }).then((res) => {
-      setHypotheses(res.data);
-      setSelectedHypothesis("");
-    });
-  }, [selectedPS, problemStatements]);
+    if (formAvailable && ps) {
+      setHypothesesLoading(true);
+      hypothesisChoices.current
+        .load(ps.id, ps.question)
+        .then((data) => {
+          if (isCurrent()) setHypotheses(data);
+        })
+        .catch(() => {
+          if (isCurrent()) setHypothesesError("Unable to load hypotheses.");
+        })
+        .finally(() => {
+          if (isCurrent()) setHypothesesLoading(false);
+        });
+    }
+    const requests = hypothesisRequests.current;
+    return () => requests.invalidate();
+  }, [formAvailable, selectedPS, problemStatements, hypothesesRetry]);
 
   const inputClass =
-    "w-full rounded-md border border-stone-200 px-3 py-2.5 text-base text-stone-800 placeholder-stone-400 transition-colors focus:border-stone-300 focus:outline-none focus:ring-1 focus:ring-stone-300";
+    "w-full rounded-md border border-stone-200 px-3 py-2.5 text-base text-stone-800 placeholder-stone-500 transition-colors focus:border-stone-600 focus:outline-none focus:ring-1 focus:ring-stone-600";
   const metricInputClass =
-    "w-full rounded-md border border-stone-200 px-3 py-2 text-sm font-mono text-stone-800 placeholder-stone-400 transition-colors focus:border-stone-300 focus:outline-none focus:ring-1 focus:ring-stone-300";
+    "w-full rounded-md border border-stone-200 px-3 py-2 text-sm font-mono text-stone-800 placeholder-stone-500 transition-colors focus:border-stone-600 focus:outline-none focus:ring-1 focus:ring-stone-600";
 
   function resetForm() {
     setSubmitted(false);
@@ -221,10 +280,10 @@ function ExperimentSubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
     return (
       <section className="rounded-2xl border border-stone-200 bg-stone-50/50 p-8 text-center">
         <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-teal-50">
-          <Check className="h-5 w-5 text-teal-600" />
+          <Check className="h-5 w-5 text-teal-700" />
         </div>
-        <h2 className="mb-1 text-lg font-semibold text-stone-800">Experiment submitted</h2>
-        <p className="mb-5 text-sm text-stone-500">
+        <h2 className="mb-1 font-serif text-xl font-medium text-stone-800">Experiment submitted</h2>
+        <p className="mb-5 text-sm text-stone-600">
           Reference:{" "}
           <code className="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-xs text-stone-600">
             {submittedId}
@@ -256,13 +315,13 @@ function ExperimentSubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
   return (
     <section className="rounded-2xl border border-stone-200 bg-stone-50/50 p-8">
       <div className="mb-6 flex items-center gap-3">
-        <FlaskConical className="h-6 w-6 text-stone-500" />
-        <h2 className="text-xl font-semibold text-stone-900">Submit an Experiment</h2>
+        <FlaskConical className="h-6 w-6 text-stone-600" />
+        <h2 className="type-heading text-stone-900">Submit an Experiment</h2>
       </div>
 
       {authLoading ? null : !user ? (
         <div className="py-6 text-center">
-          <p className="mb-4 text-sm text-stone-500">Sign in to submit an experiment.</p>
+          <p className="mb-4 text-sm text-stone-600">Sign in to submit an experiment.</p>
           <button
             onClick={() => setShowAuthModal(true)}
             className="rounded-md border border-stone-900 bg-stone-900 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-stone-800"
@@ -274,6 +333,7 @@ function ExperimentSubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
         <form
           onSubmit={async (e) => {
             e.preventDefault();
+            if (catalogLoading || catalogError || hypothesesLoading || hypothesesError) return;
             setSubmitting(true);
             setSubmitError("");
             try {
@@ -301,6 +361,8 @@ function ExperimentSubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
                     }
                   : undefined,
               });
+              hypothesisRequests.current.invalidate();
+              hypothesisChoices.current.clear();
               setSubmittedId(res.data.id);
               setSubmitted(true);
               onSubmitted();
@@ -312,6 +374,15 @@ function ExperimentSubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
           }}
           className="space-y-5"
         >
+          {catalogLoading && <p role="status">Loading problem statements and datasets...</p>}
+          {catalogError && (
+            <p role="alert" className="text-sm text-red-700">
+              {catalogError}{" "}
+              <button type="button" onClick={() => setCatalogRetry((n) => n + 1)}>
+                Retry
+              </button>
+            </p>
+          )}
           {/* Problem Statement */}
           <div>
             <label className="mb-1.5 block text-sm font-semibold text-stone-700">
@@ -320,9 +391,17 @@ function ExperimentSubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
             <div className="relative">
               <select
                 value={selectedPS}
-                onChange={(e) => setSelectedPS(e.target.value)}
+                onChange={(e) => {
+                  hypothesisRequests.current.invalidate();
+                  setHypotheses([]);
+                  setSelectedHypothesis("");
+                  setHypothesesError("");
+                  setHypothesesLoading(!!e.target.value);
+                  setSelectedPS(e.target.value);
+                }}
                 className={`${inputClass} appearance-none pr-9`}
                 required
+                disabled={catalogLoading || !!catalogError}
               >
                 <option value="">Select a problem statement...</option>
                 {problemStatements.map((ps) => (
@@ -331,7 +410,7 @@ function ExperimentSubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
                   </option>
                 ))}
               </select>
-              <ChevronDown className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-stone-300" />
+              <ChevronDown className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-stone-500" />
             </div>
           </div>
 
@@ -343,7 +422,7 @@ function ExperimentSubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
               </label>
               <Link
                 href="/submit"
-                className="text-[11px] font-medium text-stone-500 transition-colors hover:text-stone-600"
+                className="text-xs font-medium text-stone-600 transition-colors hover:text-stone-900"
               >
                 Hypothesis not on OpenExperiments yet? Add here &rarr;
               </Link>
@@ -354,10 +433,14 @@ function ExperimentSubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
                 onChange={(e) => setSelectedHypothesis(e.target.value)}
                 className={`${inputClass} appearance-none pr-9`}
                 required
-                disabled={!selectedPS}
+                disabled={!selectedPS || hypothesesLoading || !!hypothesesError}
               >
                 <option value="">
-                  {selectedPS ? "Select a hypothesis..." : "Select a problem statement first"}
+                  {hypothesesLoading
+                    ? "Loading hypotheses..."
+                    : selectedPS
+                      ? "Select a hypothesis..."
+                      : "Select a problem statement first"}
                 </option>
                 {hypotheses.map((h) => (
                   <option key={h.id} value={h.id}>
@@ -365,8 +448,21 @@ function ExperimentSubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
                   </option>
                 ))}
               </select>
-              <ChevronDown className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-stone-300" />
+              <ChevronDown className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-stone-500" />
             </div>
+            {hypothesesLoading && (
+              <p role="status" className="mt-2 text-sm text-stone-600">
+                Loading hypotheses...
+              </p>
+            )}
+            {hypothesesError && (
+              <p role="alert" className="mt-2 text-sm text-red-700">
+                {hypothesesError}{" "}
+                <button type="button" onClick={() => setHypothesesRetry((n) => n + 1)}>
+                  Retry
+                </button>
+              </p>
+            )}
           </div>
 
           {/* Study Type */}
@@ -402,7 +498,7 @@ function ExperimentSubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
                 className={`rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors ${
                   datasetMode === "platform"
                     ? "bg-stone-900 text-white"
-                    : "border border-stone-200 text-stone-500 hover:border-stone-300"
+                    : "border border-stone-200 text-stone-600 hover:border-stone-300"
                 }`}
               >
                 From platform
@@ -413,7 +509,7 @@ function ExperimentSubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
                 className={`rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors ${
                   datasetMode === "custom"
                     ? "bg-stone-900 text-white"
-                    : "border border-stone-200 text-stone-500 hover:border-stone-300"
+                    : "border border-stone-200 text-stone-600 hover:border-stone-300"
                 }`}
               >
                 Custom dataset
@@ -426,6 +522,7 @@ function ExperimentSubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
                   onChange={(e) => setSelectedDataset(e.target.value)}
                   className={`${inputClass} appearance-none pr-9`}
                   required
+                  disabled={catalogLoading || !!catalogError}
                 >
                   <option value="">Select a dataset...</option>
                   {datasets.map((d) => (
@@ -434,7 +531,7 @@ function ExperimentSubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
                     </option>
                   ))}
                 </select>
-                <ChevronDown className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-stone-300" />
+                <ChevronDown className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-stone-500" />
               </div>
             ) : (
               <input
@@ -479,7 +576,7 @@ function ExperimentSubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
 
           {/* Conditional fields based on status */}
           <div className="space-y-5 rounded-xl border border-stone-200 bg-white p-5">
-            <p className="text-xs font-medium tracking-wider text-stone-500 uppercase">
+            <p className="text-xs font-medium tracking-wider text-stone-600 uppercase">
               {status === "planned" && "Planned Details"}
               {status === "running" && "Running Details"}
               {status === "completed" && "Completed Details"}
@@ -489,9 +586,9 @@ function ExperimentSubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
               <label className="mb-1.5 block text-sm font-semibold text-stone-700">
                 Methodology
                 {methodologyRequired ? (
-                  <span className="ml-1 text-red-400">*</span>
+                  <span className="ml-1 text-red-700">*</span>
                 ) : (
-                  <span className="ml-1 font-normal text-stone-500">(optional)</span>
+                  <span className="ml-1 font-normal text-stone-600">(optional)</span>
                 )}
               </label>
               <textarea
@@ -509,9 +606,9 @@ function ExperimentSubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
                 <label className="mb-1.5 block text-sm font-semibold text-stone-700">
                   Analysis Plan
                   {analysisRequired ? (
-                    <span className="ml-1 text-red-400">*</span>
+                    <span className="ml-1 text-red-700">*</span>
                   ) : (
-                    <span className="ml-1 font-normal text-stone-500">(optional)</span>
+                    <span className="ml-1 font-normal text-stone-600">(optional)</span>
                   )}
                 </label>
                 <textarea
@@ -529,7 +626,7 @@ function ExperimentSubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
               <div className="space-y-4">
                 <div>
                   <label className="mb-1.5 block text-sm font-semibold text-stone-700">
-                    Results Summary <span className="ml-1 text-red-400">*</span>
+                    Results Summary <span className="ml-1 text-red-700">*</span>
                   </label>
                   <textarea
                     value={resSummary}
@@ -542,11 +639,11 @@ function ExperimentSubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
                 </div>
                 <div>
                   <label className="mb-2 block text-sm font-semibold text-stone-700">
-                    Key Metrics <span className="font-normal text-stone-500">(optional)</span>
+                    Key Metrics <span className="font-normal text-stone-600">(optional)</span>
                   </label>
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                     <div>
-                      <label className="mb-1 block text-[11px] font-medium tracking-wider text-stone-500 uppercase">
+                      <label className="mb-1 block text-xs font-medium tracking-wider text-stone-600 uppercase">
                         p-value
                       </label>
                       <input
@@ -559,7 +656,7 @@ function ExperimentSubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block text-[11px] font-medium tracking-wider text-stone-500 uppercase">
+                      <label className="mb-1 block text-xs font-medium tracking-wider text-stone-600 uppercase">
                         Effect Size
                       </label>
                       <input
@@ -572,7 +669,7 @@ function ExperimentSubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block text-[11px] font-medium tracking-wider text-stone-500 uppercase">
+                      <label className="mb-1 block text-xs font-medium tracking-wider text-stone-600 uppercase">
                         Sample Size
                       </label>
                       <input
@@ -585,7 +682,7 @@ function ExperimentSubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block text-[11px] font-medium tracking-wider text-stone-500 uppercase">
+                      <label className="mb-1 block text-xs font-medium tracking-wider text-stone-600 uppercase">
                         95% CI
                       </label>
                       <div className="flex items-center gap-1">
@@ -597,7 +694,7 @@ function ExperimentSubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
                           placeholder="0.18"
                           className={metricInputClass}
                         />
-                        <span className="text-stone-300">&ndash;</span>
+                        <span className="text-stone-500">&ndash;</span>
                         <input
                           type="number"
                           step="any"
@@ -618,7 +715,7 @@ function ExperimentSubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
           <div>
             <label className="mb-1.5 block text-sm font-semibold text-stone-700">
               OSF Pre-registration Link{" "}
-              <span className="font-normal text-stone-500">(optional)</span>
+              <span className="font-normal text-stone-600">(optional)</span>
             </label>
             <input
               type="url"
@@ -630,14 +727,20 @@ function ExperimentSubmitForm({ onSubmitted }: { onSubmitted: () => void }) {
           </div>
 
           {submitError && (
-            <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+            <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               {submitError}
             </p>
           )}
 
           <button
             type="submit"
-            disabled={submitting}
+            disabled={
+              submitting ||
+              catalogLoading ||
+              !!catalogError ||
+              hypothesesLoading ||
+              !!hypothesesError
+            }
             className="w-full rounded-md border border-stone-900 bg-stone-900 py-3 text-sm font-medium text-white transition-colors hover:bg-stone-800 disabled:opacity-50"
           >
             {submitting ? "Submitting..." : "Submit Experiment"}

@@ -7,11 +7,12 @@ import type {
   Dataset,
 } from "./types";
 import type { OsfCharacterization } from "./osf";
+import { STAR_BATCH_LIMIT } from "./star-batch";
 
 const BASE = "";
 
-async function fetchJSON<T>(url: string): Promise<T> {
-  const res = await fetch(`${BASE}${url}`);
+async function fetchJSON<T>(url: string, options?: { signal?: AbortSignal }): Promise<T> {
+  const res = await fetch(`${BASE}${url}`, options);
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();
 }
@@ -23,6 +24,7 @@ export async function getHypotheses(params?: {
   status?: string;
   sort?: string;
   search?: string;
+  problemStatementId?: string;
   limit?: number;
   offset?: number;
   ids?: string;
@@ -133,11 +135,12 @@ export async function getExperiment(
 }
 
 // Problem Statements
-export async function getProblemStatements(params?: {
-  includeDatasets?: boolean;
-}): Promise<{ data: ProblemStatement[] }> {
+export async function getProblemStatements(
+  params?: { includeDatasets?: boolean },
+  options?: { signal?: AbortSignal },
+): Promise<{ data: ProblemStatement[] }> {
   const qs = params?.includeDatasets ? "?includeDatasets=true" : "";
-  return fetchJSON(`/api/problem-statements${qs}`);
+  return fetchJSON(`/api/problem-statements${qs}`, options);
 }
 
 // Datasets
@@ -324,8 +327,16 @@ export async function getStarStatus(
 export async function getStarsBatch(
   ids: string[],
 ): Promise<{ data: Record<string, { count: number; starred: boolean }> }> {
-  if (ids.length === 0) return { data: {} };
-  return fetchJSON(`/api/hypotheses/stars?ids=${ids.join(",")}`);
+  const uniqueIds = [...new Set(ids.filter(Boolean))];
+  const data: Record<string, { count: number; starred: boolean }> = {};
+  for (let offset = 0; offset < uniqueIds.length; offset += STAR_BATCH_LIMIT) {
+    const query = new URLSearchParams({
+      ids: uniqueIds.slice(offset, offset + STAR_BATCH_LIMIT).join(","),
+    });
+    const batch = await fetchJSON<{ data: typeof data }>(`/api/hypotheses/stars?${query}`);
+    Object.assign(data, batch.data);
+  }
+  return { data };
 }
 
 // Profile update

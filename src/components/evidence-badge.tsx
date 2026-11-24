@@ -15,7 +15,7 @@ const statusConfig: Record<
   proposed: {
     label: "Proposed",
     bg: "bg-stone-50",
-    text: "text-stone-500",
+    text: "text-stone-600",
     ring: "ring-stone-200",
   },
   arena_ranked: {
@@ -34,7 +34,7 @@ const statusConfig: Record<
   field_validated: {
     label: "Field Validated",
     bg: "bg-amber-50",
-    text: "text-amber-700",
+    text: "text-amber-800",
     ring: "ring-amber-200",
     icon: ShieldCheck,
   },
@@ -52,7 +52,7 @@ export function EvidenceBadge({ status, phase, size = "md" }: EvidenceBadgeProps
     ? {
         label: "Evaluating",
         bg: "bg-stone-50",
-        text: "text-stone-500",
+        text: "text-stone-600",
         ring: "ring-stone-200",
         icon: undefined,
       }
@@ -67,7 +67,7 @@ export function EvidenceBadge({ status, phase, size = "md" }: EvidenceBadgeProps
         config.bg,
         config.text,
         config.ring,
-        size === "sm" && "px-1.5 py-0.5 text-[11px]",
+        size === "sm" && "px-1.5 py-0.5 text-xs",
         size === "md" && "px-2 py-0.5 text-xs",
         size === "lg" && "px-2.5 py-1 text-sm",
       )}

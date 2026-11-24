@@ -2,8 +2,16 @@ export const runtime = "edge";
 
 import { getDB } from "@/db";
 import { experiments, experimentResults, experimentVersions, users, hypotheses } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { and, asc, eq, exists, sql, type SQL } from "drizzle-orm";
 import { getSession } from "@/lib/auth";
+import { invalidateExperimentCaches } from "@/lib/edge-cache";
+import { enforceRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+
+function literalSelection<T extends Record<string, unknown>>(values: T) {
+  return Object.fromEntries(
+    Object.entries(values).map(([key, value]) => [key, sql`${value}`.as(key)]),
+  ) as { [K in keyof T]: SQL.Aliased<T[K]> };
+}
 
 function buildResultsResponse(result: {
   pValue: number;
@@ -54,59 +62,40 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (!exp) {
     return Response.json({ error: "Experiment not found" }, { status: 404 });
   }
+  const requestedVersion = versionParam ? parseInt(versionParam, 10) : undefined;
+  if (requestedVersion !== undefined && Number.isNaN(requestedVersion)) {
+    return Response.json({ error: "Version not found" }, { status: 404 });
+  }
 
-  // Get all versions from DB
-  const dbVersions = await db
-    .select()
+  const historyQuery = db
+    .select({
+      version: experimentVersions.version,
+      status: experimentVersions.status,
+      methodology: experimentVersions.methodology,
+      analysisPlan: experimentVersions.analysisPlan,
+      osfLink: experimentVersions.osfLink,
+      changeSummary: experimentVersions.changeSummary,
+      createdAt: experimentVersions.createdAt,
+    })
     .from(experimentVersions)
-    .where(eq(experimentVersions.experimentId, id));
-  dbVersions.sort((a, b) => a.version - b.version);
-
-  // Get results (needed for synthesized version 1)
-  const [result] = await db
+    .where(eq(experimentVersions.experimentId, id))
+    .orderBy(asc(experimentVersions.version));
+  const resultQuery = db
     .select()
     .from(experimentResults)
     .where(eq(experimentResults.experimentId, id))
     .limit(1);
-
-  // Synthesize version 1 if missing (for experiments created before versioning)
-  const hasV1 = dbVersions.some((v) => v.version === 1);
-  const allVersions = hasV1
-    ? dbVersions
-    : [
-        {
-          id: "synthetic-v1",
-          experimentId: id,
-          version: 1,
-          status: exp.version === 1 ? exp.status : (dbVersions[0]?.status ?? exp.status),
-          methodology: exp.version === 1 ? exp.methodology : null,
-          analysisPlan: exp.version === 1 ? exp.analysisPlan : null,
-          osfLink: exp.version === 1 ? exp.osfLink : null,
-          pValue: null,
-          effectSize: null,
-          sampleSize: null,
-          confidenceIntervalLow: null,
-          confidenceIntervalHigh: null,
-          summary: null,
-          changeSummary: "Initial submission",
-          createdAt: exp.createdAt,
-        },
-        ...dbVersions,
-      ];
-
-  // Submitter
-  let submitter = null;
-  if (exp.submittedBy) {
-    const [u] = await db
-      .select({ id: users.id, name: users.name, avatarUrl: users.avatarUrl })
-      .from(users)
-      .where(eq(users.id, exp.submittedBy))
-      .limit(1);
-    submitter = u || null;
-  }
-
-  // Hypothesis
-  const [hyp] = await db
+  const selectedVersionQuery = db
+    .select()
+    .from(experimentVersions)
+    .where(
+      and(
+        eq(experimentVersions.experimentId, id),
+        eq(experimentVersions.version, requestedVersion ?? 0),
+      ),
+    )
+    .limit(1);
+  const hypothesisQuery = db
     .select({
       id: hypotheses.id,
       statement: hypotheses.statement,
@@ -117,11 +106,53 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     .from(hypotheses)
     .where(eq(hypotheses.id, exp.hypothesisId))
     .limit(1);
+  const submitterQuery = db
+    .select({ id: users.id, name: users.name, avatarUrl: users.avatarUrl })
+    .from(users)
+    .where(eq(users.id, exp.submittedBy ?? ""))
+    .limit(1);
+  const [dbVersions, hypRows, detailRows, ...submitterRows] = await db.batch([
+    historyQuery,
+    hypothesisQuery,
+    ...(versionParam ? [selectedVersionQuery] : [resultQuery]),
+    ...(exp.submittedBy ? [submitterQuery] : []),
+  ]);
+  const hyp = hypRows[0];
+  const submitter = submitterRows.length
+    ? ((submitterRows[0] as { id: string; name: string | null; avatarUrl: string | null }[])[0] ??
+      null)
+    : null;
+  const result = versionParam
+    ? undefined
+    : (detailRows as (typeof experimentResults.$inferSelect)[])[0];
+
+  // Synthesize version 1 if missing (for experiments created before versioning)
+  const hasV1 = dbVersions.some((v) => v.version === 1);
+  const syntheticV1 = {
+    id: "synthetic-v1",
+    experimentId: id,
+    version: 1,
+    status: exp.version === 1 ? exp.status : (dbVersions[0]?.status ?? exp.status),
+    methodology: exp.version === 1 ? exp.methodology : null,
+    analysisPlan: exp.version === 1 ? exp.analysisPlan : null,
+    osfLink: exp.version === 1 ? exp.osfLink : null,
+    pValue: null,
+    effectSize: null,
+    sampleSize: null,
+    confidenceIntervalLow: null,
+    confidenceIntervalHigh: null,
+    summary: null,
+    changeSummary: "Initial submission",
+    createdAt: exp.createdAt,
+  };
+  const allVersions = hasV1 ? dbVersions : [syntheticV1, ...dbVersions];
 
   // If viewing a specific version
   if (versionParam) {
     const vNum = parseInt(versionParam, 10);
-    const ver = allVersions.find((v) => v.version === vNum);
+    const ver =
+      (detailRows as (typeof experimentVersions.$inferSelect)[])[0] ??
+      (!hasV1 && vNum === 1 ? syntheticV1 : undefined);
     if (!ver) {
       return Response.json({ error: "Version not found" }, { status: 404 });
     }
@@ -229,6 +260,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const limited = await enforceRateLimit(request, RATE_LIMITS.write);
+  if (limited) return limited;
   const { id } = await params;
   const user = await getSession(request);
   if (!user) {
@@ -269,15 +302,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     );
   }
 
-  // Check results summary requirement for completed status
   const r = results as Record<string, unknown> | undefined;
+  const [[existingResult], [existingHistory]] = await db.batch([
+    db.select().from(experimentResults).where(eq(experimentResults.experimentId, id)).limit(1),
+    db
+      .select({ id: experimentVersions.id })
+      .from(experimentVersions)
+      .where(eq(experimentVersions.experimentId, id))
+      .limit(1),
+  ]);
   if (newStatus === "completed") {
-    const [existingRes] = await db
-      .select({ summary: experimentResults.summary })
-      .from(experimentResults)
-      .where(eq(experimentResults.experimentId, id))
-      .limit(1);
-    const hasSummary = (r && r.summary) || existingRes?.summary;
+    const hasSummary = (r && r.summary) || existingResult?.summary;
     if (!hasSummary) {
       return Response.json(
         { error: "Results summary is required for completed experiments" },
@@ -288,43 +323,63 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const now = Math.floor(Date.now() / 1000);
   const newVersion = exp.version + 1;
-
-  // Backfill version 1 if this is the first edit of a pre-existing experiment
-  const [existingV1] = await db
-    .select({ id: experimentVersions.id })
-    .from(experimentVersions)
-    .where(eq(experimentVersions.experimentId, id))
-    .limit(1);
-
-  if (!existingV1) {
-    // Snapshot the pre-edit state as version 1
-    const [preResult] = await db
-      .select()
-      .from(experimentResults)
-      .where(eq(experimentResults.experimentId, id))
-      .limit(1);
-
-    await db.insert(experimentVersions).values({
-      id: crypto.randomUUID(),
-      experimentId: id,
-      version: 1,
-      status: exp.status,
-      methodology: exp.methodology || null,
-      analysisPlan: exp.analysisPlan || null,
-      osfLink: exp.osfLink || null,
-      pValue: preResult?.pValue ?? null,
-      effectSize: preResult?.effectSize ?? null,
-      sampleSize: preResult?.sampleSize ?? null,
-      confidenceIntervalLow: preResult?.confidenceIntervalLow ?? null,
-      confidenceIntervalHigh: preResult?.confidenceIntervalHigh ?? null,
-      summary: preResult?.summary ?? null,
-      changeSummary: "Initial submission",
-      createdAt: exp.createdAt,
-    });
-  }
-
-  // Update experiment
-  await db
+  const hasNewResults =
+    r && (r.summary || r.pValue != null || r.effectSize != null || r.sampleSize != null);
+  const mergedResult = hasNewResults
+    ? {
+        experimentId: id,
+        pValue: (r.pValue as number | null | undefined) ?? existingResult?.pValue ?? 0,
+        effectSize: (r.effectSize as number | null | undefined) ?? existingResult?.effectSize ?? 0,
+        confidenceIntervalLow:
+          (r.confidenceIntervalLow as number | null | undefined) ??
+          existingResult?.confidenceIntervalLow ??
+          0,
+        confidenceIntervalHigh:
+          (r.confidenceIntervalHigh as number | null | undefined) ??
+          existingResult?.confidenceIntervalHigh ??
+          0,
+        sampleSize: (r.sampleSize as number | null | undefined) ?? existingResult?.sampleSize ?? 0,
+        summary: existingResult
+          ? ((r.summary as string | null | undefined) ?? existingResult.summary)
+          : (r.summary as string) || "",
+        uplift: existingResult?.uplift ?? null,
+        createdAt: existingResult?.createdAt ?? now,
+      }
+    : existingResult;
+  const snapshotId = crypto.randomUUID();
+  // Insert-select column order must match the Drizzle table definition.
+  const snapshot = {
+    id: snapshotId,
+    experimentId: id,
+    version: newVersion,
+    status: newStatus,
+    methodology: newMethodology || null,
+    analysisPlan: newAnalysisPlan || null,
+    osfLink: newOsfLink || null,
+    pValue: mergedResult?.pValue ?? null,
+    effectSize: mergedResult?.effectSize ?? null,
+    sampleSize: mergedResult?.sampleSize ?? null,
+    confidenceIntervalLow: mergedResult?.confidenceIntervalLow ?? null,
+    confidenceIntervalHigh: mergedResult?.confidenceIntervalHigh ?? null,
+    summary: mergedResult?.summary ?? null,
+    changeSummary: (changeSummary as string) || null,
+    createdAt: now,
+  };
+  // The snapshot is a transaction-local marker: only the expected version
+  // can create it, and every subsequent write is gated on its unique ID.
+  const ownsEdit = exists(
+    db
+      .select({ id: experimentVersions.id })
+      .from(experimentVersions)
+      .where(eq(experimentVersions.id, snapshotId)),
+  );
+  const reserveSnapshot = db.insert(experimentVersions).select(
+    db
+      .select(literalSelection(snapshot))
+      .from(experiments)
+      .where(and(eq(experiments.id, id), eq(experiments.version, exp.version))),
+  );
+  const updateExperiment = db
     .update(experiments)
     .set({
       status: newStatus,
@@ -335,76 +390,71 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       version: newVersion,
       updatedAt: now,
     })
-    .where(eq(experiments.id, id));
-
-  // Handle results
-  const hasNewResults =
-    r && (r.summary || r.pValue != null || r.effectSize != null || r.sampleSize != null);
-
-  if (hasNewResults) {
-    const [existingResult] = await db
-      .select()
-      .from(experimentResults)
-      .where(eq(experimentResults.experimentId, id))
-      .limit(1);
-
-    if (existingResult) {
-      await db
-        .update(experimentResults)
-        .set({
-          pValue: r.pValue != null ? (r.pValue as number) : existingResult.pValue,
-          effectSize: r.effectSize != null ? (r.effectSize as number) : existingResult.effectSize,
-          sampleSize: r.sampleSize != null ? (r.sampleSize as number) : existingResult.sampleSize,
-          confidenceIntervalLow:
-            r.confidenceIntervalLow != null
-              ? (r.confidenceIntervalLow as number)
-              : existingResult.confidenceIntervalLow,
-          confidenceIntervalHigh:
-            r.confidenceIntervalHigh != null
-              ? (r.confidenceIntervalHigh as number)
-              : existingResult.confidenceIntervalHigh,
-          summary: r.summary != null ? (r.summary as string) : existingResult.summary,
-        })
-        .where(eq(experimentResults.experimentId, id));
-    } else {
-      await db.insert(experimentResults).values({
-        experimentId: id,
-        pValue: (r.pValue as number) ?? 0,
-        effectSize: (r.effectSize as number) ?? 0,
-        sampleSize: (r.sampleSize as number) ?? 0,
-        confidenceIntervalLow: (r.confidenceIntervalLow as number) ?? 0,
-        confidenceIntervalHigh: (r.confidenceIntervalHigh as number) ?? 0,
-        summary: (r.summary as string) || "",
-        createdAt: now,
-      });
-    }
+    .where(and(eq(experiments.id, id), eq(experiments.version, exp.version), ownsEdit))
+    .returning({ id: experiments.id });
+  const backfill = !existingHistory
+    ? [
+        db.insert(experimentVersions).select(
+          db
+            .select(
+              literalSelection({
+                ...snapshot,
+                id: crypto.randomUUID(),
+                version: 1,
+                status: exp.status,
+                methodology: exp.methodology || null,
+                analysisPlan: exp.analysisPlan || null,
+                osfLink: exp.osfLink || null,
+                pValue: existingResult?.pValue ?? null,
+                effectSize: existingResult?.effectSize ?? null,
+                sampleSize: existingResult?.sampleSize ?? null,
+                confidenceIntervalLow: existingResult?.confidenceIntervalLow ?? null,
+                confidenceIntervalHigh: existingResult?.confidenceIntervalHigh ?? null,
+                summary: existingResult?.summary ?? null,
+                changeSummary: "Initial submission",
+                createdAt: exp.createdAt,
+              }),
+            )
+            .from(experiments)
+            .where(and(eq(experiments.id, id), ownsEdit)),
+        ),
+      ]
+    : [];
+  const resultWrites =
+    hasNewResults && mergedResult
+      ? existingResult
+        ? [
+            db
+              .update(experimentResults)
+              .set({
+                pValue: mergedResult.pValue,
+                effectSize: mergedResult.effectSize,
+                sampleSize: mergedResult.sampleSize,
+                confidenceIntervalLow: mergedResult.confidenceIntervalLow,
+                confidenceIntervalHigh: mergedResult.confidenceIntervalHigh,
+                summary: mergedResult.summary,
+              })
+              .where(and(eq(experimentResults.experimentId, id), ownsEdit)),
+          ]
+        : [
+            db.insert(experimentResults).select(
+              db
+                .select(literalSelection(mergedResult))
+                .from(experiments)
+                .where(and(eq(experiments.id, id), ownsEdit)),
+            ),
+          ]
+      : [];
+  const [, updated] = await db.batch([
+    reserveSnapshot,
+    updateExperiment,
+    ...backfill,
+    ...resultWrites,
+  ]);
+  if (!updated.length) {
+    return Response.json({ error: "Experiment changed; reload before editing" }, { status: 409 });
   }
 
-  // Get current results for version snapshot
-  const [currentResult] = await db
-    .select()
-    .from(experimentResults)
-    .where(eq(experimentResults.experimentId, id))
-    .limit(1);
-
-  // Create version snapshot
-  await db.insert(experimentVersions).values({
-    id: crypto.randomUUID(),
-    experimentId: id,
-    version: newVersion,
-    status: newStatus,
-    methodology: newMethodology || null,
-    analysisPlan: newAnalysisPlan || null,
-    osfLink: newOsfLink || null,
-    pValue: currentResult?.pValue ?? null,
-    effectSize: currentResult?.effectSize ?? null,
-    sampleSize: currentResult?.sampleSize ?? null,
-    confidenceIntervalLow: currentResult?.confidenceIntervalLow ?? null,
-    confidenceIntervalHigh: currentResult?.confidenceIntervalHigh ?? null,
-    summary: currentResult?.summary ?? null,
-    changeSummary: (changeSummary as string) || null,
-    createdAt: now,
-  });
-
+  await invalidateExperimentCaches(exp.hypothesisId);
   return Response.json({ data: { id, version: newVersion } });
 }

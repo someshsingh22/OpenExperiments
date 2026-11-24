@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import { getRequestContext } from "@cloudflare/next-on-pages";
 
 /**
  * Minimal typed view of Cloudflare's `caches.default`. The Web `CacheStorage`
@@ -8,6 +9,20 @@ interface EdgeCache {
   match(request: Request): Promise<Response | undefined>;
   put(request: Request, response: Response): Promise<void>;
   delete(request: Request): Promise<boolean>;
+}
+
+interface Flight {
+  promise: Promise<unknown>;
+  invalidated: boolean;
+  write?: Promise<void>;
+}
+
+const MAX_FLIGHTS = 128;
+const flights = new Map<string, Flight>();
+
+function logCacheFailure(operation: string): void {
+  // Never log cache keys, request headers, payloads, or underlying errors.
+  console.warn(`[edge-cache] ${operation} failed`);
 }
 
 function getEdgeCache(): EdgeCache | null {
@@ -35,8 +50,10 @@ async function cacheKeyFor(key: string): Promise<Request> {
  * is stored for `ttlSeconds`. Cache failures degrade gracefully to a direct
  * query so a caching problem can never take down a page.
  *
- * Use only for public (non per-user) data. Staleness is bounded by ttlSeconds;
- * call `invalidateCached(key)` after a write for instant freshness.
+ * Use only for public, viewer-independent JSON data. Entries expire after
+ * ttlSeconds from storage; eviction can cause earlier misses. Invalidation is
+ * best-effort and local to the current Cloudflare data center and host, not a
+ * global freshness guarantee. Coalescing and fill fencing are isolate-local.
  */
 export async function cachedQuery<T>(
   key: string,
@@ -46,35 +63,109 @@ export async function cachedQuery<T>(
   const cache = getEdgeCache();
   if (!cache) return fetcher();
 
+  let cacheKey: Request;
   try {
-    const cacheKey = await cacheKeyFor(key);
-    const hit = await cache.match(cacheKey);
-    if (hit) {
-      return (await hit.json()) as T;
-    }
-
-    const data = await fetcher();
-    const response = new Response(JSON.stringify(data), {
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": `public, s-maxage=${ttlSeconds}`,
-      },
-    });
-    await cache.put(cacheKey, response);
-    return data;
+    cacheKey = await cacheKeyFor(key);
   } catch {
-    // Never let a cache issue break the page.
+    logCacheFailure("key construction");
     return fetcher();
   }
+
+  const url = cacheKey.url;
+  const existing = flights.get(url);
+  if (existing) return existing.promise as Promise<T>;
+
+  // At capacity, bypass storage as well: an untracked fill cannot be fenced.
+  if (flights.size >= MAX_FLIGHTS) return fetcher();
+
+  const flight: Flight = {
+    invalidated: false,
+    promise: Promise.resolve().then(async () => {
+      try {
+        const hit = await cache.match(cacheKey);
+        if (hit) return (await hit.json()) as T;
+      } catch {
+        logCacheFailure("lookup or JSON decoding");
+      }
+
+      // Fetcher failures propagate unchanged, without an implicit retry.
+      const data = await fetcher();
+      if (flight.invalidated) return data;
+
+      flight.write = Promise.resolve()
+        .then(async () => {
+          if (flight.invalidated) return;
+          const response = new Response(JSON.stringify(data), {
+            headers: {
+              "Content-Type": "application/json",
+              "Cache-Control": `public, s-maxage=${ttlSeconds}`,
+            },
+          });
+          await cache.put(cacheKey, response);
+        })
+        .catch(() => {
+          logCacheFailure("serialization or write");
+        });
+      void flight.write.then(cleanup);
+
+      try {
+        const { ctx } = getRequestContext();
+        ctx.waitUntil(flight.write);
+      } catch {
+        logCacheFailure("background scheduling");
+        await flight.write;
+      }
+      return data;
+    }),
+  };
+  function cleanup(): void {
+    if (flights.get(url) === flight) flights.delete(url);
+  }
+  flights.set(url, flight);
+  void flight.promise.then(() => {
+    if (!flight.write) cleanup();
+  }, cleanup);
+  return flight.promise as Promise<T>;
 }
 
-/** Drop a cached entry (call after a write that changes the cached data). */
+/**
+ * Best-effort deletion on this host/data center only. Fences this isolate's
+ * pending fills, but other isolates and locations can stay stale until expiry.
+ */
 export async function invalidateCached(key: string): Promise<void> {
   const cache = getEdgeCache();
   if (!cache) return;
   try {
-    await cache.delete(await cacheKeyFor(key));
+    const cacheKey = await cacheKeyFor(key);
+    const flight = flights.get(cacheKey.url);
+    if (flight) {
+      flight.invalidated = true;
+      flights.delete(cacheKey.url);
+      // A put already in progress must settle before deletion to avoid
+      // restoring its pre-invalidation snapshot after the delete.
+      await flight.write;
+    }
+    await cache.delete(cacheKey);
   } catch {
-    // best-effort
+    logCacheFailure("invalidation");
   }
+}
+
+/** Omit the ID when creating a hypothesis without a previously cached detail. */
+export async function invalidateHypothesisCaches(id?: string): Promise<void> {
+  await Promise.all([
+    invalidateCached("home:data"),
+    invalidateCached("explore:data"),
+    invalidateCached("sitemap:hyps"),
+    ...(id === undefined ? [] : [invalidateCached(`hypothesis:${id}`)]),
+  ]);
+}
+
+export async function invalidateExperimentCaches(hypothesisId: string): Promise<void> {
+  await Promise.all([
+    invalidateCached("experiments:list"),
+    invalidateCached(`hypothesis:${hypothesisId}`),
+    invalidateCached("explore:data"),
+    invalidateCached("datasets:list"),
+  ]);
 }

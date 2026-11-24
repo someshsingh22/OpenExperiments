@@ -4,8 +4,11 @@ import { getDB } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getSession, requireSession } from "@/lib/auth";
+import { enforceRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
+  const limited = await enforceRateLimit(request, RATE_LIMITS.write);
+  if (limited) return limited;
   const user = await getSession(request);
   const unauthorized = requireSession(user);
   if (unauthorized) return unauthorized;

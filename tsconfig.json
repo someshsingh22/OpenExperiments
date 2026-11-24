@@ -23,12 +23,15 @@
     }
   },
   "include": [
-    "next-env.d.ts",
+    "**/*.mts",
     "**/*.ts",
     "**/*.tsx",
-    ".next/types/**/*.ts",
+    ".next-dev/types/**/*.ts",
+    ".next-launch/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "**/*.mts"
+    ".next/perf-build/types/**/*.ts",
+    ".next/types/**/*.ts",
+    "next-env.d.ts"
   ],
   "exclude": ["node_modules", "mcp-server"]
 }

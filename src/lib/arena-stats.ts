@@ -1,5 +1,6 @@
 import { arenaMatchups, hypotheses } from "@/db/schema";
 import { eq, or, inArray } from "drizzle-orm";
+import { alias } from "drizzle-orm/sqlite-core";
 import type { getDB } from "@/db";
 
 type DB = ReturnType<typeof getDB>;
@@ -9,7 +10,15 @@ type DB = ReturnType<typeof getDB>;
  * Formula: (wins + 0.5 * ties) / total_relevant_votes * 100
  */
 export async function getAllWinRates(db: DB): Promise<Map<string, number>> {
-  const matchups = await db.select().from(arenaMatchups);
+  const matchups = await db
+    .select({
+      hypothesisAId: arenaMatchups.hypothesisAId,
+      hypothesisBId: arenaMatchups.hypothesisBId,
+      votesA: arenaMatchups.votesA,
+      votesB: arenaMatchups.votesB,
+      votesTie: arenaMatchups.votesTie,
+    })
+    .from(arenaMatchups);
 
   const stats = new Map<string, { wins: number; ties: number; total: number }>();
 
@@ -58,32 +67,23 @@ export async function getSourceWinRates(db: DB): Promise<
     matchups: number;
   }[]
 > {
-  const matchups = await db.select().from(arenaMatchups);
-  if (matchups.length === 0) return [];
-
-  // Collect all hypothesis IDs from matchups
-  const hypIds = new Set<string>();
-  for (const m of matchups) {
-    hypIds.add(m.hypothesisAId);
-    hypIds.add(m.hypothesisBId);
-  }
-
-  // Fetch source info for these hypotheses
-  const hyps = await db
+  const hypothesisA = alias(hypotheses, "hypothesis_a");
+  const hypothesisB = alias(hypotheses, "hypothesis_b");
+  const matchups = await db
     .select({
-      id: hypotheses.id,
-      source: hypotheses.source,
-      agentName: hypotheses.agentName,
+      hypothesisAId: arenaMatchups.hypothesisAId,
+      hypothesisBId: arenaMatchups.hypothesisBId,
+      votesA: arenaMatchups.votesA,
+      votesB: arenaMatchups.votesB,
+      votesTie: arenaMatchups.votesTie,
+      sourceA: hypothesisA.source,
+      agentNameA: hypothesisA.agentName,
+      sourceB: hypothesisB.source,
+      agentNameB: hypothesisB.agentName,
     })
-    .from(hypotheses)
-    .where(inArray(hypotheses.id, [...hypIds]));
-
-  // Build lookup: hypothesisId -> source label
-  const sourceMap = new Map<string, { label: string; type: "human" | "ai_agent" }>();
-  for (const h of hyps) {
-    const label = h.source === "ai_agent" ? h.agentName || "AI Agent" : "Human";
-    sourceMap.set(h.id, { label, type: h.source as "human" | "ai_agent" });
-  }
+    .from(arenaMatchups)
+    .innerJoin(hypothesisA, eq(arenaMatchups.hypothesisAId, hypothesisA.id))
+    .innerJoin(hypothesisB, eq(arenaMatchups.hypothesisBId, hypothesisB.id));
 
   // Aggregate per source
   const stats = new Map<
@@ -108,12 +108,10 @@ export async function getSourceWinRates(db: DB): Promise<
     const meaningful = m.votesA + m.votesB + m.votesTie;
     if (meaningful === 0) continue;
 
-    const srcA = sourceMap.get(m.hypothesisAId);
-    const srcB = sourceMap.get(m.hypothesisBId);
-    if (!srcA || !srcB) continue;
-
-    const sA = ensure(srcA.label, srcA.type);
-    const sB = ensure(srcB.label, srcB.type);
+    const labelA = m.sourceA === "ai_agent" ? m.agentNameA || "AI Agent" : "Human";
+    const labelB = m.sourceB === "ai_agent" ? m.agentNameB || "AI Agent" : "Human";
+    const sA = ensure(labelA, m.sourceA as "human" | "ai_agent");
+    const sB = ensure(labelB, m.sourceB as "human" | "ai_agent");
 
     sA.wins += m.votesA;
     sA.ties += m.votesTie;

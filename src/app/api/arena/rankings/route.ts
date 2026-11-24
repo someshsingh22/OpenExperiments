@@ -48,6 +48,15 @@ export async function GET() {
     .where(eq(hypotheses.phase, "completed"))
     .orderBy(desc(hypotheses.arenaElo));
 
+  if (completed.length === 0) {
+    return Response.json(
+      { data: [] },
+      {
+        headers: { "Cache-Control": "public, max-age=120, s-maxage=300" },
+      },
+    );
+  }
+
   const winRates = await getAllWinRates(db);
 
   const fallbackRanked = completed

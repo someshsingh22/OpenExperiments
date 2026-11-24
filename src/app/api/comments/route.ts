@@ -4,7 +4,8 @@ import { getDB } from "@/db";
 import { comments, users } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { getSession, requireSession } from "@/lib/auth";
-import { invalidateCached } from "@/lib/edge-cache";
+import { invalidateHypothesisCaches } from "@/lib/edge-cache";
+import { enforceRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
 export async function GET(request: Request) {
   const db = getDB();
@@ -52,6 +53,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const limited = await enforceRateLimit(request, RATE_LIMITS.write);
+  if (limited) return limited;
   const user = await getSession(request);
   const unauthorized = requireSession(user);
   if (unauthorized) return unauthorized;
@@ -86,8 +89,8 @@ export async function POST(request: Request) {
     sql`UPDATE hypotheses SET comment_count = comment_count + 1, updated_at = ${now} WHERE id = ${hypothesisId}`,
   );
 
-  // Comment count + comment list are part of the cached hypothesis detail.
-  await invalidateCached(`hypothesis:${hypothesisId}`);
+  // Comments change the detail, listing counts, and sitemap modification time.
+  await invalidateHypothesisCaches(hypothesisId);
 
   return Response.json(
     {

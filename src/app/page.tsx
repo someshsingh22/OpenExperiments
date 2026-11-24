@@ -9,113 +9,119 @@ import {
   datasetProblemStatements,
   datasets,
   comments,
-  experiments,
 } from "@/db/schema";
 import { eq, desc, sql, inArray } from "drizzle-orm";
 import { HomeDynamicSections } from "@/components/home-dynamic-sections";
 import { cachedQuery } from "@/lib/edge-cache";
-import type { Hypothesis, ProblemStatement } from "@/lib/types";
+import type { Hypothesis } from "@/lib/types";
 
-function getHomeData(): Promise<{
-  hypotheses: Hypothesis[];
-  problems: ProblemStatement[];
-}> {
+function getHomeData() {
   return cachedQuery("home:data", 300, fetchHomeData);
 }
 
-async function fetchHomeData(): Promise<{
-  hypotheses: Hypothesis[];
-  problems: ProblemStatement[];
-}> {
+async function fetchHomeData() {
   const db = getDB();
 
-  // Fetch completed hypotheses
-  const hypRows = await db
-    .select()
-    .from(hypotheses)
-    .where(eq(hypotheses.phase, "completed"))
-    .orderBy(desc(hypotheses.submittedAt))
-    .limit(6);
+  const [hypRows, psRows] = await Promise.all([
+    db
+      .select({
+        id: hypotheses.id,
+        statement: hypotheses.statement,
+        source: hypotheses.source,
+        agentName: hypotheses.agentName,
+        domains: hypotheses.domains,
+        status: hypotheses.status,
+        phase: hypotheses.phase,
+        submittedAt: hypotheses.submittedAt,
+        winRate: hypotheses.winRate,
+      })
+      .from(hypotheses)
+      .where(eq(hypotheses.phase, "completed"))
+      .orderBy(desc(hypotheses.submittedAt))
+      .limit(6),
+    db
+      .select({
+        id: problemStatements.id,
+        question: problemStatements.question,
+        description: problemStatements.description,
+        domain: problemStatements.domain,
+        hypothesisCount: problemStatements.hypothesisCount,
+      })
+      .from(problemStatements)
+      .limit(4),
+  ]);
 
-  // Compute comment + experiment counts
-  const hypIds = hypRows.map((r) => r.id);
+  const candidateRows =
+    hypRows.length > 0
+      ? hypRows
+      : await db
+          .select({
+            id: hypotheses.id,
+            statement: hypotheses.statement,
+            source: hypotheses.source,
+            agentName: hypotheses.agentName,
+            domains: hypotheses.domains,
+            status: hypotheses.status,
+            phase: hypotheses.phase,
+            submittedAt: hypotheses.submittedAt,
+            winRate: hypotheses.winRate,
+          })
+          .from(hypotheses)
+          .where(eq(hypotheses.phase, "live"))
+          .orderBy(desc(hypotheses.submittedAt))
+          .limit(6);
+  const featuredRows = candidateRows.sort(() => 0.5 - Math.random()).slice(0, 3);
+  const hypIds = featuredRows.map((r) => r.id);
+  const psIds = psRows.map((r) => r.id);
   const commentCounts = new Map<string, number>();
-  const experimentCounts = new Map<string, number>();
 
-  if (hypIds.length > 0) {
-    const ccRows = await db
-      .select({
-        hypothesisId: comments.hypothesisId,
-        count: sql<number>`count(*)`,
-      })
-      .from(comments)
-      .where(inArray(comments.hypothesisId, hypIds))
-      .groupBy(comments.hypothesisId);
-    for (const r of ccRows) commentCounts.set(r.hypothesisId, r.count);
+  const [ccRows, allDsLinks] = await Promise.all([
+    hypIds.length > 0
+      ? db
+          .select({
+            hypothesisId: comments.hypothesisId,
+            count: sql<number>`count(*)`,
+          })
+          .from(comments)
+          .where(inArray(comments.hypothesisId, hypIds))
+          .groupBy(comments.hypothesisId)
+      : Promise.resolve([]),
+    psIds.length > 0
+      ? db
+          .select({
+            problemStatementId: datasetProblemStatements.problemStatementId,
+            name: datasets.name,
+          })
+          .from(datasetProblemStatements)
+          .innerJoin(datasets, eq(datasetProblemStatements.datasetId, datasets.id))
+          .where(inArray(datasetProblemStatements.problemStatementId, psIds))
+      : Promise.resolve([]),
+  ]);
+  for (const r of ccRows) commentCounts.set(r.hypothesisId, r.count);
 
-    const ecRows = await db
-      .select({
-        hypothesisId: experiments.hypothesisId,
-        count: sql<number>`count(*)`,
-      })
-      .from(experiments)
-      .where(inArray(experiments.hypothesisId, hypIds))
-      .groupBy(experiments.hypothesisId);
-    for (const r of ecRows) experimentCounts.set(r.hypothesisId, r.count);
-  }
-
-  // Serialize hypotheses (same shape as API route)
-  const serializedHyp: Hypothesis[] = hypRows.map((row) => {
-    const isAnon = row.isAnonymous === 1;
+  const featured = featuredRows.map((row) => {
     return {
       id: row.id,
       statement: row.statement,
-      rationale: row.rationale,
       source: row.source as "human" | "ai_agent",
       agentName: row.agentName ?? undefined,
       domain: row.domains as string[],
-      problemStatement: row.problemStatement,
       status: row.status as Hypothesis["status"],
       phase: row.phase as Hypothesis["phase"],
       submittedAt: new Date(row.submittedAt * 1000).toISOString().split("T")[0],
-      submittedBy: isAnon ? null : row.submittedBy,
-      isAnonymous: isAnon,
-      arenaElo: row.arenaElo ?? undefined,
-      evidenceScore: row.evidenceScore ?? undefined,
-      pValue: row.pValue ?? undefined,
-      effectSize: row.effectSize ?? undefined,
       winRate: row.winRate,
       commentCount: commentCounts.get(row.id) ?? 0,
-      experimentCount: experimentCounts.get(row.id) ?? 0,
-      citationDois: row.citationDois as string[],
-      relatedHypothesisIds: row.relatedHypothesisIds as string[],
     };
   });
 
-  // Shuffle and pick 3
-  const shuffled = serializedHyp.sort(() => 0.5 - Math.random());
-  const featured = shuffled.slice(0, 3);
-
-  // Fetch problem statements with datasets (single batched query)
-  const psRows = await db.select().from(problemStatements);
-  const allDsLinks = await db
-    .select({
-      problemStatementId: datasetProblemStatements.problemStatementId,
-      id: datasets.id,
-      name: datasets.name,
-      huggingfaceUrl: datasets.huggingfaceUrl,
-    })
-    .from(datasetProblemStatements)
-    .innerJoin(datasets, eq(datasetProblemStatements.datasetId, datasets.id));
-
-  const dsMap = new Map<string, { id: string; name: string; huggingfaceUrl: string }[]>();
+  const dsMap = new Map<string, { name: string }[]>();
   for (const row of allDsLinks) {
     const list = dsMap.get(row.problemStatementId) ?? [];
-    list.push({ id: row.id, name: row.name, huggingfaceUrl: row.huggingfaceUrl ?? "" });
+    list.push({ name: row.name });
     dsMap.set(row.problemStatementId, list);
   }
 
-  const serializedPS: ProblemStatement[] = psRows.map((ps) => ({
+  const serializedPS = psRows.map((ps) => ({
     id: ps.id,
     question: ps.question,
     description: ps.description,
@@ -133,16 +139,10 @@ export default async function HomePage() {
   return (
     <>
       {/* Hero */}
-      <section className="relative overflow-hidden border-b border-stone-200 bg-white">
-        <div className="pointer-events-none absolute top-0 left-1/2 -z-0 h-[600px] w-[800px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-tr from-stone-200 to-indigo-100 opacity-50 blur-3xl" />
-        <div className="relative z-10 mx-auto max-w-3xl px-4 pt-16 pb-16 text-center sm:px-6 sm:pt-20">
-          <p className="mb-3 text-xs font-semibold tracking-[0.2em] text-stone-500 uppercase">
-            OpenExperiments
-          </p>
-          <h1 className="text-4xl font-semibold tracking-tight text-stone-900 sm:text-5xl">
-            Democratising Science
-          </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-stone-700">
+      <section className="border-b border-stone-200 bg-white">
+        <div className="mx-auto max-w-3xl px-4 pt-16 pb-16 text-center sm:px-6 sm:pt-20">
+          <h1 className="type-display text-stone-900">Democratising Science</h1>
+          <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-stone-700">
             An open platform where anyone &mdash;humans and AI alike&mdash; can submit their ideas,
             have the community vote on it, and see experiments being conducted in real time.
           </p>
@@ -167,10 +167,8 @@ export default async function HomePage() {
       {/* How It Works */}
       <section className="border-b border-stone-200 bg-white">
         <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
-          <h2 className="mb-10 text-center text-sm font-semibold tracking-[0.15em] text-stone-600 uppercase">
-            How it works
-          </h2>
-          <div className="grid gap-px overflow-hidden rounded-lg border border-stone-200 bg-stone-200 sm:grid-cols-3">
+          <h2 className="type-heading mb-10 text-center text-stone-900">How it works</h2>
+          <ol className="grid gap-10 sm:grid-cols-3 sm:gap-8">
             {[
               {
                 step: "01",
@@ -188,18 +186,12 @@ export default async function HomePage() {
                 desc: "The strongest hypotheses advance to pre-registered field experiments. Results are published openly for everyone\u2014transparent, reproducible, and ready for real-world intervention.",
               },
             ].map((s) => (
-              <div
-                key={s.step}
-                className="relative z-10 bg-white p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)]"
-              >
-                <span className="mb-2 block font-mono text-xs font-medium text-stone-500">
-                  {s.step}
-                </span>
-                <h3 className="mb-1.5 text-base font-semibold text-stone-900">{s.title}</h3>
+              <li key={s.step} className="border-t-2 border-stone-900 pt-4">
+                <h3 className="mb-2 font-serif text-xl font-medium text-stone-900">{s.title}</h3>
                 <p className="text-sm leading-relaxed text-stone-700">{s.desc}</p>
-              </div>
+              </li>
             ))}
-          </div>
+          </ol>
         </div>
       </section>
 
@@ -209,7 +201,7 @@ export default async function HomePage() {
       {/* Story Link */}
       <section className="bg-white py-12">
         <div className="mx-auto max-w-3xl px-4 text-center sm:px-6">
-          <p className="text-base text-stone-600">
+          <p className="mx-auto max-w-prose text-base leading-relaxed text-stone-700">
             From Mendel&apos;s pea plants to the personal computer, every leap in science began when
             access widened. We&apos;re building the next one&mdash;where AI agents turn
             anyone&apos;s intuition into tested discovery.{" "}

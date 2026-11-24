@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useMemo } from "react";
 
 export interface AuthUser {
   id: string;
@@ -8,6 +8,25 @@ export interface AuthUser {
   email: string | null;
   avatarUrl: string | null;
   profileCompleted: boolean;
+}
+
+export function reconcileAuthUser(
+  previous: AuthUser | null,
+  next: AuthUser | null,
+): AuthUser | null {
+  if (
+    previous === next ||
+    (previous !== null &&
+      next !== null &&
+      previous.id === next.id &&
+      previous.name === next.name &&
+      previous.email === next.email &&
+      previous.avatarUrl === next.avatarUrl &&
+      previous.profileCompleted === next.profileCompleted)
+  ) {
+    return previous;
+  }
+  return next;
 }
 
 interface AuthContextValue {
@@ -37,7 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await fetch("/api/auth/me");
       const data = (await res.json()) as { user: AuthUser | null };
-      setUser(data.user || null);
+      setUser((previous) => reconcileAuthUser(previous, data.user || null));
     } catch {
       setUser(null);
     } finally {
@@ -49,18 +68,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refresh();
   }, [refresh]);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     setUser(null);
-  };
+  }, []);
 
-  return (
-    <AuthContext.Provider
-      value={{ user, loading, signOut, refresh, showAuthModal, setShowAuthModal }}
-    >
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo(
+    () => ({ user, loading, signOut, refresh, showAuthModal, setShowAuthModal }),
+    [user, loading, signOut, refresh, showAuthModal, setShowAuthModal],
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

@@ -4,7 +4,8 @@ import { getDB } from "@/db";
 import { experiments, experimentResults, experimentVersions, users } from "@/db/schema";
 import { eq, inArray, desc } from "drizzle-orm";
 import { getSession } from "@/lib/auth";
-import { invalidateCached } from "@/lib/edge-cache";
+import { invalidateExperimentCaches } from "@/lib/edge-cache";
+import { enforceRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
 function buildResultsResponse(result: {
   pValue: number;
@@ -45,50 +46,67 @@ function buildResultsResponse(result: {
 }
 
 export async function GET(request: Request) {
-  const db = getDB();
   const url = new URL(request.url);
   const hypothesisId = url.searchParams.get("hypothesisId");
+  const limitParam = url.searchParams.get("limit");
+  const offsetParam = url.searchParams.get("offset");
+  const requestedLimit = limitParam === null ? 100 : Number(limitParam);
+  const offset = offsetParam === null ? 0 : Number(offsetParam);
+  if (
+    (limitParam !== null && !limitParam.trim()) ||
+    (offsetParam !== null && !offsetParam.trim()) ||
+    !Number.isSafeInteger(requestedLimit) ||
+    requestedLimit < 1 ||
+    !Number.isSafeInteger(offset) ||
+    offset < 0
+  ) {
+    return Response.json({ error: "Invalid pagination parameters" }, { status: 400 });
+  }
+  const limit = Math.min(requestedLimit, 100);
+  // Supplying limit or offset opts filtered requests into pagination; legacy
+  // hypothesis-only requests continue to return all matching experiments.
+  const paginated = !hypothesisId || limitParam !== null || offsetParam !== null;
+  const db = getDB();
+  const query = db
+    .select()
+    .from(experiments)
+    .where(hypothesisId ? eq(experiments.hypothesisId, hypothesisId) : undefined)
+    .orderBy(desc(experiments.startedAt));
+  const rows = await (paginated ? query.limit(limit).offset(offset) : query);
 
-  // Bound the unfiltered list so it can't scan/return the whole table.
-  const limit = Math.min(Number(url.searchParams.get("limit")) || 100, 100);
-  const offset = Math.max(Number(url.searchParams.get("offset")) || 0, 0);
-
-  const rows = hypothesisId
-    ? await db
-        .select()
-        .from(experiments)
-        .where(eq(experiments.hypothesisId, hypothesisId))
-        .orderBy(desc(experiments.startedAt))
-    : await db
-        .select()
-        .from(experiments)
-        .orderBy(desc(experiments.startedAt))
-        .limit(limit)
-        .offset(offset);
-
-  // Batch-load results and submitters for all rows instead of 2 queries per
-  // row (N+1). Two IN(...) queries regardless of page size.
   const expIds = rows.map((e) => e.id);
   const submitterIds = [...new Set(rows.map((e) => e.submittedBy).filter((v): v is string => !!v))];
-
   const resultsById = new Map<string, typeof experimentResults.$inferSelect>();
-  if (expIds.length) {
-    const resultRows = await db
-      .select()
-      .from(experimentResults)
-      .where(inArray(experimentResults.experimentId, expIds));
-    for (const r of resultRows) resultsById.set(r.experimentId, r);
-  }
-
   const submitterById = new Map<
     string,
     { id: string; name: string | null; avatarUrl: string | null }
   >();
-  if (submitterIds.length) {
-    const userRows = await db
+  // Legacy filtered lists can exceed D1's bound-parameter limit.
+  const chunks = (ids: string[]) =>
+    Array.from({ length: Math.ceil(ids.length / 100) }, (_, i) =>
+      ids.slice(i * 100, (i + 1) * 100),
+    );
+  const resultQueries = chunks(expIds).map((ids) =>
+    db.select().from(experimentResults).where(inArray(experimentResults.experimentId, ids)),
+  );
+  const userQueries = chunks(submitterIds).map((ids) =>
+    db
       .select({ id: users.id, name: users.name, avatarUrl: users.avatarUrl })
       .from(users)
-      .where(inArray(users.id, submitterIds));
+      .where(inArray(users.id, ids)),
+  );
+  const [first, ...rest] = [...resultQueries, ...userQueries];
+  if (first) {
+    const batches = await db.batch([first, ...rest]);
+    const resultRows = batches
+      .slice(0, resultQueries.length)
+      .flat() as (typeof experimentResults.$inferSelect)[];
+    const userRows = batches.slice(resultQueries.length).flat() as {
+      id: string;
+      name: string | null;
+      avatarUrl: string | null;
+    }[];
+    for (const r of resultRows) resultsById.set(r.experimentId, r);
     for (const u of userRows) submitterById.set(u.id, u);
   }
 
@@ -124,6 +142,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const limited = await enforceRateLimit(request, RATE_LIMITS.write);
+  if (limited) return limited;
   const user = await getSession(request);
   if (!user) {
     return Response.json({ error: "Authentication required" }, { status: 401 });
@@ -238,12 +258,7 @@ export async function POST(request: Request) {
     }),
   ]);
 
-  // New experiment changes the experiments list and the linked hypothesis's
-  // evidence surface; drop their cached snapshots.
-  await Promise.all([
-    invalidateCached("experiments:list"),
-    invalidateCached(`hypothesis:${hypothesisId as string}`),
-  ]);
+  await invalidateExperimentCaches(hypothesisId as string);
 
   return Response.json({ data: { id } }, { status: 201 });
 }

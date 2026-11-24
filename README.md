@@ -46,7 +46,9 @@ A platform for hypothesis generation, crowdsourced ranking, and empirical testin
 │       └── types.ts              # Shared TypeScript interfaces
 ├── drizzle/migrations/           # SQL migration files
 ├── mcp-server/                   # MCP server (separate package)
-├── scripts/seed.sql              # Seed data
+├── scripts/seed.sql              # Real CMV + ICLR catalog (no mock research results)
+├── scripts/catalog.sql           # Idempotent existing-database catalog update
+├── scripts/seed-demo.sql         # Optional mock fixtures for disposable demo DBs
 ├── wrangler.toml                 # Cloudflare config
 └── next.config.ts                # Next.js config
 ```
@@ -92,6 +94,64 @@ npm run dev
 ```
 
 Visit [http://localhost:3000](http://localhost:3000).
+
+The development server uses `.next-dev` so production builds in `.next` do not
+interrupt it. Set `NEXT_DIST_DIR` to override the output directory when needed.
+
+### Persuasion launch review
+
+Prepare a separate review database from the submitted OSF study JSON and registration
+ledgers in `~/GitHub/browser-agent`. This imports 35 CMV ledger entries and 22 ICLR
+registrations, retaining secondary hypotheses and analysis plans. Drafts without
+registration links (`study-24`, `study-27`, `study-30`) are excluded.
+
+```bash
+node scripts/research-catalog.mjs
+node scripts/launch-catalog.mjs --source-root ~/GitHub/browser-agent
+npm run wrangler -- d1 migrations apply openexperiments-db --local --persist-to=.wrangler/launch-review
+npm run wrangler -- d1 execute openexperiments-db --local --persist-to=.wrangler/launch-review --file=.wrangler/launch-review/seed.sql
+LOCAL_D1_STATE_DIR=.wrangler/launch-review/v3 NEXT_DIST_DIR=.next-launch npm run dev -- --hostname 127.0.0.1 --port 3001
+```
+
+Optional `--status-file <path>` accepts a JSON array of public OSF API checks
+(`study`, `id`, `public`, `registered`, `withdrawn`, or `http_status`). A submitted ICLR
+JSON must match its source manifest's SHA-256; missing or modified source files fail
+the import explicitly.
+
+Wrangler appends `v3` to `--persist-to`; Next's platform proxy expects the actual
+storage directory, so `LOCAL_D1_STATE_DIR` includes that suffix.
+Open [http://localhost:3001](http://localhost:3001) for review. Use `localhost`,
+not `127.0.0.1`, as the browser origin: Next development requests use the former,
+and arena voting rejects mismatched origins.
+
+The generated SQL and source snapshot stay in gitignored `.wrangler/launch-review`.
+They are **local review material, not a production seed**: CMV registrations are
+listed as private/embargoed in the ledger and cannot currently be verified publicly;
+`study-26` is also listed in the pending section and its `26mah` link returns 404.
+Resolve that entry and publication permission before public launch. The public ICLR
+ledger has 19 primary and three separately registered exploratory studies.
+
+All imported hypotheses are proposed/live; submitted studies are running/under test,
+as confirmed by the team, with no
+invented results, evidence scores or arena votes. Plans refer to prospective
+collections, not the historical datasets as if they were confirmatory data.
+The arena starts with a deterministic ring of same-question pairs, covering every
+hypothesis without inventing votes or comparing CMV against ICLR.
+The import is insert-only for hypotheses/plans and preserves existing lifecycle state
+and user edits when rerun. Do not use the existing mock database for this review.
+No production data, OSF registrations or embargo settings are changed.
+
+To correct an existing review database that still shows these studies as planned,
+regenerate the launch catalog and apply `.wrangler/launch-review/activate.sql`.
+It advances only the exact imported planned studies to running, records a new
+experiment version, and preserves completed studies and previous plan snapshots:
+
+```bash
+npm run wrangler -- d1 execute openexperiments-db --local --persist-to=.wrangler/launch-review --file=.wrangler/launch-review/activate.sql
+```
+
+Running means the study is under test, not that its hypothesis has passed empirical
+validation. Registration visibility/approval and research execution state are separate.
 
 ## Database
 
@@ -142,6 +202,60 @@ npm run wrangler -- d1 execute openexperiments-db --local --command="SELECT COUN
 # Remote
 npm run wrangler -- d1 execute openexperiments-db --remote --command="SELECT COUNT(*) FROM hypotheses"
 ```
+
+### Real problem statements and datasets
+
+The curated catalog contains **CMV counterargument persuasion** and **ICLR peer-review
+rebuttal persuasion**, linked to
+[Harini/changemyview_data](https://huggingface.co/datasets/Harini/changemyview_data) and
+[Harini/iclr_reviews](https://huggingface.co/datasets/Harini/iclr_reviews).
+Metadata, selected analysis variables, split sizes, and limitations are recorded from
+the dataset cards verified on November 5, 2026, with revision hashes in the catalog.
+The website registers these research instruments; it does not copy their multi-gigabyte
+CSV files into D1.
+
+CMV has 572,119 training, 6,000 random-holdout, and 116,472 temporal-holdout rows.
+ICLR has 44,126 training and 11,099 test reviews from 2024 and 2025. Its `label`
+records **any** rating change, including decreases; it cannot recover the planned
+ICLR 2027 `improved` outcome because final ratings are not exported. ICLR 2026 is
+excluded because its discussion was frozen and ratings were reset after a security
+incident. Prospective studies are separate from the historical datasets: ICLR studies
+plan to test on a future conference cycle, and CMV studies on posts created after
+registration. Neither HF card specifies a dataset-wide license. OpenReview comments
+and metadata are subject to its [terms](https://openreview.net/legal/terms), while
+ICLR and Reddit content may have additional rights and conditions.
+
+Dataset detail pages render links and inline code in scientific characterization text,
+and display one-variable-per-line definitions as semantic HTML definition lists.
+
+Edit `src/lib/data/research-catalog.json`, then regenerate the SQL:
+
+```bash
+node scripts/research-catalog.mjs
+node scripts/research-catalog.mjs --check
+```
+
+For an existing local database:
+
+```bash
+npm run wrangler -- d1 execute openexperiments-db --local --file=scripts/catalog.sql
+```
+
+Apply the same file with `--remote` when intentionally updating production. This
+upserts both instruments, merges the old CMV conversational question into `ps-1`,
+retires the three exact original mock questions, and recomputes hypothesis counts.
+It preserves user-submitted catalog entries and does not delete hypotheses,
+experiments, results, or votes. Existing mock research records therefore remain
+mock until separately replaced; dataset registration does not validate them.
+Non-CMV hypotheses retain their question text even when its mock catalog entry is
+retired. Fresh databases seeded with `seed.sql` contain no mock research records.
+No schema migration is needed for this catalog-only update.
+
+The optional `seed-demo.sql` is only for a fresh disposable demo database and must
+be applied **before** `seed.sql` to replace its obsolete mock catalog. Do not apply
+it to an existing or production database. Database updates do not purge Cloudflare
+HTTP or edge-query caches; cached pages can remain stale until their TTL expires
+(up to one hour for problem-statement API responses).
 
 ## Deployment
 
