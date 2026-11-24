@@ -134,7 +134,14 @@ describe("real research catalog", () => {
           .sort((a, b) => (a.id < b.id ? -1 : 1)),
         { id: "user-ps", question: "User question?", hypothesis_count: 0 },
       ]);
-      expect(db.prepare("SELECT * FROM hypotheses ORDER BY id").all()).toEqual(beforeHypotheses);
+      const former = new Set<unknown>(catalog.problemStatements[0].formerQuestions ?? []);
+      expect(db.prepare("SELECT * FROM hypotheses ORDER BY id").all()).toEqual(
+        beforeHypotheses.map((h) =>
+          former.has(h.problem_statement)
+            ? { ...h, problem_statement: catalog.problemStatements[0].question }
+            : h,
+        ),
+      );
       expect(db.prepare("SELECT * FROM experiments ORDER BY id").all()).toEqual(beforeExperiments);
       expect(db.prepare("SELECT * FROM experiment_results ORDER BY experiment_id").all()).toEqual(
         beforeResults,

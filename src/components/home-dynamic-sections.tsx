@@ -6,7 +6,8 @@ import { ArrowRight } from "lucide-react";
 import { HypothesisCard } from "@/components/hypothesis-card";
 import { toggleStar, getStarsBatch } from "@/lib/api";
 import { useAuth } from "@/components/auth-provider";
-import type { Hypothesis, ProblemStatement } from "@/lib/types";
+import type { Hypothesis } from "@/lib/types";
+import { OpenQuestionsCarousel, type OpenQuestion } from "@/components/open-questions-carousel";
 
 interface HomeDynamicSectionsProps {
   initialHypotheses: Pick<
@@ -22,9 +23,7 @@ interface HomeDynamicSectionsProps {
     | "winRate"
     | "commentCount"
   >[];
-  initialProblems: (Omit<ProblemStatement, "datasets"> & {
-    datasets?: { name: string }[];
-  })[];
+  initialProblems: OpenQuestion[];
 }
 
 export function HomeDynamicSections({
@@ -158,40 +157,7 @@ export function HomeDynamicSections({
         </div>
       </section>
 
-      {/* Open Questions */}
-      <section className="border-b border-stone-200 bg-white">
-        <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
-          <h2 className="type-heading mb-8 text-stone-900">Open questions</h2>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {initialProblems.slice(0, 4).map((ps) => (
-              <Link
-                key={ps.id}
-                href={`/explore?ps=${ps.id}`}
-                className="group rounded-lg border border-stone-200 bg-stone-50/50 p-5 transition-all duration-300 hover:-translate-y-1 hover:border-stone-300 hover:bg-white hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)]"
-              >
-                <span className="mb-1 block text-xs font-semibold tracking-wide text-stone-600 uppercase">
-                  {ps.domain}
-                </span>
-                <h3 className="mb-1.5 text-base font-semibold text-stone-900 group-hover:text-black">
-                  {ps.question}
-                </h3>
-                <p className="mb-2 line-clamp-2 text-sm text-stone-600">{ps.description}</p>
-                <span className="text-xs text-stone-600">
-                  {ps.hypothesisCount} hypotheses
-                  {ps.datasets && ps.datasets.length > 0
-                    ? ` \u00B7 ${ps.datasets.map((d) => d.name).join(", ")}`
-                    : ""}
-                </span>
-                {ps.datasets && ps.datasets.length === 0 && ps.hypothesisCount > 10 && (
-                  <span className="mt-1 block text-xs font-semibold text-amber-700">
-                    Datasets Needed
-                  </span>
-                )}
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
+      <OpenQuestionsCarousel problems={initialProblems} />
     </>
   );
 }

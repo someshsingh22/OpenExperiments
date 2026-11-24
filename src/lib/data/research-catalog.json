@@ -3,67 +3,78 @@
   "problemStatements": [
     {
       "id": "ps-1",
-      "question": "What makes a counterargument persuasive?",
+      "question": "What changes someone's mind in an argument?",
+      "formerQuestions": ["What makes a counterargument persuasive?"],
       "description": "Which linguistic, structural, and conversational features of a counterargument are associated with an original poster acknowledging a change of view on Reddit r/ChangeMyView? Study top-level comments and selected two-person discussion branches, using DeltaBot-confirmed awards as the observed outcome. Account for comments clustered within posts and distinguish historical exploration from later temporal evaluation. A delta is an acknowledgment, not proof of a causal persuasive effect.",
       "domain": "persuasion"
     },
     {
       "id": "ps-iclr",
-      "question": "What makes an author rebuttal persuasive in peer review?",
+      "question": "What makes a rebuttal move a reviewer?",
+      "formerQuestions": ["What makes an author rebuttal persuasive in peer review?"],
       "description": "Which features of an initial review, an author's rebuttal, and the surrounding paper context are associated with a reviewer revising their rating at ICLR? Explore ICLR 2024 and 2025 reviews, accounting for reviews clustered within papers. The published dataset labels any rating change, including decreases; it cannot directly identify rating improvement. Planned ICLR 2027 confirmatory studies instead measure whether the rating increases during author-reviewer discussion and require separately collected initial and final ratings.",
       "domain": "persuasion"
     },
     {
       "id": "ps-upworthy",
-      "question": "What makes a headline win a randomized A/B test?",
+      "question": "What makes people click a news headline?",
+      "formerQuestions": ["What makes a headline win a randomized A/B test?"],
       "description": "Which features of a headline package are associated with a higher click-through rate than its sibling packages in the same Upworthy test? Packages within a test were randomly assigned to readers, so within-test comparisons are causal for the tested packages, but they do not establish why a feature works or that it transfers to other outlets or eras. Use the archive's exploratory release for hypothesis generation; its confirmatory release is reserved for preregistered tests.",
       "domain": "media"
     },
     {
       "id": "ps-newyorker",
-      "question": "What makes a New Yorker cartoon caption funny?",
+      "question": "What makes a cartoon caption funny?",
+      "formerQuestions": ["What makes a New Yorker cartoon caption funny?"],
       "description": "Which features of a caption, relative to its cartoon, are associated with higher crowd funniness ratings in The New Yorker Cartoon Caption Contest? Compare captions within the same contest, since cartoons differ in how much humor they afford. Ratings come from volunteer crowd raters; associations do not establish what causes a caption to be funny.",
       "domain": "humor"
     },
     {
       "id": "ps-rjokes",
-      "question": "What makes a joke get upvoted on r/Jokes?",
+      "question": "What makes a joke land?",
+      "formerQuestions": ["What makes a joke get upvoted on r/Jokes?"],
       "description": "Which features of a joke's text are associated with landing in the top rather than the bottom quartile of net score on Reddit r/Jokes, compared within cells matched on length, format and topic? Upvotes reflect visibility, timing and audience as well as joke quality, so findings are associations, not causal effects.",
       "domain": "humor"
     },
     {
       "id": "ps-fedreg",
-      "question": "Why do agencies change a rule in response to a public comment?",
+      "question": "When does a public comment change a government rule?",
+      "formerQuestions": ["Why do agencies change a rule in response to a public comment?"],
       "description": "Which features of a public comment filed on regulations.gov are associated with the agency's final-rule response saying a rule change was made? Account for comments clustered within dockets and agencies. Labels are extracted from agencies' published responses to comments and matched to comments by an automated pipeline; they describe what the agency reported, not whether the comment caused the change.",
       "domain": "policy"
     },
     {
       "id": "ps-github-pr",
-      "question": "What makes maintainers merge an outside contribution?",
+      "question": "What gets a pull request merged?",
+      "formerQuestions": ["What makes maintainers merge an outside contribution?"],
       "description": "Which features of a pull request from an outside contributor, its description, the code change and the review conversation, are associated with maintainers merging it rather than closing it? Account for pull requests clustered within repositories, since merge norms vary widely. The launch dataset is pending (planned from public GitHub event history with GitHub API hydration); the CreativePreferences GitHub PR task may serve only as a reference set. Merge decisions are observational; associations do not establish causal effects.",
       "domain": "software"
     },
     {
       "id": "ps-aita",
-      "question": "What drives community moral verdicts on r/AmItheAsshole?",
+      "question": "What makes the crowd decide you're in the wrong?",
+      "formerQuestions": ["What drives community moral verdicts on r/AmItheAsshole?"],
       "description": "Which features of a first-person account of an interpersonal conflict are associated with the community verdict (not the asshole, you're the asshole, everyone sucks here, no assholes here) on Reddit r/AmItheAsshole? Verdicts reflect the judgments of a self-selected online community about a one-sided narrative; associations do not establish moral truth or causal effects.",
       "domain": "morality"
     },
     {
       "id": "ps-llm-slop",
-      "question": "What makes content look like LLM slop?",
+      "question": "What makes writing feel like AI slop?",
+      "formerQuestions": ["What makes content look like LLM slop?"],
       "description": "Which properties of a text lead readers to judge it as low-effort, generic machine-generated content? The dataset is pending; no outcome measure has been registered yet. Hypotheses should specify an observable reader judgment rather than presuming the text's true origin.",
       "domain": "media"
     },
     {
       "id": "ps-lamem",
-      "question": "What makes an image memorable?",
+      "question": "Why do some images stick in memory?",
+      "formerQuestions": ["What makes an image memorable?"],
       "description": "Which visual and semantic properties of a photograph are associated with higher memorability scores, measured as how often participants recognize its repeat in a visual memory game (LaMem; Khosla et al., 2015)? Scores are averages over participants and corrected for false alarms; associations do not establish that a property causes memorability.",
       "domain": "memorability"
     },
     {
       "id": "ps-anthropic-persuasion",
-      "question": "What makes a written argument change someone's mind?",
+      "question": "What makes an argument convincing?",
+      "formerQuestions": ["What makes a written argument change someone's mind?"],
       "description": "Which features of a short argument for a claim are associated with a larger shift in a reader's support for that claim, comparing human-written and model-generated arguments in Anthropic's persuasion study? The outcome is a self-reported change in agreement on a 7-point scale after reading one argument; within-claim comparisons are recommended because claims differ in how movable opinions are.",
       "domain": "persuasion"
     }
@@ -203,7 +214,7 @@
     },
     {
       "id": "ds-newyorker",
-      "name": "New Yorker Caption Contest: Crowd Ratings (CreativePreferences)",
+      "name": "New Yorker Caption Contest: Crowd Ratings",
       "huggingfaceUrl": "https://huggingface.co/datasets/alex2awesome/CreativePreferences",
       "revision": "e55f090497c0dd97de1e2ea0ba7d2cdce593aa98",
       "createdAt": "2026-11-25",
@@ -249,7 +260,7 @@
     },
     {
       "id": "ds-rjokes",
-      "name": "r/Jokes Upvotes (CreativePreferences)",
+      "name": "r/Jokes Upvotes",
       "huggingfaceUrl": "https://huggingface.co/datasets/alex2awesome/CreativePreferences",
       "revision": "e55f090497c0dd97de1e2ea0ba7d2cdce593aa98",
       "createdAt": "2026-11-25",
@@ -276,7 +287,7 @@
     },
     {
       "id": "ds-fedreg",
-      "name": "Public Comments and Agency Rule Changes (CreativePreferences)",
+      "name": "Public Comments and Agency Rule Changes",
       "huggingfaceUrl": "https://huggingface.co/datasets/alex2awesome/CreativePreferences",
       "revision": "e55f090497c0dd97de1e2ea0ba7d2cdce593aa98",
       "createdAt": "2026-11-25",
@@ -348,7 +359,7 @@
     },
     {
       "id": "ds-lamem",
-      "name": "LaMem Image Memorability (Hugging Face mirror)",
+      "name": "LaMem Image Memorability",
       "huggingfaceUrl": "https://huggingface.co/datasets/chitradrishti/LAMEM",
       "revision": "9aeed54fff9800200dcdb219635365a9da50d70b",
       "createdAt": "2026-11-25",

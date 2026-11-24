@@ -128,9 +128,9 @@ describe("homepage data integration", () => {
       datasetProblemStatements,
     ]);
     expect(queries[0].limit).toBe(6);
-    expect(queries[1].limit).toBe(4);
+    expect(queries[1].limit).toBe(24);
     expect(queries[2].params).toEqual(["h-0", "h-1", "h-2"]);
-    expect(queries[3].params).toEqual(["ps-0", "ps-1", "ps-2", "ps-3"]);
+    expect(queries[3].params).toEqual(["ps-0", "ps-1", "ps-2", "ps-3", "ps-4", "ps-5", "ps-6"]);
     expect(Object.keys(queries[0].fields)).toEqual([
       "id",
       "statement",
@@ -152,7 +152,7 @@ describe("homepage data integration", () => {
       commentCount: 2,
     });
     expect(props.initialHypotheses[0]).not.toHaveProperty("rationale");
-    expect(props.initialProblems).toHaveLength(4);
+    expect(props.initialProblems).toHaveLength(7);
     expect(props.initialProblems[0].datasets).toEqual([{ name: "Dataset ps-0" }]);
     expect(mocks.cachedQuery).toHaveBeenCalledWith("home:data", 300, expect.any(Function));
   });

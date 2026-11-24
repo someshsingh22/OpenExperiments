@@ -18,6 +18,12 @@ for (const ps of catalog.problemStatements) {
   lines.push(
     `INSERT INTO problem_statements (id, question, description, domain, hypothesis_count, created_at, updated_at) VALUES (${quote(ps.id)}, ${quote(ps.question)}, ${quote(ps.description)}, ${quote(ps.domain)}, 0, ${now}, ${now}) ON CONFLICT(id) DO UPDATE SET question=excluded.question, description=excluded.description, domain=excluded.domain, updated_at=excluded.updated_at;`,
   );
+  // Hypotheses reference questions by text, so relink them when a question is retitled.
+  for (const former of ps.formerQuestions ?? []) {
+    lines.push(
+      `UPDATE hypotheses SET problem_statement=${quote(ps.question)} WHERE problem_statement=${quote(former)};`,
+    );
+  }
 }
 
 for (const ds of catalog.datasets) {

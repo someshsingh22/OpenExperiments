@@ -832,16 +832,24 @@ function ExperimentCard({ experiment }: { experiment: Experiment }) {
         {experiment.completedAt && <span>Completed: {fmtDate(experiment.completedAt)}</span>}
       </div>
       {experiment.results && <p className="text-sm text-stone-600">{experiment.results.summary}</p>}
-      <div className="mt-4">
-        <a
-          href={experiment.osfLink ?? "https://osf.io/"}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 rounded-md border border-stone-900 bg-stone-900 px-5 py-2 text-xs font-semibold text-white transition-colors hover:bg-stone-800"
+      <div className="mt-4 flex flex-wrap gap-2">
+        {experiment.osfLink && (
+          <a
+            href={experiment.osfLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded-md border border-stone-900 bg-stone-900 px-5 py-2 text-xs font-semibold text-white transition-colors hover:bg-stone-800"
+          >
+            <ExternalLink className="h-4 w-4" aria-hidden="true" />
+            View study on OSF
+          </a>
+        )}
+        <Link
+          href={`/experiments/${experiment.id}`}
+          className="inline-flex items-center gap-2 rounded-md border border-stone-300 px-5 py-2 text-xs font-semibold text-stone-700 transition-colors hover:border-stone-400 hover:text-stone-900"
         >
-          <ExternalLink className="h-4 w-4" />
-          View Study on OSF
-        </a>
+          Study plan
+        </Link>
       </div>
     </div>
   );

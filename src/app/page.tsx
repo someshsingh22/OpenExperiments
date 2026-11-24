@@ -48,7 +48,7 @@ async function fetchHomeData() {
         hypothesisCount: problemStatements.hypothesisCount,
       })
       .from(problemStatements)
-      .limit(4),
+      .limit(24),
   ]);
 
   const candidateRows =

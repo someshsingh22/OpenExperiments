@@ -108,10 +108,7 @@ function ExperimentCard({ experiment }: { experiment: Experiment }) {
   const statusMeta = STATUS_LABELS[experiment.status] || STATUS_LABELS.planned;
 
   return (
-    <Link
-      href={`/experiments/${experiment.id}`}
-      className="group block rounded-lg border border-stone-200 bg-white p-4 transition-all duration-300 hover:-translate-y-1 hover:border-stone-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)]"
-    >
+    <article className="group relative rounded-lg border border-stone-200 bg-white p-4 transition-all duration-300 focus-within:border-stone-400 hover:-translate-y-1 hover:border-stone-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
       <div className="mb-2.5 flex flex-wrap items-center gap-1.5">
         <span
           className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${typeMeta.cls}`}
@@ -126,7 +123,12 @@ function ExperimentCard({ experiment }: { experiment: Experiment }) {
       </div>
 
       <p className="mb-1 text-[13px] font-medium text-stone-800 group-hover:text-stone-900">
-        {experiment.datasetName}
+        <Link
+          href={`/experiments/${experiment.id}`}
+          className="after:absolute after:inset-0 after:rounded-lg focus-visible:outline-none"
+        >
+          {experiment.datasetName}
+        </Link>
       </p>
       {experiment.methodology && (
         <p className="mb-2.5 line-clamp-3 text-[13px] leading-relaxed text-stone-600">
@@ -151,10 +153,21 @@ function ExperimentCard({ experiment }: { experiment: Experiment }) {
           {experiment.results?.pValue != null && (
             <span className="type-data">{formatPValueInline(experiment.results.pValue)}</span>
           )}
-          {experiment.osfLink && <ExternalLink className="h-3 w-3" />}
+          {experiment.osfLink && (
+            <a
+              href={experiment.osfLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="relative z-10 inline-flex items-center gap-1 rounded font-medium text-stone-700 underline decoration-stone-300 underline-offset-2 hover:text-stone-900 hover:decoration-stone-500"
+            >
+              OSF study
+              <ExternalLink className="h-3 w-3" aria-hidden="true" />
+              <span className="sr-only">(opens in a new tab)</span>
+            </a>
+          )}
         </div>
       </div>
-    </Link>
+    </article>
   );
 }
 
