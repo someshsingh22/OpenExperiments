@@ -28,7 +28,8 @@ function fixture() {
     join(source, "osf/registrations1.md"),
     "## Registered\n| study-02 | [cmv01](https://osf.io/cmv01/) |\n" +
       "| study-03 | [cmv02](https://osf.io/cmv02/) |\n" +
-      "## Not Yet Registered\n| study-24 | draft |\n",
+      "| study-26 | [cmv26](https://osf.io/cmv26/) |\n" +
+      "## Not Yet Registered\n| study-24 | draft |\n| study-26 | draft deleted |\n",
   );
   writeFileSync(
     join(source, "studies/study-02.json"),

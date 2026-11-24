@@ -30,18 +30,22 @@ const statuses = new Map(
 const manifest = new Map(
   JSON.parse(read("ICLR/osf/manifest.json")).map((entry) => [entry.study_id, entry]),
 );
-const cmvLedger = read("osf/registrations1.md").split("## Not Yet Registered")[0];
+const [cmvLedger, cmvPending = ""] = read("osf/registrations1.md").split("## Not Yet Registered");
+// A study listed as both registered and not-yet-registered is a ledger conflict; skip it.
+const cmvUnregistered = new Set(Array.from(cmvPending.matchAll(/\| (study-\d+) \|/g), (m) => m[1]));
 const iclrLedger = read("ICLR/osf/registrations.md");
 const entries = [
-  ...Array.from(cmvLedger.matchAll(/\| (study-\d+) \| \[([a-z0-9]+)\]/g), (match) => ({
-    studyId: match[1],
-    osfId: match[2],
-    sourcePath: `studies/${match[1]}.json`,
-    problemStatementId: "ps-1",
-    kind: "primary",
-    registeredDate: "2026-06-20",
-    access: "ledger_only",
-  })),
+  ...Array.from(cmvLedger.matchAll(/\| (study-\d+) \| \[([a-z0-9]+)\]/g))
+    .filter((match) => !cmvUnregistered.has(match[1]))
+    .map((match) => ({
+      studyId: match[1],
+      osfId: match[2],
+      sourcePath: `studies/${match[1]}.json`,
+      problemStatementId: "ps-1",
+      kind: "primary",
+      registeredDate: "2026-06-20",
+      access: "ledger_only",
+    })),
   ...Array.from(
     iclrLedger.matchAll(
       /\| (iclr-2027-[^ |]+) \| (primary|exploratory) \| yes \| True \| True \| False \| \[([a-z0-9]+)\][^\n]*?\| (2026-[^ |]+) \|/g,
