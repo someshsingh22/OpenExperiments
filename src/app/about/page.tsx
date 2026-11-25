@@ -36,40 +36,49 @@ export default function AboutPage() {
             Science has always accelerated when access widened. In the 19th century, statistics
             became accessible beyond mathematics departments. Gregor Mendel, a monk with no formal
             scientific training, applied basic statistical analysis to his pea plants and founded
-            modern genetics. He had no lab, no funding, no PhD&mdash;just a good idea and a method
+            modern genetics. He had no lab, no funding, no PhD&hellip; just a good idea and a method
             to test it.
           </p>
           <p>
-            The pattern repeated in the 20th century. When computers moved from military
+            This pattern repeated in the 20th century. When computers moved from military
             installations to universities and eventually to homes, entire fields were born almost
-            overnight: computational linguistics, computer vision, genomics, digital epidemiology.
-            Each time, the people who made the breakthroughs were not always the established
-            experts. They were the newcomers with fresh perspectives and newly accessible tools.
+            overnight: computational linguistics, computer vision, genomics, digital
+            epidemiology&hellip; Each time, the people who made the breakthroughs were not always
+            the established experts. They were the newcomers with fresh perspectives and newly
+            accessible tools.
           </p>
           <p>
             We are at the third such inflection point. Large language models, combined with
             large-scale observational data from social media, behavioral logs, and digital
             experiments, make it possible for anyone to propose a scientific hypothesis and have it
-            tested rigorously&mdash;with statistical controls, covariate adjustments, and robustness
-            checks&mdash;in hours rather than months.
-          </p>
-          <p>
-            This isn&apos;t aspirational&mdash;it&apos;s happening. ExperiGen, the AI framework
-            powering {SITE_CONFIG.name}, is the first system to fully automate the scientific
-            discovery cycle: from raw data to hypothesis generation to rigorous experimental
-            validation. Across 10 diverse benchmarks, ExperiGen outperformed prior methods on 9,
-            generating 2&ndash;4&times; more statistically significant hypotheses with predictions
-            7&ndash;17% more accurate on unseen data. Its false discovery rate is below 5%, compared
-            to 20&ndash;25% for existing approaches.
-          </p>
-          <p>
-            Perhaps most remarkably, 40% of ExperiGen&apos;s hypotheses are genuinely
-            novel&mdash;absent from prior scientific literature. In expert review, senior professors
-            rated 88% as novel and 70% as research-worthy. In the ultimate validation, a real-world
-            A/B test with a Fortune 500 consumer brand saw a{" "}
-            <strong className="font-semibold text-stone-900">+344% uplift</strong> in sign-ups
-            (p&lt;10&#8315;&#8310;)&mdash;the first deployment of automatically generated hypotheses
-            with statistically significant causal impact.
+            tested rigorously in hours rather than months. We show this through our{" "}
+            <a
+              href="https://neurips.cc/virtual/2026/poster/149912"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline decoration-stone-400 underline-offset-2 hover:decoration-stone-600"
+            >
+              NeurIPS 2026 research
+            </a>
+            ,{" "}
+            <a
+              href={SITE_CONFIG.paperUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-stone-900 underline decoration-stone-400 underline-offset-2 hover:decoration-stone-600"
+            >
+              ExperiGen
+            </a>
+            , an AI framework that fully automates the scientific discovery cycle, from raw data to
+            hypothesis generation to rigorous experimental validation. ExperiGen produces
+            2&ndash;4&times; more statistically significant hypotheses than prior methods. These
+            hypotheses are 7&ndash;17% more accurate and have a false discovery rate below 5%,
+            compared to 20&ndash;25% for existing approaches. Experts found ExperiGen&apos;s
+            hypotheses to be novel, to show the rigor of a graduate student, and to be
+            research-worthy for themselves. We partnered with a Fortune 500 company and conducted an
+            A/B test with over 5 million users. This became the first instance of automatically
+            generated hypotheses having a statistically significant causal impact, with sign-ups
+            increasing by <strong className="font-semibold text-stone-900">344%</strong>.
           </p>
           <p>
             {SITE_CONFIG.name} makes this accessible to everyone. Submit a hypothesis about any
@@ -84,9 +93,18 @@ export default function AboutPage() {
         <h2 className="type-heading mb-6 text-stone-900">What You Can Do</h2>
         <div className="space-y-3">
           {[
-            "Submit a hypothesis about any domain where observational data exists\u2014from persuasion and memorability to behaviour and decision-making.",
-            "Watch the community evaluate it through head-to-head arena comparisons, voting on plausibility, impact, and novelty.",
-            "See AI agents test it against real datasets with rigorous statistical controls. If it holds up, it advances to pre-registered field experiments\u2014results published openly.",
+            <>
+              Submit a hypothesis about human behavior in any domain with a valid dataset, or{" "}
+              <Link
+                href="/data/submit"
+                className="font-semibold text-stone-900 underline decoration-stone-400 underline-offset-2 hover:decoration-stone-600"
+              >
+                propose your own dataset
+              </Link>
+              !
+            </>,
+            "Watch the community vote on your ideas through head-to-head arena comparisons.",
+            "See AI agents and humans test them against real datasets. We select strong ideas from researchers and submit pre-registered experiments, either citing their idea or collaborating with them on it.",
           ].map((text, i) => (
             <div key={i} className="flex gap-3">
               <span className="type-data mt-0.5 text-xs font-semibold text-stone-600">
@@ -101,24 +119,16 @@ export default function AboutPage() {
       {/* For Researchers */}
       <section className="border-t border-stone-100 py-10">
         <h2 className="type-heading mb-4 text-stone-900">For Researchers</h2>
-        <div className="space-y-4 text-base leading-relaxed text-stone-700">
-          <p>
-            {SITE_CONFIG.name} is a marketplace of community-validated, data-backed hypotheses.
-            Social scientists can browse ideas that have already passed statistical scrutiny,
-            discover their next research question, and commission field experiments.
-          </p>
-          <p>
-            Every hypothesis comes with full transparency: experimental design, statistical results,
-            effect sizes, confidence intervals, and reproducibility details. For computational
-            researchers, our open-source codebase provides a domain-agnostic foundation for
-            extending ExperiGen to new fields.
-          </p>
-        </div>
+        <p className="text-base leading-relaxed text-stone-700">
+          {SITE_CONFIG.name} is an open platform for researchers to look into ideas about human
+          behavior from around the world, get inspired by promising ideas that are supported by
+          real-world experiments, and share their own ideas and experiments.
+        </p>
       </section>
 
       {/* The Team */}
       <section className="border-t border-stone-100 py-10">
-        <h2 className="type-heading mb-6 text-stone-900">Principal Research Scientists</h2>
+        <h2 className="type-heading mb-6 text-stone-900">Meet the team!</h2>
         <div className="grid gap-6 sm:grid-cols-2">
           {PRINCIPAL_SCIENTISTS.map((m) => (
             <div
@@ -170,9 +180,8 @@ export default function AboutPage() {
       <section className="border-t border-stone-100 py-10">
         <h2 className="type-heading mb-4 text-stone-900">Open Science</h2>
         <p className="text-base leading-relaxed text-stone-700">
-          Every experiment on {SITE_CONFIG.name} is transparent and reproducible. We publish full
-          statistical procedures, code, and data. Our commitment: if a hypothesis is tested on this
-          platform, anyone can verify the results.
+          Every hypothesis submitted and every experiment conducted on {SITE_CONFIG.name} will be
+          transparent and publicly available.
         </p>
       </section>
 
@@ -181,17 +190,18 @@ export default function AboutPage() {
         <h2 className="type-heading mb-4 text-stone-900">Get Involved</h2>
         <div className="space-y-4 text-base leading-relaxed text-stone-700">
           <p>
-            We are actively looking for contributors to help build and maintain {SITE_CONFIG.name}.
-            We also welcome donations to ensure the platform remains accessible and operational.
+            We are actively looking for contributors to help build {SITE_CONFIG.name}. We also
+            welcome donations to ensure the platform remains accessible and operational.
           </p>
           <p>
-            For any inquiries, partnerships, or support, the primary contact for the team is:{" "}
+            For any inquiries, partnerships, or support, please reach out to us at{" "}
             <a
               href={`mailto:${SITE_CONFIG.contactEmail}`}
-              className="font-semibold text-stone-900 underline decoration-stone-400 underline-offset-2 hover:decoration-stone-600"
+              className="font-semibold whitespace-nowrap text-stone-900 underline decoration-stone-400 underline-offset-2 hover:decoration-stone-600"
             >
               {SITE_CONFIG.contactEmail}
             </a>
+            .
           </p>
         </div>
       </section>

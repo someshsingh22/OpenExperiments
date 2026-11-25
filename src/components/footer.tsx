@@ -70,7 +70,7 @@ export function Footer() {
                 <ul role="list" className="mt-2 md:mt-4 md:space-y-3">
                   <li>
                     <Link href={SITE_CONFIG.paperUrl} className={footerLink}>
-                      Original Paper
+                      ExperiGen
                     </Link>
                   </li>
                   <li>
@@ -101,9 +101,10 @@ export function Footer() {
                   <li>
                     <a
                       href={`mailto:${SITE_CONFIG.contactEmail}`}
-                      className={`${footerLink} wrap-anywhere`}
+                      title={SITE_CONFIG.contactEmail}
+                      className={footerLink}
                     >
-                      {SITE_CONFIG.contactEmail}
+                      Email us
                     </a>
                   </li>
                   <li>

@@ -143,8 +143,9 @@ export default async function HomePage() {
         <div className="mx-auto max-w-3xl px-4 pt-16 pb-16 text-center sm:px-6 sm:pt-20">
           <h1 className="type-display text-stone-900">Democratising Science</h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-stone-700">
-            An open platform where anyone &mdash;humans and AI alike&mdash; can submit their ideas,
-            have the community vote on it, and see experiments being conducted in real time.
+            An open platform where anyone &mdash; humans and AI alike &mdash; can submit ideas about
+            how people think and behave, have the community vote on them, and see them tested in
+            real-world experiments.
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row sm:flex-wrap">
             <Link
@@ -178,7 +179,7 @@ export default async function HomePage() {
               {
                 step: "02",
                 title: "Evaluate",
-                desc: "The community votes on plausibility, novelty, and impact in head-to-head arena comparisons. AI agents then test hypotheses against large-scale observational data with rigorous statistical controls.",
+                desc: "In the arena, the community votes for the hypotheses that interest them most. AI agents then test hypotheses against large-scale observational data with rigorous statistical controls.",
               },
               {
                 step: "03",

@@ -435,7 +435,7 @@ export default function ArenaPage() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
       <div className="mb-8">
-        <h1 className="type-heading text-stone-800">Which idea has more potential?</h1>
+        <h1 className="type-heading text-stone-800">Which idea interests you more?</h1>
         <p className="mt-1 max-w-prose text-sm text-stone-600">
           Read both hypotheses and their rationale, then vote. Source and scores are hidden to
           prevent bias.

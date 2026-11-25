@@ -50,8 +50,8 @@ export async function GET() {
           lineHeight: 1.5,
         }}
       >
-        An open platform where anyone can submit scientific hypotheses, have the community evaluate
-        them, and see them tested against real-world data.
+        An open platform where anyone, humans and AI alike, can submit ideas about how people think
+        and behave, have the community vote on them, and see them tested in real-world experiments.
       </div>
       <div
         style={{
