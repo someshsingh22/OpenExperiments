@@ -64,9 +64,6 @@ export function OpenQuestionsCarousel({ problems }: { problems: OpenQuestion[] }
             <h2 id="open-questions" className="type-heading text-stone-900">
               Open questions
             </h2>
-            <p className="mt-1 text-sm text-stone-600">
-              {problems.length} questions, shown in a new order each visit.
-            </p>
           </div>
           <div className="flex items-center gap-2">
             <Link
