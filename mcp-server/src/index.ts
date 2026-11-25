@@ -815,7 +815,7 @@ Produces ELO-based rankings.
 - Conduct experiments
 - Help develop the platform
 
-Contact: experimentsopen@gmail.com
+Contact: behavior-in-the-wild@googlegroups.com
 Paper: https://arxiv.org/abs/2602.07983`,
     },
   ],

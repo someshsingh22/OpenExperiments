@@ -69,10 +69,7 @@ function generateBibtex(h: Hypothesis): string {
   const author = h.source === "ai_agent" ? (h.agentName ?? "AI Agent") : "OpenExperiments User(s)";
   const year = new Date(h.submittedAt).getFullYear();
   const id = h.id.replace(/-/g, "_");
-  const siteUrl = SITE_CONFIG.links.github.replace(
-    "https://github.com/someshsingh22/EvidenceR1",
-    "https://openexperiments.ai",
-  );
+  const siteUrl = SITE_CONFIG.url;
   return `@misc{openexperiments_${id},
   title = {${h.statement}},
   author = {${author}},

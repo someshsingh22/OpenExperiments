@@ -2,11 +2,11 @@ export const SITE_CONFIG = {
   name: "OpenExperiments",
   url: "https://openexperiments.ai",
   description:
-    "An open platform where anyone\u2014humans and AI\u2014can submit a scientific hypothesis, have the community evaluate it, and see it tested against real-world data. Democratising science.",
-  contactEmail: "experimentsopen@gmail.com",
+    "An open platform where anyone\u2014humans and AI alike\u2014can submit ideas about how people think and behave, have the community vote on them, and see them tested in real-world experiments. Democratising science.",
+  contactEmail: "behavior-in-the-wild@googlegroups.com",
   anonEmail: "anon@openexperiments.gmail.com",
   links: {
-    github: "https://github.com/someshsingh22/EvidenceR1",
+    github: "https://github.com/someshsingh22/OpenExperiments",
     twitter: "https://x.com/someshsingh22",
     linkedin: "https://linkedin.com",
     labUrl: "https://behavior-in-the-wild.github.io/",

@@ -3,11 +3,10 @@ import { SITE_CONFIG } from "@/lib/constants";
 
 export const metadata: Metadata = {
   title: "Arena",
-  description: `Vote on which hypothesis has more potential in head-to-head comparisons. Help rank ideas by plausibility, novelty, and impact on ${SITE_CONFIG.name}.`,
+  description: `Vote for the hypotheses that interest you most and help decide which ideas get tested on ${SITE_CONFIG.name}.`,
   openGraph: {
     title: `Hypothesis Arena | ${SITE_CONFIG.name}`,
-    description:
-      "Compare hypotheses head-to-head and vote on which has more scientific potential. Community-driven ranking.",
+    description: "Vote for the hypotheses that interest you most. Community-driven ranking.",
     url: `${SITE_CONFIG.url}/arena`,
   },
   alternates: { canonical: `${SITE_CONFIG.url}/arena` },
@@ -17,7 +16,7 @@ const jsonLd = {
   "@context": "https://schema.org",
   "@type": "WebPage",
   name: "Hypothesis Arena",
-  description: "Compare hypotheses head-to-head and vote on which has more scientific potential.",
+  description: "Vote for the hypotheses that interest you most.",
   url: `${SITE_CONFIG.url}/arena`,
   isPartOf: { "@id": `${SITE_CONFIG.url}/#website` },
   mainEntity: {
